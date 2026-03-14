@@ -17,14 +17,6 @@
 pip install mybiout
 ```
 
-完成安装后, 打开Windows终端, 输入以下命令获取使用帮助:  
-
-```cmd
-man!
-```
-
-`man`即`manuscript`(参阅Linux的`man`命令): 手册.  
-
 使用以下命令(不区分大小写)启动系统:  
 
 ```cmd
@@ -32,7 +24,7 @@ MyBiOut!
 ```
 
 这将在本机的的`23333`端口启动服务. 你需要保持这个终端不关闭以维持服务的运行.  
-页面将在浏览器自动打开. 如果没有打开, 考虑手动访问:  
+页面将在浏览器自动打开. 如果没有打开, 考虑[手动访问](http://localhost:23333):  
 
 ```url
 http://localhost:23333
@@ -55,7 +47,9 @@ MyBiOut! --port 2026
 - [biliffm4s](https://github.com/Water-Run/-m4s-Python-biliffm4s/blob/master/biliffm4s/biliffm4s.py): 对`ffmpeg`的封装  
 - [BBDown](https://github.com/nilaoda/BBDown): 知名哔哩哔哩下载工具  
 
+> 项目仅可在Windows环境下运行  
+
 ## 测试
 
-- Windows 11
+- Windows 11, Fedora 43, Linux Mint 22
 - 小米13(Hyper OS 3), 一加8(原生Android 15)
