@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mybiout"
+version = "60314.0"
+description = "MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "WaterRun", email = "linzhuangrun49@gmail.com" }]
+maintainers = [{ name = "WaterRun", email = "linzhuangrun49@gmail.com" }]
+keywords = [
+    "bilibili",
+    "downloader",
+    "exporter",
+    "video",
+    "cache",
+    "markdown",
+    "bbdown",
+    "m4s",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "httpx>=0.27.0",
+    "biliffm4s>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "ruff>=0.1.0"]
+
+[project.scripts]
+"MyBiOut!" = "mybiout.main:main"
+
+[project.urls]
+Homepage = "https://github.com/Water-Run/MyBiOut"
+Repository = "https://github.com/Water-Run/MyBiOut.git"
+Issues = "https://github.com/Water-Run/MyBiOut/issues"
+
+[tool.hatch.build.targets.sdist]
+include = ["/mybiout"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["mybiout"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM", "PTH", "RUF"]
+ignore = ["E501", "B008", "SIM108"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mybiout"]

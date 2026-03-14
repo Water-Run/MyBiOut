@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200">
+    <title>MyBiOut!</title>
+    <link rel="icon" href="./assets/logo-fullres.png" type="image/png">
+    <style>
+        /* ========== RESET ========== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* ========== BODY / BG ========== */
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: url('./assets/bg.png') center center / cover no-repeat fixed;
+            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+            cursor: default;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ========== PAGE CONTAINER ========== */
+        .page {
+            width: 1200px;
+            height: 100vh;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* ========== LOGO (左上) ========== */
+        .logo {
+            position: absolute;
+            top: 36px;
+            left: 28px;
+        }
+
+        .logo img {
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            background: #fff;
+        }
+
+        @keyframes logo-shake {
+
+            0%,
+            100% {
+                transform: rotate(0)
+            }
+
+            20% {
+                transform: rotate(-4deg)
+            }
+
+            40% {
+                transform: rotate(4deg)
+            }
+
+            60% {
+                transform: rotate(-2deg)
+            }
+
+            80% {
+                transform: rotate(2deg)
+            }
+        }
+
+        .logo img:hover {
+            animation: logo-shake .4s ease;
+        }
+
+        /* ========== SETTINGS LINK (Logo下方) ========== */
+        .settings-link {
+            position: absolute;
+            top: 202px;
+            left: 32px;
+            font-size: 14px;
+            color: #E85B8A;
+            border-bottom: 2px dashed #E85B8A;
+            padding-bottom: 1px;
+            transition: color .2s, border-color .2s;
+        }
+
+        .settings-link:hover {
+            color: #F5A623;
+            border-color: #F5A623;
+        }
+
+        /* ========== GITHUB (右上) ========== */
+        .github-link {
+            position: absolute;
+            top: 36px;
+            right: 28px;
+            background: #F5A623;
+            color: #fff;
+            font-size: 15px;
+            font-weight: bold;
+            padding: 12px 24px;
+            border: 3px solid #d48b0e;
+            box-shadow: 5px 5px 0 #E85B8A;
+            transition: transform .12s, box-shadow .12s;
+            white-space: nowrap;
+        }
+
+        .github-link:hover {
+            transform: translate(3px, 3px);
+            box-shadow: 2px 2px 0 #E85B8A;
+        }
+
+        /* ========== CARDS (中间) ========== */
+        .cards {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            gap: 52px;
+        }
+
+        .card {
+            width: 272px;
+            height: 272px;
+            background: #fff;
+            border: 3px solid #F5A623;
+            box-shadow: 6px 6px 0 #E85B8A;
+            position: relative;
+            overflow: hidden;
+            display: block;
+            cursor: pointer;
+            transition: transform .12s, box-shadow .12s;
+        }
+
+        /* 每张卡片随意歪一点 */
+        .card:nth-child(1) {
+            transform: rotate(-1.5deg)
+        }
+
+        .card:nth-child(2) {
+            transform: rotate(0.8deg)
+        }
+
+        .card:nth-child(3) {
+            transform: rotate(-0.6deg)
+        }
+
+        .card:nth-child(1):hover {
+            transform: rotate(-1.5deg) translate(3px, 3px);
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .card:nth-child(2):hover {
+            transform: rotate(0.8deg) translate(3px, 3px);
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .card:nth-child(3):hover {
+            transform: rotate(-0.6deg) translate(3px, 3px);
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(232, 91, 138, .82);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity .2s;
+        }
+
+        .card:hover .card-overlay {
+            opacity: 1;
+        }
+
+        .card-overlay span {
+            color: #fff;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-shadow: 2px 2px 0 rgba(0, 0, 0, .12);
+        }
+
+        /* ========== MAN! (底部) ========== */
+        .man-link {
+            position: absolute;
+            bottom: 48px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 44px;
+            font-weight: 900;
+            color: #F5A623;
+            text-shadow: 3px 3px 0 #E85B8A;
+            letter-spacing: 6px;
+            transition: color .2s, text-shadow .2s;
+            white-space: nowrap;
+        }
+
+        .man-link .t-default {
+            display: inline;
+        }
+
+        .man-link .t-hover {
+            display: none;
+            font-size: 26px;
+            letter-spacing: 3px;
+        }
+
+        .man-link:hover .t-default {
+            display: none;
+        }
+
+        .man-link:hover .t-hover {
+            display: inline;
+        }
+
+        .man-link:hover {
+            color: #E85B8A;
+            text-shadow: 3px 3px 0 #F5A623;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+
+        <!-- LOGO -->
+        <div class="logo">
+            <img src="./assets/logo-fullres.png" alt="MyBiOut!">
+        </div>
+
+        <!-- 设置入口 -->
+        <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
+
+        <!-- GitHub -->
+        <a class="github-link" href="https://github.com/Water-Run/MyBiOut" target="_blank" rel="noopener">来仓库点 Star ⭐ 提交
+            Issue 🐛</a>
+
+        <!-- 三张功能卡片 -->
+        <div class="cards">
+            <a class="card" href="/localout">
+                <img src="./assets/localout.png" alt="本地缓存导出">
+                <div class="card-overlay"><span>本地缓存导出</span></div>
+            </a>
+            <a class="card" href="/bbdown">
+                <img src="./assets/bbdown.png" alt="BBDown">
+                <div class="card-overlay"><span>BBDown 下载</span></div>
+            </a>
+            <a class="card" href="/mdout">
+                <img src="./assets/mdout.png" alt="Markdown导出">
+                <div class="card-overlay"><span>Markdown 导出</span></div>
+            </a>
+        </div>
+
+        <!-- Man! -->
+        <a class="man-link" href="/man">
+            <span class="t-default">Man!</span>
+            <span class="t-hover">ManualScript 手册</span>
+        </a>
+
+    </div>
+</body>
+
+</html>
