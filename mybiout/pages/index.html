@@ -143,7 +143,6 @@
             transition: transform .12s, box-shadow .12s;
         }
 
-        /* 每张卡片随意歪一点 */
         .card:nth-child(1) {
             transform: rotate(-1.5deg)
         }
@@ -238,6 +237,105 @@
             color: #E85B8A;
             text-shadow: 3px 3px 0 #F5A623;
         }
+
+        /* ========== STAR ANIMATION OVERLAY ========== */
+        #star-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        #star-overlay.active {
+            display: block;
+        }
+
+        #star-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .overlay-card {
+            position: fixed;
+            background: #fff;
+            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+            font-weight: 900;
+            letter-spacing: 5px;
+            padding: 22px 58px;
+            font-size: 78px;
+            pointer-events: none;
+            opacity: 0;
+            white-space: nowrap;
+        }
+
+        #overlay-t1 {
+            color: #E85B8A;
+            text-shadow: 5px 5px 0 #F5A623;
+            border: 4px solid #F5A623;
+            box-shadow: 8px 8px 0 #E85B8A;
+            top: 30%;
+            left: 50%;
+        }
+
+        #overlay-t2 {
+            color: #F5A623;
+            text-shadow: 5px 5px 0 #E85B8A;
+            border: 4px solid #E85B8A;
+            box-shadow: 8px 8px 0 #F5A623;
+            top: 62%;
+            left: 50%;
+        }
+
+        .ch-pre {
+            display: inline-block;
+            opacity: 0;
+        }
+
+        @keyframes ch-pop {
+            0% {
+                transform: scale(0) rotate(20deg);
+                opacity: 0;
+            }
+
+            62% {
+                transform: scale(1.32) rotate(-6deg);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .ch-show {
+            display: inline-block;
+            animation: ch-pop .4s cubic-bezier(.34, 1.56, .64, 1) both;
+        }
+
+        #overlay-skip {
+            position: fixed;
+            bottom: 34px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 13px;
+            color: #E85B8A;
+            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+            border-bottom: 2px dashed #E85B8A;
+            padding-bottom: 2px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .5s;
+        }
+
+        #overlay-skip.show {
+            opacity: .65;
+        }
     </style>
 </head>
 
@@ -253,8 +351,8 @@
         <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
 
         <!-- GitHub -->
-        <a class="github-link" href="https://github.com/Water-Run/MyBiOut" target="_blank" rel="noopener">来仓库点 Star ⭐ 提交
-            Issue 🐛</a>
+        <a class="github-link" id="github-btn" href="https://github.com/Water-Run/MyBiOut" target="_blank"
+            rel="noopener">来仓库点 Star ⭐ 提交 Issue 🐛</a>
 
         <!-- 三张功能卡片 -->
         <div class="cards">
@@ -279,6 +377,321 @@
         </a>
 
     </div>
+
+    <!-- ========== STAR ANIMATION OVERLAY ========== -->
+    <div id="star-overlay" onclick="skipStarAnim()">
+        <canvas id="star-canvas"></canvas>
+        <div id="overlay-t1" class="overlay-card"></div>
+        <div id="overlay-t2" class="overlay-card"></div>
+        <div id="overlay-skip">点击跳过</div>
+    </div>
+
+    <script>
+        (function () {
+            /* ---- constants ---- */
+            const O = '#F5A623', P = '#E85B8A';
+
+            /* ---- elements ---- */
+            const ov = document.getElementById('star-overlay');
+            const cv = document.getElementById('star-canvas');
+            const cx2d = cv.getContext('2d');
+            const t1 = document.getElementById('overlay-t1');
+            const t2 = document.getElementById('overlay-t2');
+            const sk = document.getElementById('overlay-skip');
+            const btn = document.getElementById('github-btn');
+
+            /* ---- state ---- */
+            let parts = [], rafId = null, alive = false;
+            let loopT0 = null, showOrbit = false;
+            let doFade = false, fadeT0 = 0;
+            let _tids = [], _ivids = [];
+
+            const tm = (f, d) => _tids.push(setTimeout(f, d));
+            const iv = (f, d) => { const id = setInterval(f, d); _ivids.push(id); };
+            function clearAll() {
+                _tids.forEach(clearTimeout); _tids = [];
+                _ivids.forEach(clearInterval); _ivids = [];
+            }
+
+            /* ---- canvas ---- */
+            function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+
+            /* ---- draw 5-pointed star ---- */
+            function dstar(x, y, r, rot, col, a) {
+                if (a < .012) return;
+                cx2d.save();
+                cx2d.globalAlpha = Math.min(1, a);
+                cx2d.translate(x, y); cx2d.rotate(rot);
+                cx2d.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const ao = i * 2 * Math.PI / 5 - Math.PI / 2;
+                    const ai = ao + Math.PI / 5;
+                    i ? cx2d.lineTo(Math.cos(ao) * r, Math.sin(ao) * r)
+                        : cx2d.moveTo(Math.cos(ao) * r, Math.sin(ao) * r);
+                    cx2d.lineTo(Math.cos(ai) * r * .4, Math.sin(ai) * r * .4);
+                }
+                cx2d.closePath(); cx2d.fillStyle = col; cx2d.fill();
+                cx2d.restore();
+            }
+
+            /* ---- particle: burst star ---- */
+            class Burst {
+                constructor(px, py, big) {
+                    const a = Math.random() * Math.PI * 2;
+                    const s = big ? Math.random() * 15 + 5 : Math.random() * 9 + 2;
+                    this.x = px; this.y = py;
+                    this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
+                    this.sz = big ? Math.random() * 24 + 10 : Math.random() * 13 + 5;
+                    this.c = Math.random() > .5 ? O : P;
+                    this.r = Math.random() * Math.PI * 2;
+                    this.rv = (Math.random() - .5) * .32;
+                    this.life = 1;
+                    this.dc = big ? .006 + Math.random() * .009 : .009 + Math.random() * .014;
+                    this.g = .2;
+                }
+                step() {
+                    this.x += this.vx; this.y += this.vy;
+                    this.vy += this.g; this.vx *= .99;
+                    this.r += this.rv; this.life -= this.dc;
+                    return this.life > 0;
+                }
+                draw() { dstar(this.x, this.y, this.sz, this.r, this.c, this.life); }
+            }
+
+            /* ---- particle: falling rain star ---- */
+            class Rain {
+                constructor() {
+                    this.x = Math.random() * innerWidth;
+                    this.y = -Math.random() * 70 - 10;
+                    this.vy = Math.random() * 3.2 + 1.4;
+                    this.vx = (Math.random() - .5) * 1.6;
+                    this.sz = Math.random() * 14 + 5;
+                    this.c = Math.random() > .5 ? O : P;
+                    this.r = Math.random() * Math.PI * 2;
+                    this.rv = (Math.random() - .5) * .07;
+                    this.al = Math.random() * .5 + .5;
+                }
+                step() { this.x += this.vx; this.y += this.vy; this.r += this.rv; return this.y < innerHeight + 30; }
+                draw() { dstar(this.x, this.y, this.sz, this.r, this.c, this.al); }
+            }
+
+            /* ---- particle: shooting star with trail ---- */
+            class Shoot {
+                constructor() {
+                    const a = Math.PI * (.07 + Math.random() * .22);
+                    const s = Math.random() * 11 + 8;
+                    this.x = Math.random() * innerWidth * .5;
+                    this.y = Math.random() * innerHeight * .42;
+                    this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
+                    this.sz = Math.random() * 11 + 5;
+                    this.c = Math.random() > .5 ? O : P;
+                    this.r = 0; this.trail = []; this.life = 1; this.dc = .022;
+                }
+                step() {
+                    this.trail.push({ x: this.x, y: this.y });
+                    if (this.trail.length > 20) this.trail.shift();
+                    this.x += this.vx; this.y += this.vy;
+                    this.r += .19; this.life -= this.dc;
+                    return this.life > 0 && this.x < innerWidth + 60;
+                }
+                draw() {
+                    this.trail.forEach((p, i) => {
+                        const t = i / this.trail.length;
+                        dstar(p.x, p.y, this.sz * t * .75, this.r, this.c, t * this.life * .45);
+                    });
+                    dstar(this.x, this.y, this.sz, this.r, this.c, this.life);
+                }
+            }
+
+            /* ---- helpers ---- */
+            function burst(px, py, n, big) { for (let i = 0; i < n; i++) parts.push(new Burst(px, py, big)); }
+
+            function drawOrbits(elapsed) {
+                const ocx = innerWidth / 2, ocy = innerHeight * .62;
+                const rings = [
+                    { r: 210, sp: 1.35, n: 5, cols: [O, P, O, P, O], ys: .32 },
+                    { r: 272, sp: -.85, n: 4, cols: [P, O, P, O], ys: .26 },
+                ];
+                rings.forEach(({ r, sp, n, cols, ys }) => {
+                    for (let i = 0; i < n; i++) {
+                        const a = elapsed * sp + i * 2 * Math.PI / n;
+                        const sz = 12 + Math.sin(elapsed * 2.5 + i * 1.3) * 3;
+                        dstar(ocx + Math.cos(a) * r, ocy + Math.sin(a) * r * ys, sz, a * 2.1, cols[i % cols.length], .88);
+                    }
+                });
+            }
+
+            /* ---- char-by-char reveal ---- */
+            function revealChars(el, text, onDone) {
+                el.innerHTML = [...text].map(ch => `<span class="ch-pre">${ch}</span>`).join('');
+                const spans = [...el.children];
+                spans.forEach((sp, i) => {
+                    tm(() => {
+                        sp.className = 'ch-show';
+                        const rc = sp.getBoundingClientRect();
+                        const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
+                        burst(cx, cy, 12, false);
+                        if (i === spans.length - 1) tm(() => burst(cx, cy, 40, true), 85);
+                    }, i * 170);
+                });
+                tm(onDone, spans.length * 170 + 210);
+            }
+
+            /* ---- Web Animations API wrappers ---- */
+            function slideFromLeft(el, onDone) {
+                const rot = 'rotate(-2deg)';
+                const anim = el.animate([
+                    { transform: `translate(-230%, -50%) ${rot}`, opacity: 0 },
+                    { transform: `translate(-44%, -50%) ${rot}`, opacity: 1, offset: .64 },
+                    { transform: `translate(-53%, -50%) ${rot}`, offset: .82 },
+                    { transform: `translate(-50%, -50%) ${rot}`, opacity: 1 }
+                ], { duration: 660, easing: 'ease-out', fill: 'forwards' });
+                anim.onfinish = () => {
+                    el.style.opacity = '1';
+                    el.style.transform = `translate(-50%, -50%) ${rot}`;
+                    anim.cancel();
+                    onDone();
+                };
+            }
+
+            function dropFromTop(el, onDone) {
+                const rot = 'rotate(1.5deg)';
+                const anim = el.animate([
+                    { transform: `translate(-50%, -900%) ${rot} scale(.45)`, opacity: 0 },
+                    { transform: `translate(-50%, -44%) ${rot} scale(1.1)`, opacity: 1, offset: .64 },
+                    { transform: `translate(-50%, -54%) ${rot} scale(.96)`, offset: .82 },
+                    { transform: `translate(-50%, -50%) ${rot} scale(1)`, opacity: 1 }
+                ], { duration: 700, easing: 'ease-out', fill: 'forwards' });
+                anim.onfinish = () => {
+                    el.style.opacity = '1';
+                    el.style.transform = `translate(-50%, -50%) ${rot}`;
+                    anim.cancel();
+                    onDone();
+                };
+            }
+
+            function startFloat(el, rotDeg) {
+                const rot = `rotate(${rotDeg}deg)`;
+                el.animate([
+                    { transform: `translate(-50%, -50%) ${rot}` },
+                    { transform: `translate(-50%, -55%) ${rot}` },
+                    { transform: `translate(-50%, -50%) ${rot}` }
+                ], { duration: 2400, iterations: Infinity, easing: 'ease-in-out' });
+            }
+
+            /* ---- animation loop ---- */
+            function loop(ts) {
+                if (!alive) return;
+                if (!loopT0) loopT0 = ts;
+                const elapsed = (ts - loopT0) / 1000;
+
+                cx2d.clearRect(0, 0, cv.width, cv.height);
+                parts = parts.filter(p => { const ok = p.step(); if (ok) p.draw(); return ok; });
+                if (showOrbit) drawOrbits(elapsed);
+
+                if (doFade) {
+                    const ft = (ts - fadeT0) / 620;
+                    const a = Math.max(0, 1 - ft);
+                    ov.style.opacity = a;
+                    if (a <= 0) { endAnim(); return; }
+                }
+
+                rafId = requestAnimationFrame(loop);
+            }
+
+            /* ---- play / end ---- */
+            function playAnim() {
+                if (alive) return;
+                alive = true; parts = []; showOrbit = false; doFade = false; loopT0 = null;
+                resize();
+
+                /* show overlay: fade in via opacity transition */
+                ov.classList.add('active');
+                ov.style.background = 'rgba(255,255,255,.96)';
+                ov.style.opacity = '0';
+                ov.style.transition = 'opacity .38s ease';
+                t1.style.opacity = '0'; t1.style.transform = '';
+                t2.style.opacity = '0'; t2.style.transform = '';
+                t1.innerHTML = ''; t2.innerHTML = '';
+
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    ov.style.opacity = '1';
+                }));
+
+                const vcx = innerWidth / 2, vcy = innerHeight / 2;
+
+                /* initial big burst */
+                tm(() => burst(vcx, vcy, 75, true), 55);
+                tm(() => burst(vcx, vcy * .44, 28, false), 310);
+
+                /* text1: 听我说 */
+                tm(() => {
+                    slideFromLeft(t1, () => {
+                        revealChars(t1, '听我说', () => startFloat(t1, -2));
+                    });
+                }, 530);
+
+                /* rain starts */
+                tm(() => iv(() => { for (let i = 0; i < 6; i++) parts.push(new Rain()); }, 175), 880);
+
+                /* text2: 谢谢你 */
+                tm(() => {
+                    dropFromTop(t2, () => {
+                        revealChars(t2, '谢谢你', () => startFloat(t2, 1.5));
+                    });
+                }, 1940);
+
+                /* shooting stars + orbits */
+                tm(() => {
+                    showOrbit = true;
+                    iv(() => parts.push(new Shoot()), 560);
+                }, 2560);
+
+                /* skip hint */
+                tm(() => sk.classList.add('show'), 1150);
+
+                /* begin fade-out */
+                tm(() => {
+                    clearAll();
+                    ov.style.transition = 'none';
+                    doFade = true;
+                    fadeT0 = performance.now();
+                    sk.classList.remove('show');
+                }, 4900);
+
+                rafId = requestAnimationFrame(loop);
+            }
+
+            function endAnim() {
+                alive = false;
+                clearAll();
+                parts = []; showOrbit = false; doFade = false;
+                [t1, t2].forEach(el => {
+                    el.getAnimations().forEach(a => a.cancel());
+                    el.innerHTML = '';
+                    el.style.opacity = '0';
+                    el.style.transform = '';
+                });
+                ov.classList.remove('active');
+                ov.style.opacity = '';
+                ov.style.background = '';
+                ov.style.transition = '';
+                sk.classList.remove('show');
+                if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+                loopT0 = null;
+            }
+
+            /* ---- exposed skip function ---- */
+            window.skipStarAnim = function () { if (alive) endAnim(); };
+
+            /* ---- intercept GitHub button ---- */
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                window.open(this.href, '_blank');
+                playAnim();
+            });
+        })();
+    </script>
 </body>
 
 </html>
