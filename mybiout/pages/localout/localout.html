@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200">
+    <title>LocalOut! — MyBiOut!</title>
+    <link rel="icon" href="/assets/logo-fullres.png" type="image/png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #E85B8A;
+            border-radius: 3px;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: url('/assets/bg.png') center center / cover no-repeat fixed;
+            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+            cursor: default;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== Canvas BG ===== */
+        #bg-cv {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ===== PAGE ===== */
+        .page {
+            position: relative;
+            z-index: 1;
+            width: 1200px;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            padding: 18px 20px 14px;
+        }
+
+        /* ===== HEADER ===== */
+        .hdr {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+
+        .back {
+            background: #E85B8A;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 18px;
+            border: 3px solid #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+            transition: transform .12s, box-shadow .12s;
+        }
+
+        .back:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        .hdr h1 {
+            font-size: 32px;
+            font-weight: 900;
+            color: #F5A623;
+            text-shadow: 3px 3px 0 #E85B8A;
+            transform: rotate(-0.6deg);
+        }
+
+        .hdr-stats {
+            margin-left: auto;
+            font-size: 13px;
+            font-weight: 700;
+            color: #E85B8A;
+            display: flex;
+            gap: 16px;
+        }
+
+        .hdr-stats span {
+            color: #F5A623;
+        }
+
+        /* ===== COLUMNS ===== */
+        .cols {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            min-height: 0;
+        }
+
+        .col {
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform .22s;
+        }
+
+        .col:hover {
+            transform: rotate(0deg) !important;
+        }
+
+        .col:nth-child(1) {
+            transform: rotate(-0.4deg);
+        }
+
+        .col:nth-child(2) {
+            transform: rotate(0.25deg);
+        }
+
+        .col:nth-child(3) {
+            transform: rotate(-0.3deg);
+        }
+
+        /* Column Header */
+        .col-hd {
+            padding: 12px 14px 8px;
+            border-bottom: 3px dashed #F5A623;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .col-hd h2 {
+            font-size: 17px;
+            font-weight: 900;
+            color: #E85B8A;
+            white-space: nowrap;
+        }
+
+        .col-hd .badge {
+            background: #F5A623;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 0;
+            border: 2px solid #d48b0e;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .col-hd-right {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        /* Scan indicator */
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .scan-spin {
+            display: inline-block;
+            font-size: 15px;
+            animation: spin 1.5s linear infinite;
+        }
+
+        .scan-spin.hidden {
+            display: none;
+        }
+
+        /* Search */
+        .col-search {
+            padding: 8px 12px;
+            flex-shrink: 0;
+        }
+
+        .col-search input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 2px solid #F5A623;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            background: #fff;
+            transition: border-color .2s;
+        }
+
+        .col-search input:focus {
+            border-color: #E85B8A;
+        }
+
+        /* Card list */
+        .card-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 12px;
+        }
+
+        /* Card */
+        .card {
+            background: #fff;
+            border: 2px solid #eee;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            position: relative;
+            transition: border-color .18s, box-shadow .18s, transform .18s, background .18s;
+            border-left: 4px solid #ccc;
+        }
+
+        .card:hover {
+            transform: translateX(3px);
+            box-shadow: 0 3px 10px rgba(232, 91, 138, .15);
+            border-color: #F5A623;
+        }
+
+        .card.sel {
+            background: rgba(245, 166, 35, .06);
+            border-color: #E85B8A;
+            border-left-color: #E85B8A !important;
+        }
+
+        .card.sel::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            border: 10px solid transparent;
+            border-top-color: #E85B8A;
+            border-right-color: #E85B8A;
+        }
+
+        .card-pc {
+            border-left-color: #8e44ad;
+        }
+
+        .card-local {
+            border-left-color: #2980b9;
+        }
+
+        .card-android_adb {
+            border-left-color: #27ae60;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 3px;
+        }
+
+        .card-meta {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.6;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .card-meta b {
+            color: #E85B8A;
+            font-weight: 600;
+        }
+
+        .card-src-tag {
+            display: inline-block;
+            font-size: 10px;
+            padding: 1px 6px;
+            background: #F5A623;
+            color: #fff;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .card-status {
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 4px;
+            padding: 2px 6px;
+            display: inline-block;
+        }
+
+        .card-status.queued {
+            background: #f0f0f0;
+            color: #888;
+        }
+
+        .card-status.exporting {
+            background: linear-gradient(90deg, #E85B8A, #F5A623, #E85B8A);
+            background-size: 200% auto;
+            color: #fff;
+            animation: shimmer 1.5s linear infinite;
+        }
+
+        .card-status.success {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .card-status.failed {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 0% center;
+            }
+
+            100% {
+                background-position: 200% center;
+            }
+        }
+
+        /* Column Footer */
+        .col-ft {
+            padding: 8px 12px;
+            border-top: 2px solid rgba(245, 166, 35, .2);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 2px solid;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: transform .1s, box-shadow .1s, opacity .2s;
+        }
+
+        .btn:active {
+            transform: translate(1px, 1px) !important;
+        }
+
+        .btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .btn-pk {
+            background: #E85B8A;
+            color: #fff;
+            border-color: #c44876;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .btn-or {
+            background: #F5A623;
+            color: #fff;
+            border-color: #d48b0e;
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .btn-gh {
+            background: transparent;
+            color: #E85B8A;
+            border-color: #E85B8A;
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        .btn-gn {
+            background: #27ae60;
+            color: #fff;
+            border-color: #1e8449;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .btn-dn {
+            background: #e74c3c;
+            color: #fff;
+            border-color: #c0392b;
+            box-shadow: 3px 3px 0 #888;
+        }
+
+        /* Dropdown */
+        .dd {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dd-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 100;
+            background: #fff;
+            border: 2px solid #F5A623;
+            box-shadow: 4px 4px 0 #E85B8A;
+            min-width: 220px;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .dd-menu.open {
+            display: block;
+        }
+
+        .dd-item {
+            padding: 8px 14px;
+            font-size: 13px;
+            color: #333;
+            cursor: pointer;
+            border-bottom: 1px solid #f5f5f5;
+            transition: background .12s;
+        }
+
+        .dd-item:hover {
+            background: rgba(245, 166, 35, .12);
+            color: #E85B8A;
+        }
+
+        .dd-item:last-child {
+            border-bottom: none;
+        }
+
+        .dd-item .dd-sub {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        /* ===== LOG BAR ===== */
+        .logbar {
+            flex-shrink: 0;
+            height: 120px;
+            margin-top: 12px;
+            display: flex;
+            gap: 14px;
+            background: rgba(30, 30, 40, .88);
+            backdrop-filter: blur(8px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            padding: 10px 16px;
+            overflow: hidden;
+        }
+
+        .log-msgs {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.7;
+            font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+        }
+
+        .log-msgs::-webkit-scrollbar-thumb {
+            background: #F5A623;
+        }
+
+        .lm {
+            opacity: 0;
+            animation: logIn .3s ease-out forwards;
+        }
+
+        @keyframes logIn {
+            from {
+                opacity: 0;
+                transform: translateX(-12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .lm-time {
+            color: #666;
+        }
+
+        .lm-info {
+            color: #F5A623;
+        }
+
+        .lm-success {
+            color: #2ecc71;
+        }
+
+        .lm-warn {
+            color: #f39c12;
+        }
+
+        .lm-error {
+            color: #e74c3c;
+        }
+
+        .log-right {
+            width: 180px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prog-bar {
+            width: 100%;
+            height: 18px;
+            background: #333;
+            border: 2px solid #F5A623;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .prog-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #E85B8A, #F5A623, #E85B8A);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s linear infinite;
+            transition: width .3s ease;
+        }
+
+        .prog-text {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, .5);
+        }
+
+        .log-label {
+            font-size: 11px;
+            color: #888;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            padding: 10px 22px;
+            background: #F5A623;
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+            border: 3px solid #d48b0e;
+            box-shadow: 4px 4px 0 #E85B8A;
+            z-index: 9000;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity .25s, transform .25s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.err {
+            background: #E85B8A;
+            border-color: #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+        }
+
+        /* ===== EMPTY ===== */
+        .empty-hint {
+            text-align: center;
+            padding: 40px 10px;
+            color: #ccc;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .empty-hint .em-icon {
+            font-size: 38px;
+            display: block;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-cv"></canvas>
+    <div class="page">
+        <!-- HEADER -->
+        <div class="hdr">
+            <a class="back" href="/">← 首页</a>
+            <h1>LocalOut!</h1>
+            <div class="hdr-stats">
+                <div>源 <span id="st-src">0</span></div>
+                <div>任务 <span id="st-task">0</span></div>
+                <div>完成 <span id="st-done">0</span></div>
+            </div>
+        </div>
+
+        <!-- COLUMNS -->
+        <div class="cols">
+            <!-- SOURCE -->
+            <div class="col">
+                <div class="col-hd">
+                    <h2>🔍 源</h2>
+                    <div class="badge" id="badge-src">0</div>
+                    <span class="scan-spin hidden" id="scan-spin">✦</span>
+                    <div class="col-hd-right">
+                        <div class="dd">
+                            <button class="btn btn-or" id="btn-add-src" onclick="toggleDD()">添加源 ▼</button>
+                            <div class="dd-menu" id="dd-menu"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-search"><input placeholder="搜索标题 / UP主 / BV号..." id="src-search"></div>
+                <div class="card-list" id="src-cards"></div>
+                <div class="col-ft">
+                    <button class="btn btn-gh" onclick="selAll('src')">全选</button>
+                    <button class="btn btn-gh" onclick="selNone('src')">取消</button>
+                    <button class="btn btn-gh" onclick="clearSrc()">清空</button>
+                    <button class="btn btn-pk" onclick="toTasks()" style="margin-left:auto">→ 添加到任务</button>
+                </div>
+            </div>
+
+            <!-- TASKS -->
+            <div class="col">
+                <div class="col-hd">
+                    <h2>📋 任务</h2>
+                    <div class="badge" id="badge-task">0</div>
+                    <div class="col-hd-right">
+                        <button class="btn btn-dn btn-sm" id="btn-cancel-exp" onclick="cancelExport()"
+                            style="display:none">取消导出</button>
+                    </div>
+                </div>
+                <div class="col-search"><input placeholder="搜索..." id="task-search"></div>
+                <div class="card-list" id="task-cards"></div>
+                <div class="col-ft">
+                    <button class="btn btn-gh" onclick="selAll('task')">全选</button>
+                    <button class="btn btn-gh" onclick="selNone('task')">取消</button>
+                    <button class="btn btn-gh" onclick="clearTasks()">清空</button>
+                    <button class="btn btn-gn" onclick="startExport()" style="margin-left:auto" id="btn-export">▶
+                        开始导出</button>
+                </div>
+            </div>
+
+            <!-- COMPLETED -->
+            <div class="col">
+                <div class="col-hd">
+                    <h2>✅ 完成</h2>
+                    <div class="badge" id="badge-done">0</div>
+                </div>
+                <div class="col-search"><input placeholder="搜索..." id="done-search"></div>
+                <div class="card-list" id="done-cards"></div>
+                <div class="col-ft">
+                    <button class="btn btn-gh" onclick="clearDone()">清空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOG BAR -->
+        <div class="logbar">
+            <div class="log-msgs" id="log-msgs"></div>
+            <div class="log-right">
+                <div class="log-label" id="prog-label">就绪</div>
+                <div class="prog-bar">
+                    <div class="prog-fill" id="prog-fill"></div>
+                    <div class="prog-text" id="prog-text">0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        (function () {
+            /* ===== GLOBALS ===== */
+            const selSrc = new Set(), selTask = new Set();
+            let prevLogLen = 0, ddOpen = false, polling = null;
+
+            /* ===== TOAST ===== */
+            let _tt = null;
+            function toast(msg, err) {
+                const el = $('toast');
+                if (_tt) clearTimeout(_tt);
+                el.textContent = msg;
+                el.className = 'toast show' + (err ? ' err' : '');
+                _tt = setTimeout(() => { el.className = 'toast'; }, 2200);
+            }
+
+            /* ===== HELPERS ===== */
+            const $ = id => document.getElementById(id);
+            function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+            /* ===== DROPDOWN ===== */
+            async function toggleDD() {
+                if (ddOpen) { closeDD(); return; }
+                const menu = $('dd-menu');
+                menu.innerHTML = '<div class="dd-item" style="color:#aaa">加载中...</div>';
+                menu.classList.add('open');
+                ddOpen = true;
+                try {
+                    const r = await fetch('/api/localout/available-sources');
+                    const srcs = await r.json();
+                    menu.innerHTML = srcs.map(s => {
+                        if (s.type === 'browse') {
+                            return `<div class="dd-item" onclick="doBrowse()">${escH(s.label)}</div>`;
+                        }
+                        return `<div class="dd-item" onclick="doAddSource('${escH(s.type)}','${escH(s.path || '')}','${escH(s.label)}','${escH(s.serial || '')}','${escH(s.package || '')}')">
+                        ${escH(s.label)}
+                        ${s.path ? '<div class="dd-sub">' + escH(s.path) + '</div>' : ''}
+                    </div>`;
+                    }).join('');
+                } catch (e) { menu.innerHTML = '<div class="dd-item" style="color:#e74c3c">加载失败</div>'; }
+            }
+            function closeDD() { $('dd-menu').classList.remove('open'); ddOpen = false; }
+            document.addEventListener('click', e => {
+                if (ddOpen && !e.target.closest('.dd')) closeDD();
+            });
+            window.toggleDD = toggleDD;
+
+            async function doBrowse() {
+                closeDD();
+                toast('请在弹出的窗口中选择目录');
+                const r = await (await fetch('/api/localout/browse-local', { method: 'POST' })).json();
+                if (r.ok && r.path) {
+                    doAddSource('local', r.path, '本地: ' + r.path, '', '');
+                }
+            }
+            window.doBrowse = doBrowse;
+
+            async function doAddSource(type, path, label, serial, pkg) {
+                closeDD();
+                const r = await (await fetch('/api/localout/add-source', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source_type: type, path: path, label: label, serial: serial, package: pkg })
+                })).json();
+                if (!r.ok) toast(r.error || '添加失败', true);
+            }
+            window.doAddSource = doAddSource;
+
+            /* ===== SCAN CONTROLS ===== */
+            window.pauseScan = () => fetch('/api/localout/pause-scan', { method: 'POST' });
+            window.resumeScan = () => fetch('/api/localout/resume-scan', { method: 'POST' });
+            window.cancelScan = () => fetch('/api/localout/cancel-scan', { method: 'POST' });
+
+            /* ===== CARD RENDERING ===== */
+            function cardHtml(c, col) {
+                const selSet = col === 'src' ? selSrc : col === 'task' ? selTask : null;
+                const isSel = selSet ? selSet.has(c.id) : false;
+                const typeClass = 'card-' + (c.source_type || 'local');
+                let statusHtml = '';
+                if (col === 'task' && c.status) {
+                    const labels = { queued: '排队中', exporting: '导出中...', failed: '失败' };
+                    if (c.status !== 'success' && labels[c.status]) {
+                        statusHtml = `<div class="card-status ${c.status}">${labels[c.status]}${c.status === 'failed' && c.error ? ': ' + escH(c.error) : ''}</div>`;
+                    }
+                }
+                if (col === 'done') {
+                    statusHtml = '<div class="card-status success">✓ 完成</div>';
+                }
+                return `<div class="card ${typeClass} ${isSel ? 'sel' : ''}" data-id="${c.id}" onclick="toggleCard('${col}','${c.id}')">
+                <div class="card-title">${escH(c.title || c.folder_name || '未知视频')}</div>
+                <div class="card-meta"><b>${escH(c.up_name || '—')}</b> · ${escH(c.quality || '—')} · ${c.size_mb || 0}MB</div>
+                <div class="card-meta">${escH(c.bvid || (c.avid ? 'av' + c.avid : ''))}${c.part > 1 ? ' · P' + c.part : ''}${c.resolution ? ' · ' + escH(c.resolution) : ''}${c.publish_time ? ' · ' + escH(c.publish_time) : ''}</div>
+                ${c.source_label && col !== 'src' ? '<div class="card-src-tag">' + escH(c.source_label) + '</div>' : ''}
+                ${statusHtml}
+            </div>`;
+            }
+
+            function renderCol(col, cards) {
+                const containerId = col + '-cards';
+                const searchId = col + '-search';
+                const container = $(containerId);
+                const q = $(searchId).value.toLowerCase();
+                const filtered = q ? cards.filter(c =>
+                    (c.title || '').toLowerCase().includes(q) ||
+                    (c.up_name || '').toLowerCase().includes(q) ||
+                    (c.bvid || '').toLowerCase().includes(q) ||
+                    (c.folder_name || '').toLowerCase().includes(q)
+                ) : cards;
+
+                const html = filtered.length
+                    ? filtered.map(c => cardHtml(c, col)).join('')
+                    : `<div class="empty-hint"><span class="em-icon">${col === 'src' ? '📂' : col === 'task' ? '📋' : '🎉'}</span>${col === 'src' ? '点击上方「添加源」开始' : col === 'task' ? '从源栏添加视频到这里' : '导出完成的视频将出现在这里'}</div>`;
+
+                if (container._lh !== html) {
+                    const st = container.scrollTop;
+                    container.innerHTML = html;
+                    container.scrollTop = st;
+                    container._lh = html;
+                }
+            }
+
+            window.toggleCard = function (col, id) {
+                const s = col === 'src' ? selSrc : col === 'task' ? selTask : null;
+                if (!s) return;
+                s.has(id) ? s.delete(id) : s.add(id);
+                poll(); // force re-render
+            };
+
+            /* ===== SELECTION ===== */
+            window.selAll = function (col) {
+                const s = col === 'src' ? selSrc : selTask;
+                const cards = col === 'src' ? _lastState?.source_cards : _lastState?.task_cards;
+                if (!cards) return;
+                cards.forEach(c => s.add(c.id));
+                poll();
+            };
+            window.selNone = function (col) {
+                const s = col === 'src' ? selSrc : selTask;
+                s.clear();
+                poll();
+            };
+
+            /* ===== ACTIONS ===== */
+            window.toTasks = async function () {
+                const ids = [...selSrc];
+                if (!ids.length) { toast('请先在源栏选择视频', true); return; }
+                const r = await (await fetch('/api/localout/add-to-tasks', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_ids: ids })
+                })).json();
+                if (r.ok) { selSrc.clear(); toast(`已添加 ${r.added} 个视频到任务`); }
+            };
+
+            window.startExport = async function () {
+                const ids = [...selTask];
+                const r = await (await fetch('/api/localout/start-export', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_ids: ids.length ? ids : [] })
+                })).json();
+                if (!r.ok) toast(r.error || '无法导出', true);
+                else { selTask.clear(); toast('导出已开始'); }
+            };
+
+            window.cancelExport = async function () {
+                await fetch('/api/localout/cancel-export', { method: 'POST' });
+            };
+
+            window.clearSrc = async function () {
+                await fetch('/api/localout/clear-source', { method: 'POST' });
+                selSrc.clear();
+            };
+            window.clearTasks = async function () {
+                await fetch('/api/localout/clear-tasks', { method: 'POST' });
+                selTask.clear();
+            };
+            window.clearDone = async function () {
+                await fetch('/api/localout/clear-completed', { method: 'POST' });
+            };
+
+            /* ===== LOG RENDERING ===== */
+            function renderLogs(logs) {
+                if (logs.length === prevLogLen) return;
+                const el = $('log-msgs');
+                const newLogs = logs.slice(prevLogLen);
+                prevLogLen = logs.length;
+                newLogs.forEach(l => {
+                    const d = document.createElement('div');
+                    d.className = 'lm';
+                    d.innerHTML = `<span class="lm-time">[${escH(l.time)}]</span> <span class="lm-${l.level}">${escH(l.msg)}</span>`;
+                    el.appendChild(d);
+                });
+                el.scrollTop = el.scrollHeight;
+            }
+
+            /* ===== PROGRESS ===== */
+            function updateProgress(s) {
+                let pct = 0, label = '就绪';
+                if (s.scan_status === 'scanning' || s.scan_status === 'paused') {
+                    pct = s.scan_progress * 100;
+                    label = s.scan_status === 'paused' ? '扫描暂停' : '扫描中...';
+                }
+                if (s.export_status === 'exporting') {
+                    pct = s.export_progress * 100;
+                    label = `导出 ${s.export_done}/${s.export_total}`;
+                }
+                $('prog-fill').style.width = pct + '%';
+                $('prog-text').textContent = Math.round(pct) + '%';
+                $('prog-label').textContent = label;
+
+                const spinning = s.scan_status === 'scanning';
+                $('scan-spin').classList.toggle('hidden', !spinning);
+                $('btn-add-src').disabled = s.scan_status !== 'idle';
+                $('btn-export').disabled = s.export_status === 'exporting';
+                $('btn-cancel-exp').style.display = s.export_status === 'exporting' ? '' : 'none';
+            }
+
+            /* ===== POLLING ===== */
+            let _lastState = null;
+            async function poll() {
+                try {
+                    const r = await fetch('/api/localout/state');
+                    const s = await r.json();
+                    _lastState = s;
+
+                    renderCol('src', s.source_cards);
+                    renderCol('task', s.task_cards);
+                    renderCol('done', s.completed_cards);
+                    renderLogs(s.logs);
+                    updateProgress(s);
+
+                    $('badge-src').textContent = s.source_cards.length;
+                    $('badge-task').textContent = s.task_cards.length;
+                    $('badge-done').textContent = s.completed_cards.length;
+                    $('st-src').textContent = s.source_cards.length;
+                    $('st-task').textContent = s.task_cards.length;
+                    $('st-done').textContent = s.completed_cards.length;
+
+                    /* Purge stale selections */
+                    const srcIds = new Set(s.source_cards.map(c => c.id));
+                    for (const id of selSrc) { if (!srcIds.has(id)) selSrc.delete(id); }
+                    const taskIds = new Set(s.task_cards.map(c => c.id));
+                    for (const id of selTask) { if (!taskIds.has(id)) selTask.delete(id); }
+                } catch (e) { }
+            }
+
+            /* ===== BG STARS ===== */
+            function initBgStars() {
+                const cv = $('bg-cv');
+                const cx = cv.getContext('2d');
+                const O = '#F5A623', P = '#E85B8A';
+                let stars = [];
+                function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+                resize(); window.addEventListener('resize', resize);
+
+                for (let i = 0; i < 28; i++) {
+                    stars.push({
+                        x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+                        sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2,
+                        rv: (Math.random() - .5) * .015,
+                        vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2,
+                        c: Math.random() > .5 ? O : P,
+                        al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2
+                    });
+                }
+                function drawStar(x, y, r, sz, col, al) {
+                    if (al < .01) return;
+                    cx.save(); cx.globalAlpha = al;
+                    cx.translate(x, y); cx.rotate(r);
+                    cx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        const ao = i * 2 * Math.PI / 5 - Math.PI / 2;
+                        const ai = ao + Math.PI / 5;
+                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
+                        cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
+                    }
+                    cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore();
+                }
+                function loop() {
+                    cx.clearRect(0, 0, cv.width, cv.height);
+                    stars.forEach(s => {
+                        s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
+                        if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; }
+                        if (s.x < -20) s.x = innerWidth + 20;
+                        if (s.x > innerWidth + 20) s.x = -20;
+                        drawStar(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
+                    });
+                    requestAnimationFrame(loop);
+                }
+                loop();
+            }
+
+            /* ===== SEARCH DEBOUNCE ===== */
+            ['src-search', 'task-search', 'done-search'].forEach(id => {
+                $(id).addEventListener('input', () => {
+                    if (_lastState) {
+                        const col = id.split('-')[0];
+                        const map = { src: 'source_cards', task: 'task_cards', done: 'completed_cards' };
+                        const el = $(col + '-cards'); el._lh = null;
+                        renderCol(col, _lastState[map[col]]);
+                    }
+                });
+            });
+
+            /* ===== INIT ===== */
+            initBgStars();
+            poll();
+            polling = setInterval(poll, 500);
+        })();
+    </script>
+</body>
+
+</html>
