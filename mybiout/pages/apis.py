@@ -80,3 +80,11 @@ async def api_desktop_path():
     from mybiout.pages.ohmyconfig.ohmyconfig import get_desktop_path
 
     return {"path": get_desktop_path()}
+
+
+@app.get("/api/default-bili-pc-cache-path")
+async def api_default_bili_pc_cache_path():
+    """获取默认哔哩哔哩电脑端缓存路径"""
+    from mybiout.pages.ohmyconfig.ohmyconfig import get_default_bili_pc_cache_path
+
+    return {"path": get_default_bili_pc_cache_path()}

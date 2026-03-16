@@ -6,6 +6,14 @@ from pathlib import Path
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.ini"
 _DEFAULT_PORT = 23333
 
+# ============================== 默认值辅助 ==============================
+
+
+def get_default_bilibili_pc_cache_path() -> str:
+    """默认的哔哩哔哩电脑端缓存路径: C:\\Users\\[用户名]\\Videos\\bilibili"""
+    return str(Path.home() / "Videos" / "bilibili")
+
+
 # ============================== 默认值 ==============================
 
 DEFAULTS: dict[str, dict[str, str]] = {
@@ -19,11 +27,11 @@ DEFAULTS: dict[str, dict[str, str]] = {
     "localout": {
         "folder": "localout!",
         "scan_android": "true",
-        "scan_bilibili_pc": "true",
+        "bilibili_pc_cache_path": get_default_bilibili_pc_cache_path(),
+        "bilibili_pc_cache_optional_when_installed": "true",
         "scan_interval": "1s",
-        "crawl_title": "true",
-        "crawl_fail_action": "export_without_title",
-        "crawl_timeout": "2s",
+        "name_parts": "title",
+        "incomplete_title_action": "partial_or_folder",
         "ffmpeg_concurrent": "3",
     },
     "bbdown": {

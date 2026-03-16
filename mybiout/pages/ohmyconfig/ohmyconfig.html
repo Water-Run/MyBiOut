@@ -4,10 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1200">
-    <title>哦, 我的设置 — MyBiOut!</title>
+    <title>设置 — MyBiOut!</title>
     <link rel="icon" href="/assets/logo-fullres.png" type="image/png">
     <style>
-        /* ========== RESET ========== */
         * {
             margin: 0;
             padding: 0;
@@ -19,7 +18,6 @@
             color: inherit;
         }
 
-        /* ========== SCROLLBAR ========== */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -32,7 +30,6 @@
             background: #E85B8A;
         }
 
-        /* ========== BODY ========== */
         body {
             width: 100vw;
             min-height: 100vh;
@@ -48,7 +45,6 @@
             padding: 36px 28px 90px;
         }
 
-        /* ========== HEADER ========== */
         .header {
             display: flex;
             align-items: center;
@@ -80,7 +76,6 @@
             transform: rotate(-0.8deg);
         }
 
-        /* ========== SECTION CARD ========== */
         .section {
             background: rgba(255, 255, 255, .92);
             backdrop-filter: blur(10px);
@@ -108,7 +103,6 @@
             content: "✦ ";
         }
 
-        /* ========== SETTING ROW ========== */
         .setting-row {
             padding: 14px 0;
             border-bottom: 1px solid rgba(245, 166, 35, .18);
@@ -129,7 +123,6 @@
             color: #E85B8A;
         }
 
-        /* ========== HINT (悬浮展开) ========== */
         .setting-hint {
             max-height: 0;
             overflow: hidden;
@@ -153,7 +146,7 @@
         }
 
         .setting-row:hover .setting-hint {
-            max-height: 50px;
+            max-height: 64px;
             opacity: 1;
             margin-top: 3px;
             transform: translateX(0) scaleY(1);
@@ -170,7 +163,6 @@
             }
         }
 
-        /* ========== CONTROLS ========== */
         .setting-controls {
             margin-top: 10px;
             display: flex;
@@ -237,7 +229,6 @@
             box-shadow: 3px 3px 0 #888;
         }
 
-        /* ========== TOGGLE ========== */
         .toggle {
             position: relative;
             width: 50px;
@@ -284,7 +275,6 @@
             border-color: #c44876;
         }
 
-        /* ========== SELECT ========== */
         select {
             padding: 7px 14px;
             border: 2px solid #F5A623;
@@ -300,7 +290,98 @@
             border-color: #E85B8A;
         }
 
-        /* ========== CONDITIONAL / SUB ========== */
+        .check-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            margin-top: 2px;
+        }
+
+        .check-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: #444;
+            user-select: none;
+        }
+
+        .check-item input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            accent-color: #E85B8A;
+            cursor: pointer;
+        }
+
+        .preview-wrap {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .preview-box {
+            width: 100%;
+            background: #fff;
+            border: 2px solid #F5A623;
+            padding: 10px 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+            word-break: break-all;
+        }
+
+        .preview-caption {
+            font-size: 12px;
+            font-weight: 700;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .seg-up {
+            color: #e74c3c;
+            font-weight: 700;
+        }
+
+        .seg-bv {
+            color: #8e44ad;
+            font-weight: 700;
+        }
+
+        .seg-group {
+            color: #16a085;
+            font-weight: 700;
+        }
+
+        .seg-part {
+            color: #2c3e50;
+            font-weight: 700;
+        }
+
+        .seg-title {
+            color: #d35400;
+            font-weight: 700;
+        }
+
+        .seg-publish {
+            color: #2980b9;
+            font-weight: 700;
+        }
+
+        .seg-export {
+            color: #c0392b;
+            font-weight: 700;
+        }
+
+        .seg-sep {
+            color: #666;
+            font-weight: 700;
+        }
+
+        .seg-muted {
+            color: #bbb;
+        }
+
         .conditional {
             display: none;
         }
@@ -319,13 +400,11 @@
             font-weight: 900;
         }
 
-        /* ========== PLACEHOLDER (留空) ========== */
         .placeholder-row {
             opacity: .35;
             font-style: italic;
         }
 
-        /* ========== INLINE LABEL ========== */
         .inline-label {
             font-size: 13px;
             color: #E85B8A;
@@ -333,7 +412,6 @@
             min-width: 26px;
         }
 
-        /* ========== MODAL ========== */
         .modal-backdrop {
             display: none;
             position: fixed;
@@ -355,7 +433,7 @@
             padding: 36px 44px;
             text-align: center;
             transform: rotate(-1.2deg);
-            max-width: 420px;
+            max-width: 460px;
         }
 
         .modal h3 {
@@ -368,6 +446,7 @@
             color: #777;
             font-size: 14px;
             margin-bottom: 22px;
+            line-height: 1.7;
         }
 
         .modal-btns {
@@ -376,7 +455,6 @@
             justify-content: center;
         }
 
-        /* ========== TOAST ========== */
         .toast {
             position: fixed;
             bottom: 36px;
@@ -406,7 +484,6 @@
             box-shadow: 4px 4px 0 #F5A623;
         }
 
-        /* ========== FOOTER ========== */
         .footer {
             text-align: center;
             margin-top: 12px;
@@ -419,70 +496,61 @@
 
 <body>
     <div class="page">
-
-        <!-- ========== HEADER ========== -->
         <div class="header">
-            <a class="back-link" href="/">← 回去啦</a>
-            <h1 class="page-title">哦, 我的设置</h1>
+            <a class="back-link" href="/">← 返回首页</a>
+            <h1 class="page-title">设置</h1>
         </div>
 
-        <!-- ===================== 最主要的 ===================== -->
         <div class="section" style="transform:rotate(-0.7deg)">
-            <h2 class="section-title">最主要的</h2>
+            <h2 class="section-title">通用设置</h2>
 
-            <!-- 放在哪 -->
             <div class="setting-row">
-                <div class="setting-label">放在哪</div>
-                <div class="setting-hint">导出的所有内容的存储位置, 默认甩在 C:\MyBiOut!</div>
+                <div class="setting-label">导出根目录</div>
+                <div class="setting-hint">导出内容的统一存储位置，默认 C:\MyBiOut!</div>
                 <div class="setting-controls">
                     <input type="text" id="s-export-path" style="width:420px" readonly>
                     <button class="btn btn-orange" onclick="browsePath()">浏览</button>
-                    <button class="btn btn-pink" onclick="desktopPath()">放桌面</button>
-                    <button class="btn btn-ghost" onclick="resetExportPath()">改回去</button>
+                    <button class="btn btn-pink" onclick="desktopPath()">设为桌面目录</button>
+                    <button class="btn btn-ghost" onclick="resetExportPath()">恢复默认</button>
                 </div>
             </div>
 
-            <!-- 大模型API -->
             <div class="setting-row">
-                <div class="setting-label">大模型API (OpenAI)</div>
-                <div class="setting-hint">不填也行, 只是某些花活用不了而已~</div>
+                <div class="setting-label">大模型 API (OpenAI)</div>
+                <div class="setting-hint">可选项，不配置时仅无法使用依赖该能力的功能</div>
                 <div class="setting-controls" style="flex-direction:column;align-items:flex-start;gap:7px">
                     <div style="display:flex;align-items:center;gap:8px">
-                        <span class="inline-label">键:</span>
+                        <span class="inline-label">Key:</span>
                         <input type="text" id="s-api-key" style="width:380px" placeholder="sk-...">
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
-                        <span class="inline-label">模:</span>
+                        <span class="inline-label">Model:</span>
                         <input type="text" id="s-api-model" style="width:380px" placeholder="gpt-4o-mini">
                     </div>
                     <div style="display:flex;gap:10px;margin-top:2px">
-                        <button class="btn btn-orange" onclick="confirmApi()">确定</button>
+                        <button class="btn btn-orange" onclick="confirmApi()">保存</button>
                         <button class="btn btn-danger" onclick="clearApi()">清空</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ===================== localout的 ===================== -->
         <div class="section" style="transform:rotate(0.45deg)">
-            <h2 class="section-title">localout的</h2>
+            <h2 class="section-title">LocalOut 设置</h2>
 
-            <!-- 文件夹名 -->
             <div class="setting-row">
-                <div class="setting-label">放的文件夹叫什么</div>
-                <div class="setting-hint">在导出目录底下, 本地缓存的产出全扔这儿</div>
+                <div class="setting-label">输出目录名称</div>
+                <div class="setting-hint">位于导出根目录下，用于存放本地缓存导出结果</div>
                 <div class="setting-controls">
                     <input type="text" id="s-localout-folder" style="width:260px"
-                        onchange="saveFolder('localout',this.value)"
-                        onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="btn btn-ghost" onclick="resetFolder('localout')">改回去</button>
+                        onchange="saveFolder('localout',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="btn btn-ghost" onclick="resetFolder('localout')">恢复默认</button>
                 </div>
             </div>
 
-            <!-- 扫描Android -->
             <div class="setting-row">
-                <div class="setting-label">扫描连接的Android喵</div>
-                <div class="setting-hint">翻一翻USB连着的安卓设备有没有B站缓存</div>
+                <div class="setting-label">扫描已连接 Android 设备</div>
+                <div class="setting-hint">扫描 USB 连接设备中的哔哩哔哩缓存目录</div>
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-scan-android"
@@ -492,26 +560,11 @@
                 </div>
             </div>
 
-            <!-- 扫描B站PC端 -->
-            <div class="setting-row">
-                <div class="setting-label">扫描哔哩哔哩电脑端喵</div>
-                <div class="setting-hint">看看B站桌面客户端本地偷偷藏了啥缓存</div>
-                <div class="setting-controls">
-                    <label class="toggle">
-                        <input type="checkbox" id="s-scan-bili"
-                            onchange="saveToggle('localout','scan_bilibili_pc',this.checked)">
-                        <div class="toggle-track"></div>
-                    </label>
-                </div>
-            </div>
-
-            <!-- 多久扫一次 (条件) -->
             <div class="setting-row conditional sub-row" id="row-scan-interval">
-                <div class="setting-label">多久扫一次喵</div>
-                <div class="setting-hint">越快越烧, 但越及时, 自己掂量</div>
+                <div class="setting-label">扫描间隔</div>
+                <div class="setting-hint">仅对 Android 设备扫描生效；间隔越短发现越及时，但资源占用更高</div>
                 <div class="setting-controls">
-                    <select id="s-scan-interval"
-                        onchange="saveSelect('localout','scan_interval',this.value)">
+                    <select id="s-scan-interval" onchange="saveSelect('localout','scan_interval',this.value)">
                         <option value="1s">1s</option>
                         <option value="8s">8s</option>
                         <option value="45s">45s</option>
@@ -519,53 +572,99 @@
                 </div>
             </div>
 
-            <!-- 爬虫标题 -->
             <div class="setting-row">
-                <div class="setting-label">给爷爬虫并写入标题信息?</div>
-                <div class="setting-hint">导出时顺手爬一下视频标题, 文件名好看点</div>
+                <div class="setting-label">哔哩哔哩桌面端缓存路径</div>
+                <div class="setting-hint">默认 C:\Users\[当前用户名]\Videos\bilibili；留空表示不扫描桌面端缓存</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-bili-pc-path" style="width:520px" oninput="syncConditional()"
+                        onchange="saveBiliPcPath(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="btn btn-orange" onclick="browseBiliPcPath()">浏览</button>
+                    <button class="btn btn-ghost" onclick="resetBiliPcPath()">恢复默认</button>
+                </div>
+            </div>
+
+            <div class="setting-row conditional sub-row" id="row-bili-pc-path-only-if-installed">
+                <div class="setting-label">仅在安装桌面端时作为可选路径</div>
+                <div class="setting-hint">开启后，该路径按“检测到桌面端后可选”逻辑处理（默认开启）</div>
                 <div class="setting-controls">
                     <label class="toggle">
-                        <input type="checkbox" id="s-crawl-title"
-                            onchange="saveToggle('localout','crawl_title',this.checked)">
+                        <input type="checkbox" id="s-bili-pc-path-only-if-installed"
+                            onchange="saveToggle('localout','bilibili_pc_cache_optional_when_installed',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
             </div>
 
-            <!-- 爬不到怎么办 (条件) -->
-            <div class="setting-row conditional sub-row" id="row-crawl-fail">
-                <div class="setting-label">爬不到怎么办?</div>
-                <div class="setting-hint">网烂了? B站抽风了? 反正爬虫翻车了</div>
-                <div class="setting-controls">
-                    <select id="s-crawl-fail"
-                        onchange="saveSelect('localout','crawl_fail_action',this.value)">
-                        <option value="export_without_title">不要标题了也要导</option>
-                        <option value="skip">别导了</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- 最多爬多久 (条件) -->
-            <div class="setting-row conditional sub-row" id="row-crawl-timeout">
-                <div class="setting-label">最多爬多久?</div>
-                <div class="setting-hint">超时就按上面的策略处理, 不等了</div>
-                <div class="setting-controls">
-                    <select id="s-crawl-timeout"
-                        onchange="saveSelect('localout','crawl_timeout',this.value)">
-                        <option value="1s">1s</option>
-                        <option value="2s">2s</option>
-                        <option value="3s">3s</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- ffmpeg并发 -->
             <div class="setting-row">
-                <div class="setting-label">同时几个ffmpeg</div>
-                <div class="setting-hint">并发数, 机器猛就拉满, 卡就缩着</div>
+                <div class="setting-label">名称包含（至少选择一项）</div>
+                <div class="setting-hint">用于组合导出文件名，默认勾选“视频标题”</div>
                 <div class="setting-controls">
-                    <select id="s-ffmpeg"
-                        onchange="saveSelect('localout','ffmpeg_concurrent',this.value)">
+                    <div class="check-group">
+                        <label class="check-item">
+                            <input type="checkbox" name="name-parts" value="bv" onchange="onNamePartsChanged(this)">
+                            BV号
+                        </label>
+                        <label class="check-item">
+                            <input type="checkbox" name="name-parts" value="title" onchange="onNamePartsChanged(this)">
+                            视频标题（默认）
+                        </label>
+                        <label class="check-item">
+                            <input type="checkbox" name="name-parts" value="up" onchange="onNamePartsChanged(this)">
+                            UP主名称
+                        </label>
+                        <label class="check-item">
+                            <input type="checkbox" name="name-parts" value="group" onchange="onNamePartsChanged(this)">
+                            分组标题
+                        </label>
+                        <label class="check-item">
+                            <input type="checkbox" name="name-parts" value="part" onchange="onNamePartsChanged(this)">
+                            分P号
+                        </label>
+                        <label class="check-item">
+                            <input type="checkbox" name="name-parts" value="publish_time"
+                                onchange="onNamePartsChanged(this)">
+                            发布时间
+                        </label>
+                        <label class="check-item">
+                            <input type="checkbox" name="name-parts" value="export_time"
+                                onchange="onNamePartsChanged(this)">
+                            导出时间
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">导出结构</div>
+                <div class="setting-hint">与最终文件名完全一致，实时更新</div>
+                <div class="setting-controls" style="width:100%">
+                    <div class="preview-wrap">
+                        <div class="preview-box">
+                            <div class="preview-caption">导出结构</div>
+                            <div id="name-preview-current"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">无法提取完整标题信息时</div>
+                <div class="setting-hint">配置导出时的降级策略，默认优先保证可导出性</div>
+                <div class="setting-controls">
+                    <select id="s-incomplete-title-action"
+                        onchange="saveSelect('localout','incomplete_title_action',this.value)">
+                        <option value="partial_or_folder">有多少用多少，否则使用文件夹名称（默认）</option>
+                        <option value="folder_only">直接使用文件夹名称</option>
+                        <option value="skip">跳过导出</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">FFmpeg 并发数</div>
+                <div class="setting-hint">并发越高速度通常越快，但资源占用会增加</div>
+                <div class="setting-controls">
+                    <select id="s-ffmpeg" onchange="saveSelect('localout','ffmpeg_concurrent',this.value)">
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
@@ -579,69 +678,64 @@
             </div>
         </div>
 
-        <!-- ===================== bbdown的 ===================== -->
         <div class="section" style="transform:rotate(-0.55deg)">
-            <h2 class="section-title">bbdown的</h2>
+            <h2 class="section-title">BBDown 设置</h2>
 
             <div class="setting-row">
-                <div class="setting-label">放的文件夹叫什么</div>
-                <div class="setting-hint">BBDown 下载的成品扔这个文件夹</div>
+                <div class="setting-label">输出目录名称</div>
+                <div class="setting-hint">BBDown 下载结果输出目录</div>
                 <div class="setting-controls">
                     <input type="text" id="s-bbdown-folder" style="width:260px"
-                        onchange="saveFolder('bbdown',this.value)"
-                        onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="btn btn-ghost" onclick="resetFolder('bbdown')">改回去</button>
+                        onchange="saveFolder('bbdown',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="btn btn-ghost" onclick="resetFolder('bbdown')">恢复默认</button>
                 </div>
             </div>
 
             <div class="setting-row placeholder-row">
-                <div class="setting-label">其它的... 以后再说</div>
-                <div class="setting-hint">还没想好, 先空着嘿</div>
+                <div class="setting-label">更多配置项待补充</div>
+                <div class="setting-hint">预留区域</div>
             </div>
         </div>
 
-        <!-- ===================== mdout的 ===================== -->
         <div class="section" style="transform:rotate(0.5deg)">
-            <h2 class="section-title">mdout的</h2>
+            <h2 class="section-title">MdOut 设置</h2>
 
             <div class="setting-row">
-                <div class="setting-label">放的文件夹叫什么</div>
-                <div class="setting-hint">Markdown 导出的东西扔这个文件夹</div>
+                <div class="setting-label">输出目录名称</div>
+                <div class="setting-hint">Markdown 导出结果输出目录</div>
                 <div class="setting-controls">
-                    <input type="text" id="s-mdout-folder" style="width:260px"
-                        onchange="saveFolder('mdout',this.value)"
+                    <input type="text" id="s-mdout-folder" style="width:260px" onchange="saveFolder('mdout',this.value)"
                         onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="btn btn-ghost" onclick="resetFolder('mdout')">改回去</button>
+                    <button class="btn btn-ghost" onclick="resetFolder('mdout')">恢复默认</button>
                 </div>
             </div>
 
             <div class="setting-row placeholder-row">
-                <div class="setting-label">其它的... 以后再说</div>
-                <div class="setting-hint">还没想好, 先空着嘿</div>
+                <div class="setting-label">更多配置项待补充</div>
+                <div class="setting-hint">预留区域</div>
             </div>
         </div>
 
-        <div class="footer">MyBiOut! — 哦, 你的设置到底了</div>
+        <div class="footer">MyBiOut! — 设置项已全部显示</div>
     </div>
 
-    <!-- ========== API 确认弹窗 ========== -->
     <div class="modal-backdrop" id="api-modal">
         <div class="modal">
-            <h3>明文存储, 嘿嘿</h3>
-            <p>你的 API Key 会以明文写在配置文件里哦~<br>介意的话就... 算了你都点到这了</p>
+            <h3>明文存储提示</h3>
+            <p>API Key 将以明文写入配置文件。<br>请确认你已了解该风险后再保存。</p>
             <div class="modal-btns">
-                <button class="btn btn-orange" onclick="doSaveApi()">行吧存吧</button>
-                <button class="btn btn-ghost" onclick="closeApiModal()">别啊</button>
+                <button class="btn btn-orange" onclick="doSaveApi()">确认保存</button>
+                <button class="btn btn-ghost" onclick="closeApiModal()">取消</button>
             </div>
         </div>
     </div>
 
-    <!-- ========== TOAST ========== -->
     <div class="toast" id="toast"></div>
 
     <script>
-        /* ==================== Toast ==================== */
         let _toastT = null;
+        let _previewTimer = null;
+
         function showToast(msg, isErr) {
             const el = document.getElementById('toast');
             if (_toastT) clearTimeout(_toastT);
@@ -650,11 +744,11 @@
             _toastT = setTimeout(() => { el.className = 'toast'; _toastT = null; }, 2200);
         }
 
-        /* ==================== API helpers ==================== */
         async function apiGet(url) {
             const r = await fetch(url);
             return r.json();
         }
+
         async function apiPost(url, body) {
             const r = await fetch(url, {
                 method: 'POST',
@@ -664,7 +758,76 @@
             return { ok: r.ok, data: await r.json() };
         }
 
-        /* ==================== 读取设置 ==================== */
+        function escHtml(s) {
+            return s
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function span(cls, text) {
+            return `<span class="${cls}">${escHtml(text)}</span>`;
+        }
+
+        function nowForExport() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function collectNameParts() {
+            return Array.from(document.querySelectorAll('input[name="name-parts"]:checked'))
+                .map(el => el.value);
+        }
+
+        function renderCurrentPattern() {
+            const selected = new Set(collectNameParts());
+
+            let base = '';
+
+            if (selected.has('up')) {
+                base += `${span('seg-up', 'UP主名称')}${span('seg-sep', '--')}`;
+            }
+
+            if (selected.has('bv')) {
+                base += `${span('seg-sep', '{')}${span('seg-bv', 'BV号')}${span('seg-sep', '}')}`;
+            }
+
+            if (selected.has('group') || selected.has('part')) {
+                const mid = `${selected.has('group') ? span('seg-group', '分组标题') : ''}${selected.has('part') ? span('seg-part', '[分P号]') : ''}`;
+                base += `${span('seg-sep', '(')}${mid}${span('seg-sep', ')')}`;
+            }
+
+            if (selected.has('title')) {
+                base += span('seg-title', '视频标题');
+            }
+
+            const tails = [];
+            if (selected.has('publish_time')) {
+                tails.push(span('seg-publish', '发布时间'));
+            }
+            if (selected.has('export_time')) {
+                tails.push(span('seg-export', `导出于${nowForExport()}`));
+            }
+
+            if (!base && tails.length === 0) {
+                document.getElementById('name-preview-current').innerHTML = span('seg-muted', '（请至少保留一个命名字段）');
+                return;
+            }
+
+            if (tails.length > 0) {
+                base += `${span('seg-sep', '--')}${tails.join(span('seg-sep', ','))}`;
+            }
+
+            document.getElementById('name-preview-current').innerHTML = base;
+        }
+
+        function updateNamePreview() {
+            renderCurrentPattern();
+        }
+
         async function loadSettings() {
             const s = await apiGet('/api/settings');
 
@@ -674,38 +837,54 @@
 
             document.getElementById('s-localout-folder').value = s.localout?.folder ?? '';
             document.getElementById('s-scan-android').checked = s.localout?.scan_android === 'true';
-            document.getElementById('s-scan-bili').checked = s.localout?.scan_bilibili_pc === 'true';
+            document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? '';
+            document.getElementById('s-bili-pc-path-only-if-installed').checked =
+                (s.localout?.bilibili_pc_cache_optional_when_installed ?? 'true') === 'true';
             document.getElementById('s-scan-interval').value = s.localout?.scan_interval ?? '1s';
-            document.getElementById('s-crawl-title').checked = s.localout?.crawl_title === 'true';
-            document.getElementById('s-crawl-fail').value = s.localout?.crawl_fail_action ?? 'export_without_title';
-            document.getElementById('s-crawl-timeout').value = s.localout?.crawl_timeout ?? '2s';
             document.getElementById('s-ffmpeg').value = s.localout?.ffmpeg_concurrent ?? '3';
+            document.getElementById('s-incomplete-title-action').value =
+                s.localout?.incomplete_title_action ?? 'partial_or_folder';
+
+            const rawParts = s.localout?.name_parts ?? 'title';
+            const selectedParts = new Set(rawParts.split(',').map(x => x.trim()).filter(Boolean));
+            document.querySelectorAll('input[name="name-parts"]').forEach(el => {
+                el.checked = selectedParts.has(el.value);
+            });
+
+            if (collectNameParts().length === 0) {
+                const titleBox = document.querySelector('input[name="name-parts"][value="title"]');
+                if (titleBox) titleBox.checked = true;
+            }
 
             document.getElementById('s-bbdown-folder').value = s.bbdown?.folder ?? '';
             document.getElementById('s-mdout-folder').value = s.mdout?.folder ?? '';
 
             syncConditional();
+            updateNamePreview();
+
+            if (_previewTimer) clearInterval(_previewTimer);
+            _previewTimer = setInterval(updateNamePreview, 1000);
         }
 
-        /* ==================== 条件显隐 ==================== */
         function syncConditional() {
-            const anyScn = document.getElementById('s-scan-android').checked
-                || document.getElementById('s-scan-bili').checked;
-            toggle$('row-scan-interval', anyScn);
+            const scanAndroid = document.getElementById('s-scan-android').checked;
+            const hasBiliPcPath = (document.getElementById('s-bili-pc-path').value || '').trim().length > 0;
 
-            const crawl = document.getElementById('s-crawl-title').checked;
-            toggle$('row-crawl-fail', crawl);
-            toggle$('row-crawl-timeout', crawl);
+            toggle$('row-scan-interval', scanAndroid);
+            toggle$('row-bili-pc-path-only-if-installed', hasBiliPcPath);
         }
+
         function toggle$(id, show) {
             document.getElementById(id).classList.toggle('vis', show);
         }
 
-        /* ==================== 通用保存 ==================== */
         async function saveSetting(sec, key, val) {
             const { ok, data } = await apiPost('/api/setting', { section: sec, key, value: val });
-            if (ok) { showToast('存好了!'); return true; }
-            showToast(data.error || '出错了!', true);
+            if (ok) {
+                showToast('保存成功');
+                return true;
+            }
+            showToast(data.error || '保存失败', true);
             return false;
         }
 
@@ -726,9 +905,47 @@
             }
         }
 
-        /* ==================== 导出路径 ==================== */
+        async function saveBiliPcPath(val) {
+            const v = (val || '').trim();
+            const ok = await saveSetting('localout', 'bilibili_pc_cache_path', v);
+            if (!ok) {
+                const s = await apiGet('/api/settings');
+                document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? '';
+            }
+            syncConditional();
+        }
+
+        async function browseBiliPcPath() {
+            showToast('请在弹出的窗口中选择目录');
+            const r = await fetch('/api/browse-folder', { method: 'POST' });
+            const d = await r.json();
+            if (d.ok && d.path) {
+                document.getElementById('s-bili-pc-path').value = d.path;
+                await saveBiliPcPath(d.path);
+            }
+        }
+
+        async function resetBiliPcPath() {
+            const d = await apiGet('/api/default-bili-pc-cache-path');
+            const def = d.path ?? '';
+            document.getElementById('s-bili-pc-path').value = def;
+            await saveBiliPcPath(def);
+        }
+
+        async function onNamePartsChanged(changedEl) {
+            const parts = collectNameParts();
+            if (parts.length === 0) {
+                changedEl.checked = true;
+                showToast('至少需要保留一个命名字段', true);
+                updateNamePreview();
+                return;
+            }
+            updateNamePreview();
+            await saveSelect('localout', 'name_parts', parts.join(','));
+        }
+
         async function browsePath() {
-            showToast('请在弹出的窗口里选...');
+            showToast('请在弹出的窗口中选择目录');
             const r = await fetch('/api/browse-folder', { method: 'POST' });
             const d = await r.json();
             if (d.ok && d.path) {
@@ -749,11 +966,13 @@
             await saveSetting('export', 'path', def);
         }
 
-        /* ==================== API Key/Model ==================== */
         function confirmApi() {
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
-            if (!k && !m) { showToast('啥都没填啊!', true); return; }
+            if (!k && !m) {
+                showToast('请至少填写一项', true);
+                return;
+            }
             document.getElementById('api-modal').classList.add('show');
         }
 
@@ -771,7 +990,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ section: 'api', key: 'model', value: m })
             });
-            showToast('API 存好了!');
+            showToast('API 设置已保存');
         }
 
         function closeApiModal() {
@@ -791,17 +1010,15 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ section: 'api', key: 'model', value: '' })
             });
-            showToast('清掉了!');
+            showToast('API 设置已清空');
         }
 
-        /* ==================== 重置文件夹名 ==================== */
         function resetFolder(sec) {
             const defs = { localout: 'localout!', bbdown: 'bbdown!', mdout: 'mdout!' };
             document.getElementById('s-' + sec + '-folder').value = defs[sec];
             saveFolder(sec, defs[sec]);
         }
 
-        /* ==================== 启动 ==================== */
         loadSettings();
     </script>
 </body>
