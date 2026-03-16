@@ -82,7 +82,7 @@
             animation: logo-shake .4s ease;
         }
 
-        /* ========== SETTINGS LINK (Logo下方) ========== */
+        /* ========== SETTINGS LINK ========== */
         .settings-link {
             position: absolute;
             top: 202px;
@@ -120,7 +120,7 @@
             box-shadow: 2px 2px 0 #E85B8A;
         }
 
-        /* ========== CARDS (中间) ========== */
+        /* ========== CARDS ========== */
         .cards {
             position: absolute;
             top: 50%;
@@ -200,7 +200,7 @@
             text-shadow: 2px 2px 0 rgba(0, 0, 0, .12);
         }
 
-        /* ========== MAN! (底部) ========== */
+        /* ========== MAN! ========== */
         .man-link {
             position: absolute;
             bottom: 48px;
@@ -245,7 +245,8 @@
             z-index: 9999;
             display: none;
             overflow: hidden;
-            cursor: pointer;
+            /* 不可跳过：不接受点击 */
+            pointer-events: none;
         }
 
         #star-overlay.active {
@@ -318,43 +319,59 @@
             animation: ch-pop .4s cubic-bezier(.34, 1.56, .64, 1) both;
         }
 
-        #overlay-skip {
+        /* ========== FLASH ========== */
+        #flash-overlay {
             position: fixed;
-            bottom: 34px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 13px;
-            color: #E85B8A;
-            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
-            border-bottom: 2px dashed #E85B8A;
-            padding-bottom: 2px;
+            inset: 0;
+            z-index: 10000;
+            background: #fff;
             pointer-events: none;
             opacity: 0;
-            transition: opacity .5s;
         }
 
-        #overlay-skip.show {
-            opacity: .65;
+        /* ========== GLOW PULSE ========== */
+        @keyframes glow-pulse-pink {
+
+            0%,
+            100% {
+                box-shadow: 8px 8px 0 #E85B8A, 0 0 15px rgba(232, 91, 138, 0.15);
+            }
+
+            50% {
+                box-shadow: 8px 8px 0 #E85B8A, 0 0 40px rgba(232, 91, 138, 0.5), 0 0 80px rgba(245, 166, 35, 0.2);
+            }
+        }
+
+        @keyframes glow-pulse-orange {
+
+            0%,
+            100% {
+                box-shadow: 8px 8px 0 #F5A623, 0 0 15px rgba(245, 166, 35, 0.15);
+            }
+
+            50% {
+                box-shadow: 8px 8px 0 #F5A623, 0 0 40px rgba(245, 166, 35, 0.5), 0 0 80px rgba(232, 91, 138, 0.2);
+            }
+        }
+
+        #overlay-t1.glow {
+            animation: glow-pulse-pink .9s ease-in-out infinite;
+        }
+
+        #overlay-t2.glow {
+            animation: glow-pulse-orange .9s ease-in-out infinite;
         }
     </style>
 </head>
 
 <body>
     <div class="page">
-
-        <!-- LOGO -->
         <div class="logo">
             <img src="./assets/logo-fullres.png" alt="MyBiOut!">
         </div>
-
-        <!-- 设置入口 -->
         <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
-
-        <!-- GitHub -->
         <a class="github-link" id="github-btn" href="https://github.com/Water-Run/MyBiOut" target="_blank"
             rel="noopener">来仓库点 Star ⭐ 提交 Issue 🐛</a>
-
-        <!-- 三张功能卡片 -->
         <div class="cards">
             <a class="card" href="/localout">
                 <img src="./assets/localout.png" alt="本地缓存导出">
@@ -369,42 +386,38 @@
                 <div class="card-overlay"><span>Markdown 导出</span></div>
             </a>
         </div>
-
-        <!-- Man! -->
         <a class="man-link" href="/man">
             <span class="t-default">Man!</span>
             <span class="t-hover">ManualScript 手册</span>
         </a>
-
     </div>
 
-    <!-- ========== STAR ANIMATION OVERLAY ========== -->
-    <div id="star-overlay" onclick="skipStarAnim()">
+    <!-- OVERLAY (无跳过按钮) -->
+    <div id="star-overlay">
         <canvas id="star-canvas"></canvas>
         <div id="overlay-t1" class="overlay-card"></div>
         <div id="overlay-t2" class="overlay-card"></div>
-        <div id="overlay-skip">点击跳过</div>
     </div>
+    <div id="flash-overlay"></div>
 
     <script>
         (function () {
-            /* ---- constants ---- */
             const O = '#F5A623', P = '#E85B8A';
 
-            /* ---- elements ---- */
             const ov = document.getElementById('star-overlay');
             const cv = document.getElementById('star-canvas');
             const cx2d = cv.getContext('2d');
             const t1 = document.getElementById('overlay-t1');
             const t2 = document.getElementById('overlay-t2');
-            const sk = document.getElementById('overlay-skip');
             const btn = document.getElementById('github-btn');
+            const flashEl = document.getElementById('flash-overlay');
 
-            /* ---- state ---- */
             let parts = [], rafId = null, alive = false;
             let loopT0 = null, showOrbit = false;
             let doFade = false, fadeT0 = 0;
             let _tids = [], _ivids = [];
+            /* ★ 核心状态：是否等待用户返回 */
+            let waitingForReturn = false;
 
             const tm = (f, d) => _tids.push(setTimeout(f, d));
             const iv = (f, d) => { const id = setInterval(f, d); _ivids.push(id); };
@@ -413,10 +426,31 @@
                 _ivids.forEach(clearInterval); _ivids = [];
             }
 
-            /* ---- canvas ---- */
             function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+            window.addEventListener('resize', () => { if (alive) resize(); });
 
-            /* ---- draw 5-pointed star ---- */
+            function flash(duration) {
+                flashEl.style.transition = 'none';
+                flashEl.style.opacity = '0.88';
+                requestAnimationFrame(() => {
+                    flashEl.style.transition = 'opacity ' + (duration || 400) + 'ms ease-out';
+                    flashEl.style.opacity = '0';
+                });
+            }
+
+            function screenShake(intensity, duration) {
+                const start = performance.now();
+                (function step() {
+                    const elapsed = performance.now() - start;
+                    if (elapsed > duration || !alive) { ov.style.transform = ''; return; }
+                    const decay = 1 - elapsed / duration;
+                    const x = (Math.random() - .5) * 2 * intensity * decay;
+                    const y = (Math.random() - .5) * 2 * intensity * decay;
+                    ov.style.transform = `translate(${x}px,${y}px)`;
+                    requestAnimationFrame(step);
+                })();
+            }
+
             function dstar(x, y, r, rot, col, a) {
                 if (a < .012) return;
                 cx2d.save();
@@ -434,7 +468,20 @@
                 cx2d.restore();
             }
 
-            /* ---- particle: burst star ---- */
+            function drawGlow(x, y, r, col, alpha) {
+                if (alpha < 0.01 || r < 1) return;
+                cx2d.save();
+                cx2d.globalAlpha = alpha;
+                const grad = cx2d.createRadialGradient(x, y, 0, x, y, r);
+                grad.addColorStop(0, col);
+                grad.addColorStop(1, 'transparent');
+                cx2d.fillStyle = grad;
+                cx2d.fillRect(x - r, y - r, r * 2, r * 2);
+                cx2d.restore();
+            }
+
+            /* ======== PARTICLES ======== */
+
             class Burst {
                 constructor(px, py, big) {
                     const a = Math.random() * Math.PI * 2;
@@ -449,16 +496,10 @@
                     this.dc = big ? .006 + Math.random() * .009 : .009 + Math.random() * .014;
                     this.g = .2;
                 }
-                step() {
-                    this.x += this.vx; this.y += this.vy;
-                    this.vy += this.g; this.vx *= .99;
-                    this.r += this.rv; this.life -= this.dc;
-                    return this.life > 0;
-                }
+                step() { this.x += this.vx; this.y += this.vy; this.vy += this.g; this.vx *= .99; this.r += this.rv; this.life -= this.dc; return this.life > 0; }
                 draw() { dstar(this.x, this.y, this.sz, this.r, this.c, this.life); }
             }
 
-            /* ---- particle: falling rain star ---- */
             class Rain {
                 constructor() {
                     this.x = Math.random() * innerWidth;
@@ -475,7 +516,6 @@
                 draw() { dstar(this.x, this.y, this.sz, this.r, this.c, this.al); }
             }
 
-            /* ---- particle: shooting star with trail ---- */
             class Shoot {
                 constructor() {
                     const a = Math.PI * (.07 + Math.random() * .22);
@@ -489,7 +529,7 @@
                 }
                 step() {
                     this.trail.push({ x: this.x, y: this.y });
-                    if (this.trail.length > 20) this.trail.shift();
+                    if (this.trail.length > 22) this.trail.shift();
                     this.x += this.vx; this.y += this.vy;
                     this.r += .19; this.life -= this.dc;
                     return this.life > 0 && this.x < innerWidth + 60;
@@ -499,29 +539,161 @@
                         const t = i / this.trail.length;
                         dstar(p.x, p.y, this.sz * t * .75, this.r, this.c, t * this.life * .45);
                     });
+                    drawGlow(this.x, this.y, this.sz * 1.5, this.c, this.life * 0.25);
                     dstar(this.x, this.y, this.sz, this.r, this.c, this.life);
                 }
             }
 
-            /* ---- helpers ---- */
+            class Shockwave {
+                constructor(px, py, maxR, col) {
+                    this.x = px; this.y = py;
+                    this.r = 0; this.maxR = maxR;
+                    this.c = col || (Math.random() > .5 ? O : P);
+                    this.life = 1; this.speed = maxR / 26;
+                }
+                step() { this.r += this.speed; this.life = Math.max(0, 1 - this.r / this.maxR); return this.life > 0; }
+                draw() {
+                    cx2d.save(); cx2d.globalAlpha = this.life * 0.55;
+                    cx2d.strokeStyle = this.c; cx2d.lineWidth = 2 + this.life * 6;
+                    cx2d.beginPath(); cx2d.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                    cx2d.stroke(); cx2d.restore();
+                }
+            }
+
+            class Sparkle {
+                constructor() {
+                    this.x = Math.random() * innerWidth;
+                    this.y = Math.random() * innerHeight;
+                    this.sz = Math.random() * 7 + 2;
+                    this.c = Math.random() > .5 ? O : P;
+                    this.phase = Math.random() * Math.PI * 2;
+                    this.speed = Math.random() * 3 + 2;
+                    this.life = 1; this.dc = 0.004 + Math.random() * 0.006;
+                    this.r = Math.random() * Math.PI * 2;
+                }
+                step() { this.phase += 0.08; this.r += 0.015; this.life -= this.dc; return this.life > 0; }
+                draw() { dstar(this.x, this.y, this.sz, this.r, this.c, Math.abs(Math.sin(this.phase * this.speed)) * this.life); }
+            }
+
+            class Firework {
+                constructor(sx, targetY) {
+                    this.x = sx; this.y = innerHeight + 10;
+                    this.targetY = targetY;
+                    this.vy = -(Math.random() * 3 + 12);
+                    this.sz = 7; this.c = Math.random() > .5 ? O : P;
+                    this.r = 0; this.trail = []; this.exploded = false;
+                }
+                step() {
+                    if (this.exploded) return false;
+                    this.trail.push({ x: this.x, y: this.y });
+                    if (this.trail.length > 18) this.trail.shift();
+                    this.y += this.vy; this.vy += 0.12; this.r += 0.12;
+                    if (this.y <= this.targetY) {
+                        this.exploded = true;
+                        burst(this.x, this.y, 55, true);
+                        parts.push(new Shockwave(this.x, this.y, 180, this.c));
+                        ringBurst(this.x, this.y, 12, 6);
+                        return false;
+                    }
+                    return true;
+                }
+                draw() {
+                    drawGlow(this.x, this.y, 22, this.c, 0.4);
+                    this.trail.forEach((p, i) => {
+                        const t = i / this.trail.length;
+                        dstar(p.x, p.y, this.sz * t * 0.6, this.r, this.c, t * 0.5);
+                    });
+                    dstar(this.x, this.y, this.sz, this.r, this.c, 1);
+                }
+            }
+
+            class SpeedLine {
+                constructor(cx, cy) {
+                    const a = Math.random() * Math.PI * 2;
+                    const innerR = Math.random() * 40 + 20;
+                    const outerR = innerR + Math.random() * 250 + 80;
+                    this.x1 = cx + Math.cos(a) * innerR; this.y1 = cy + Math.sin(a) * innerR;
+                    this.x2 = cx + Math.cos(a) * outerR; this.y2 = cy + Math.sin(a) * outerR;
+                    this.c = Math.random() > .5 ? O : P;
+                    this.life = 1; this.dc = 0.025 + Math.random() * 0.02;
+                    this.lw = Math.random() * 3 + 1;
+                }
+                step() { this.life -= this.dc; return this.life > 0; }
+                draw() {
+                    cx2d.save(); cx2d.globalAlpha = this.life * 0.6;
+                    cx2d.strokeStyle = this.c; cx2d.lineWidth = this.lw * this.life;
+                    cx2d.beginPath(); cx2d.moveTo(this.x1, this.y1); cx2d.lineTo(this.x2, this.y2);
+                    cx2d.stroke(); cx2d.restore();
+                }
+            }
+
+            class Confetti {
+                constructor(px, py) {
+                    const a = Math.random() * Math.PI * 2;
+                    const s = Math.random() * 7 + 3;
+                    this.x = px; this.y = py;
+                    this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s - 4;
+                    this.w = Math.random() * 10 + 4; this.h = Math.random() * 5 + 2;
+                    this.c = Math.random() > .5 ? O : P;
+                    this.r = Math.random() * Math.PI * 2;
+                    this.rv = (Math.random() - .5) * .2;
+                    this.life = 1; this.dc = 0.006 + Math.random() * 0.006; this.g = 0.1;
+                }
+                step() { this.x += this.vx; this.y += this.vy; this.vy += this.g; this.vx *= 0.99; this.r += this.rv; this.life -= this.dc; return this.life > 0; }
+                draw() {
+                    cx2d.save(); cx2d.globalAlpha = this.life;
+                    cx2d.translate(this.x, this.y); cx2d.rotate(this.r);
+                    cx2d.fillStyle = this.c; cx2d.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
+                    cx2d.restore();
+                }
+            }
+
+            class GlowOrb {
+                constructor(x, y, col) {
+                    this.x = x; this.y = y; this.r = 10;
+                    this.maxR = Math.random() * 80 + 40;
+                    this.c = col || (Math.random() > .5 ? O : P);
+                    this.life = 1; this.speed = (this.maxR - 10) / 38;
+                }
+                step() { this.r += this.speed; this.life = Math.max(0, 1 - this.r / this.maxR); return this.life > 0; }
+                draw() { drawGlow(this.x, this.y, this.r, this.c, this.life * 0.4); }
+            }
+
+            /* ======== HELPERS ======== */
+
             function burst(px, py, n, big) { for (let i = 0; i < n; i++) parts.push(new Burst(px, py, big)); }
 
+            function ringBurst(cx, cy, count, speed) {
+                for (let i = 0; i < count; i++) {
+                    const angle = (i / count) * Math.PI * 2;
+                    const b = new Burst(cx, cy, true);
+                    b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
+                    b.g = 0; b.dc = 0.012; parts.push(b);
+                }
+            }
+
+            function speedLines(cx, cy, count) { for (let i = 0; i < count; i++) parts.push(new SpeedLine(cx, cy)); }
+            function confettiBurst(cx, cy, count) { for (let i = 0; i < count; i++) parts.push(new Confetti(cx, cy)); }
+            function spawnSparkles(count) { for (let i = 0; i < count; i++) parts.push(new Sparkle()); }
+
             function drawOrbits(elapsed) {
-                const ocx = innerWidth / 2, ocy = innerHeight * .62;
-                const rings = [
-                    { r: 210, sp: 1.35, n: 5, cols: [O, P, O, P, O], ys: .32 },
-                    { r: 272, sp: -.85, n: 4, cols: [P, O, P, O], ys: .26 },
-                ];
-                rings.forEach(({ r, sp, n, cols, ys }) => {
+                const ocx = innerWidth / 2, ocy = innerHeight * .5;
+                [
+                    { r: 170, sp: 1.5, n: 5, cols: [O, P, O, P, O], ys: .35, szBase: 10 },
+                    { r: 235, sp: -1.0, n: 6, cols: [P, O, P, O, P, O], ys: .28, szBase: 8 },
+                    { r: 305, sp: 0.7, n: 4, cols: [O, P, O, P], ys: .22, szBase: 12 },
+                ].forEach(({ r, sp, n, cols, ys, szBase }) => {
                     for (let i = 0; i < n; i++) {
                         const a = elapsed * sp + i * 2 * Math.PI / n;
-                        const sz = 12 + Math.sin(elapsed * 2.5 + i * 1.3) * 3;
-                        dstar(ocx + Math.cos(a) * r, ocy + Math.sin(a) * r * ys, sz, a * 2.1, cols[i % cols.length], .88);
+                        const sz = szBase + Math.sin(elapsed * 2.5 + i * 1.3) * 3;
+                        const sx = ocx + Math.cos(a) * r, sy = ocy + Math.sin(a) * r * ys;
+                        drawGlow(sx, sy, sz * 2.2, cols[i % cols.length], 0.13);
+                        dstar(sx, sy, sz, a * 2.1, cols[i % cols.length], .88);
                     }
                 });
             }
 
-            /* ---- char-by-char reveal ---- */
+            /* ---- char reveal ---- */
             function revealChars(el, text, onDone) {
                 el.innerHTML = [...text].map(ch => `<span class="ch-pre">${ch}</span>`).join('');
                 const spans = [...el.children];
@@ -530,14 +702,21 @@
                         sp.className = 'ch-show';
                         const rc = sp.getBoundingClientRect();
                         const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
-                        burst(cx, cy, 12, false);
-                        if (i === spans.length - 1) tm(() => burst(cx, cy, 40, true), 85);
+                        burst(cx, cy, 18, false);
+                        parts.push(new GlowOrb(cx, cy));
+                        if (i === spans.length - 1) {
+                            tm(() => {
+                                burst(cx, cy, 55, true);
+                                screenShake(5, 200); flash(280);
+                                parts.push(new Shockwave(cx, cy, 200, P));
+                            }, 85);
+                        }
                     }, i * 170);
                 });
-                tm(onDone, spans.length * 170 + 210);
+                tm(onDone, spans.length * 170 + 260);
             }
 
-            /* ---- Web Animations API wrappers ---- */
+            /* ---- Web Animations ---- */
             function slideFromLeft(el, onDone) {
                 const rot = 'rotate(-2deg)';
                 const anim = el.animate([
@@ -550,6 +729,13 @@
                     el.style.opacity = '1';
                     el.style.transform = `translate(-50%, -50%) ${rot}`;
                     anim.cancel();
+                    const rc = el.getBoundingClientRect();
+                    const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
+                    screenShake(10, 320);
+                    parts.push(new Shockwave(cx, cy, 240, O));
+                    parts.push(new GlowOrb(cx, cy, O));
+                    burst(cx - rc.width / 2, cy, 22, true);
+                    flash(250);
                     onDone();
                 };
             }
@@ -566,6 +752,14 @@
                     el.style.opacity = '1';
                     el.style.transform = `translate(-50%, -50%) ${rot}`;
                     anim.cancel();
+                    const rc = el.getBoundingClientRect();
+                    const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
+                    screenShake(12, 380);
+                    parts.push(new Shockwave(cx, cy, 280, P));
+                    parts.push(new GlowOrb(cx, cy, P));
+                    burst(cx, cy + rc.height / 2, 28, true);
+                    confettiBurst(cx, cy, 30);
+                    flash(280);
                     onDone();
                 };
             }
@@ -579,33 +773,29 @@
                 ], { duration: 2400, iterations: Infinity, easing: 'ease-in-out' });
             }
 
-            /* ---- animation loop ---- */
+            /* ---- main loop ---- */
             function loop(ts) {
                 if (!alive) return;
                 if (!loopT0) loopT0 = ts;
                 const elapsed = (ts - loopT0) / 1000;
-
                 cx2d.clearRect(0, 0, cv.width, cv.height);
                 parts = parts.filter(p => { const ok = p.step(); if (ok) p.draw(); return ok; });
                 if (showOrbit) drawOrbits(elapsed);
-
                 if (doFade) {
-                    const ft = (ts - fadeT0) / 620;
+                    const ft = (ts - fadeT0) / 750;
                     const a = Math.max(0, 1 - ft);
                     ov.style.opacity = a;
                     if (a <= 0) { endAnim(); return; }
                 }
-
                 rafId = requestAnimationFrame(loop);
             }
 
-            /* ---- play / end ---- */
+            /* ---- play ---- */
             function playAnim() {
                 if (alive) return;
                 alive = true; parts = []; showOrbit = false; doFade = false; loopT0 = null;
                 resize();
 
-                /* show overlay: fade in via opacity transition */
                 ov.classList.add('active');
                 ov.style.background = 'rgba(255,255,255,.96)';
                 ov.style.opacity = '0';
@@ -613,6 +803,7 @@
                 t1.style.opacity = '0'; t1.style.transform = '';
                 t2.style.opacity = '0'; t2.style.transform = '';
                 t1.innerHTML = ''; t2.innerHTML = '';
+                t1.classList.remove('glow'); t2.classList.remove('glow');
 
                 requestAnimationFrame(() => requestAnimationFrame(() => {
                     ov.style.opacity = '1';
@@ -620,76 +811,136 @@
 
                 const vcx = innerWidth / 2, vcy = innerHeight / 2;
 
-                /* initial big burst */
-                tm(() => burst(vcx, vcy, 75, true), 55);
-                tm(() => burst(vcx, vcy * .44, 28, false), 310);
+                tm(() => {
+                    flash(350);
+                    burst(vcx, vcy, 100, true);
+                    parts.push(new Shockwave(vcx, vcy, 350, O));
+                    parts.push(new Shockwave(vcx, vcy, 260, P));
+                    speedLines(vcx, vcy, 45);
+                    screenShake(12, 400);
+                    for (let i = 0; i < 5; i++) parts.push(new GlowOrb(vcx, vcy));
+                }, 55);
 
-                /* text1: 听我说 */
+                tm(() => {
+                    burst(vcx * 0.5, vcy * 0.6, 30, true);
+                    burst(vcx * 1.5, vcy * 0.6, 30, true);
+                    parts.push(new Shockwave(vcx * 0.5, vcy * 0.6, 120, P));
+                    parts.push(new Shockwave(vcx * 1.5, vcy * 0.6, 120, O));
+                }, 300);
+
+                tm(() => iv(() => spawnSparkles(3), 200), 380);
+
+                tm(() => parts.push(new Firework(vcx * 0.35, vcy * 0.32)), 500);
+
                 tm(() => {
                     slideFromLeft(t1, () => {
+                        t1.classList.add('glow');
                         revealChars(t1, '听我说', () => startFloat(t1, -2));
                     });
-                }, 530);
+                }, 700);
 
-                /* rain starts */
-                tm(() => iv(() => { for (let i = 0; i < 6; i++) parts.push(new Rain()); }, 175), 880);
+                tm(() => parts.push(new Firework(vcx * 1.65, vcy * 0.4)), 850);
 
-                /* text2: 谢谢你 */
+                tm(() => iv(() => { for (let i = 0; i < 8; i++) parts.push(new Rain()); }, 150), 1000);
+
+                tm(() => parts.push(new Firework(vcx * 0.75, vcy * 0.28)), 1600);
+
                 tm(() => {
                     dropFromTop(t2, () => {
+                        t2.classList.add('glow');
                         revealChars(t2, '谢谢你', () => startFloat(t2, 1.5));
                     });
-                }, 1940);
+                }, 2000);
 
-                /* shooting stars + orbits */
                 tm(() => {
                     showOrbit = true;
-                    iv(() => parts.push(new Shoot()), 560);
-                }, 2560);
+                    iv(() => parts.push(new Shoot()), 400);
+                }, 2500);
 
-                /* skip hint */
-                tm(() => sk.classList.add('show'), 1150);
+                tm(() => {
+                    parts.push(new Firework(vcx * 0.28, vcy * 0.22));
+                    parts.push(new Firework(vcx * 1.72, vcy * 0.28));
+                }, 3200);
 
-                /* begin fade-out */
+                tm(() => {
+                    confettiBurst(vcx, vcy, 60);
+                    speedLines(vcx, vcy, 30);
+                    ringBurst(vcx, vcy, 18, 8);
+                    parts.push(new Shockwave(vcx, vcy, 280, O));
+                }, 3800);
+
+                /* Grand Finale */
+                tm(() => {
+                    flash(400); screenShake(15, 500);
+                    burst(vcx, vcy, 120, true);
+                    confettiBurst(vcx, vcy, 80);
+                    speedLines(vcx, vcy, 50);
+                    ringBurst(vcx, vcy, 24, 10);
+                    parts.push(new Shockwave(vcx, vcy, 450, O));
+                    parts.push(new Shockwave(vcx, vcy, 380, P));
+                    for (let i = 0; i < 6; i++) {
+                        const a = (i / 6) * Math.PI * 2, d = 200;
+                        tm(() => {
+                            burst(vcx + Math.cos(a) * d, vcy + Math.sin(a) * d, 30, true);
+                            parts.push(new Shockwave(vcx + Math.cos(a) * d, vcy + Math.sin(a) * d, 140, i % 2 ? O : P));
+                        }, i * 70);
+                    }
+                }, 4500);
+
+                /* fade out */
                 tm(() => {
                     clearAll();
                     ov.style.transition = 'none';
                     doFade = true;
                     fadeT0 = performance.now();
-                    sk.classList.remove('show');
-                }, 4900);
+                }, 5600);
 
                 rafId = requestAnimationFrame(loop);
             }
 
+            /* ---- end ---- */
             function endAnim() {
-                alive = false;
-                clearAll();
+                alive = false; clearAll();
                 parts = []; showOrbit = false; doFade = false;
                 [t1, t2].forEach(el => {
                     el.getAnimations().forEach(a => a.cancel());
-                    el.innerHTML = '';
-                    el.style.opacity = '0';
-                    el.style.transform = '';
+                    el.innerHTML = ''; el.style.opacity = '0'; el.style.transform = '';
+                    el.classList.remove('glow');
                 });
                 ov.classList.remove('active');
-                ov.style.opacity = '';
-                ov.style.background = '';
-                ov.style.transition = '';
-                sk.classList.remove('show');
+                ov.style.opacity = ''; ov.style.background = '';
+                ov.style.transition = ''; ov.style.transform = '';
                 if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
                 loopT0 = null;
             }
 
-            /* ---- exposed skip function ---- */
-            window.skipStarAnim = function () { if (alive) endAnim(); };
+            /* ========================================
+             *  ★ 核心逻辑：点击 → 跳转 → 返回后播放
+             * ======================================== */
 
-            /* ---- intercept GitHub button ---- */
             btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                window.open(this.href, '_blank');
-                playAnim();
+                /* 让浏览器正常跳转（target=_blank），不阻止默认行为 */
+                /* 标记「等待用户返回」 */
+                waitingForReturn = true;
             });
+
+            /* 用户切回本标签页时触发 */
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible' && waitingForReturn) {
+                    waitingForReturn = false;
+                    /* 给一点小延迟，让页面完全渲染好 */
+                    setTimeout(playAnim, 120);
+                }
+            });
+
+            /* 有些浏览器不触发 visibilitychange 但触发 focus */
+            window.addEventListener('focus', function () {
+                if (waitingForReturn) {
+                    waitingForReturn = false;
+                    setTimeout(playAnim, 120);
+                }
+            });
+
         })();
     </script>
 </body>
