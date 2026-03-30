@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200">
+    <title>MdOut! — MyBiOut!</title>
+    <link rel="icon" href="/assets/logo-fullres.png" type="image/png">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #E85B8A;
+            border-radius: 3px;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: url('/assets/bg.png') center center / cover no-repeat fixed;
+            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+            cursor: default;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #bg-cv {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            width: 1200px;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            padding: 18px 20px 14px;
+        }
+
+        /* Header */
+        .hdr {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+
+        .back {
+            background: #E85B8A;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 18px;
+            border: 3px solid #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+            transition: transform .12s, box-shadow .12s;
+            cursor: pointer;
+        }
+
+        .back:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        .hdr h1 {
+            font-size: 32px;
+            font-weight: 900;
+            color: #F5A623;
+            text-shadow: 3px 3px 0 #E85B8A;
+            transform: rotate(-0.6deg);
+        }
+
+        .hdr-stats {
+            margin-left: auto;
+            font-size: 13px;
+            font-weight: 700;
+            color: #E85B8A;
+            display: flex;
+            gap: 16px;
+        }
+
+        .hdr-stats span {
+            color: #F5A623;
+        }
+
+        /* ===== MAIN AREA (shared) ===== */
+        .main-area {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ===== CARD GRID ===== */
+        .card-grid {
+            display: grid;
+            grid-template-columns: 5fr 3fr 2.5fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 16px;
+            height: 100%;
+        }
+
+        .func-card {
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            padding: 24px 28px;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform .18s, box-shadow .18s, border-color .18s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .func-card:hover {
+            transform: translate(3px, 3px) rotate(0deg) !important;
+            box-shadow: 2px 2px 0 #E85B8A;
+            border-color: #E85B8A;
+        }
+
+        .func-card.card-video {
+            grid-column: 1;
+            grid-row: 1 / 3;
+            transform: rotate(-0.4deg);
+        }
+
+        .func-card.card-user {
+            grid-column: 2 / 4;
+            grid-row: 1;
+            transform: rotate(0.3deg);
+        }
+
+        .func-card.card-article {
+            grid-column: 2;
+            grid-row: 2;
+            transform: rotate(-0.25deg);
+        }
+
+        .func-card.card-done {
+            grid-column: 3;
+            grid-row: 2;
+            transform: rotate(0.35deg);
+            cursor: default;
+        }
+
+        .func-card.card-done:hover {
+            transform: translate(0, 0) rotate(0deg) !important;
+            box-shadow: 5px 5px 0 #E85B8A;
+        }
+
+        .func-emoji {
+            font-size: 48px;
+            margin-bottom: 12px;
+            line-height: 1;
+        }
+
+        .card-video .func-emoji {
+            font-size: 72px;
+            margin-bottom: 18px;
+        }
+
+        .func-name {
+            font-size: 22px;
+            font-weight: 900;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .card-video .func-name {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .func-desc {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.7;
+            margin-bottom: 10px;
+            flex: 1;
+        }
+
+        .card-video .func-desc {
+            font-size: 15px;
+        }
+
+        .func-accept {
+            font-size: 12px;
+            font-weight: 700;
+            color: #E85B8A;
+            background: rgba(232, 91, 138, .08);
+            padding: 6px 12px;
+            border: 1px dashed #E85B8A;
+            display: inline-block;
+        }
+
+        .card-video .func-accept {
+            font-size: 13px;
+            padding: 8px 14px;
+        }
+
+        .func-count {
+            position: absolute;
+            top: 12px;
+            right: 14px;
+            background: #F5A623;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 10px;
+            border: 2px solid #d48b0e;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        .func-count.has {
+            background: #E85B8A;
+            border-color: #c44876;
+        }
+
+        /* Done card */
+        .done-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .done-title-row .func-emoji {
+            font-size: 28px;
+            margin-bottom: 0;
+        }
+
+        .done-title-row .func-name {
+            font-size: 17px;
+            margin-bottom: 0;
+        }
+
+        .done-scroll {
+            flex: 1;
+            overflow-y: auto;
+            margin: 4px 0;
+        }
+
+        .done-item {
+            font-size: 12px;
+            color: #666;
+            padding: 3px 0;
+            border-bottom: 1px solid #f0f0f0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .done-item b {
+            color: #27ae60;
+        }
+
+        .done-empty {
+            color: #ccc;
+            font-size: 13px;
+            text-align: center;
+            padding: 16px 0;
+        }
+
+        .done-ft {
+            margin-top: auto;
+            padding-top: 6px;
+        }
+
+        /* ===== PANEL VIEW ===== */
+        .panel-wrap {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            gap: 12px;
+        }
+
+        .panel-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            padding: 12px 20px;
+        }
+
+        .panel-icon {
+            font-size: 28px;
+        }
+
+        .panel-title {
+            font-size: 22px;
+            font-weight: 900;
+            color: #E85B8A;
+        }
+
+        .panel-type-hint {
+            margin-left: auto;
+            font-size: 12px;
+            font-weight: 700;
+            color: #888;
+        }
+
+        .panel-input {
+            display: flex;
+            gap: 10px;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 4px 4px 0 #E85B8A;
+            padding: 10px 16px;
+        }
+
+        .panel-input input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #F5A623;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            background: #fff;
+            transition: border-color .2s;
+        }
+
+        .panel-input input:focus {
+            border-color: #E85B8A;
+        }
+
+        .panel-body {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 12px;
+            min-height: 0;
+        }
+
+        .panel-col {
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 4px 4px 0 #E85B8A;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-col-hd {
+            padding: 10px 14px 6px;
+            border-bottom: 3px dashed #F5A623;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .panel-col-hd h3 {
+            font-size: 15px;
+            font-weight: 900;
+            color: #E85B8A;
+            white-space: nowrap;
+        }
+
+        .badge {
+            background: #F5A623;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border: 2px solid #d48b0e;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .panel-col-hd-right {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .panel-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 10px;
+        }
+
+        .panel-col-ft {
+            padding: 6px 10px;
+            border-top: 2px solid rgba(245, 166, 35, .2);
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        /* Item cards */
+        .item {
+            background: #fff;
+            border: 2px solid #eee;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: border-color .18s, box-shadow .18s, transform .18s, background .18s;
+            border-left: 4px solid #ccc;
+        }
+
+        .item:hover {
+            transform: translateX(3px);
+            box-shadow: 0 2px 8px rgba(232, 91, 138, .12);
+            border-color: #F5A623;
+        }
+
+        .item.sel {
+            background: rgba(245, 166, 35, .06);
+            border-color: #E85B8A;
+            border-left-color: #E85B8A !important;
+        }
+
+        .item.sel::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            border: 8px solid transparent;
+            border-top-color: #E85B8A;
+            border-right-color: #E85B8A;
+        }
+
+        .item-video {
+            border-left-color: #8e44ad;
+        }
+
+        .item-user {
+            border-left-color: #27ae60;
+        }
+
+        .item-article {
+            border-left-color: #2980b9;
+        }
+
+        .item-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 2px;
+        }
+
+        .item-sub {
+            font-size: 11px;
+            color: #888;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .item-status {
+            font-size: 10px;
+            font-weight: 700;
+            margin-top: 3px;
+            padding: 1px 6px;
+            display: inline-block;
+        }
+
+        .item-status.pending {
+            background: #f0f0f0;
+            color: #888;
+        }
+
+        .item-status.fetching {
+            background: linear-gradient(90deg, #E85B8A, #F5A623, #E85B8A);
+            background-size: 200% auto;
+            color: #fff;
+            animation: shimmer 1.5s linear infinite;
+        }
+
+        .item-status.ready {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .item-status.failed {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 0% center
+            }
+
+            100% {
+                background-position: 200% center
+            }
+        }
+
+        /* Preview */
+        .preview-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 14px;
+        }
+
+        .md-rendered h1 {
+            font-size: 20px;
+            color: #333;
+            border-bottom: 2px solid #F5A623;
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+        }
+
+        .md-rendered h2 {
+            font-size: 16px;
+            color: #E85B8A;
+            margin-top: 14px;
+            margin-bottom: 6px;
+        }
+
+        .md-rendered h3 {
+            font-size: 14px;
+            color: #F5A623;
+            margin-top: 10px;
+            margin-bottom: 4px;
+        }
+
+        .md-rendered table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+
+        .md-rendered th,
+        .md-rendered td {
+            border: 1px solid #ddd;
+            padding: 4px 8px;
+            text-align: left;
+        }
+
+        .md-rendered th {
+            background: #F5A623;
+            color: #fff;
+            font-size: 11px;
+        }
+
+        .md-rendered blockquote {
+            border-left: 3px solid #E85B8A;
+            padding-left: 10px;
+            color: #888;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+
+        .md-rendered code {
+            background: #f5f5f5;
+            padding: 1px 4px;
+            font-size: 11px;
+        }
+
+        .md-rendered p {
+            margin: 5px 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #444;
+        }
+
+        .md-rendered hr {
+            border: none;
+            border-top: 2px dashed #F5A623;
+            margin: 10px 0;
+        }
+
+        .md-rendered img {
+            max-width: 100%;
+            max-height: 180px;
+            border: 2px solid #F5A623;
+        }
+
+        .md-rendered em {
+            color: #888;
+        }
+
+        .md-rendered ul,
+        .md-rendered ol {
+            padding-left: 18px;
+            font-size: 13px;
+        }
+
+        .md-raw {
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 11px;
+            font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+            color: #333;
+            line-height: 1.5;
+            padding: 0;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 2px solid;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: transform .1s, box-shadow .1s, opacity .2s;
+        }
+
+        .btn:active {
+            transform: translate(1px, 1px) !important;
+        }
+
+        .btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .btn-pk {
+            background: #E85B8A;
+            color: #fff;
+            border-color: #c44876;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .btn-or {
+            background: #F5A623;
+            color: #fff;
+            border-color: #d48b0e;
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .btn-gh {
+            background: transparent;
+            color: #E85B8A;
+            border-color: #E85B8A;
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        .btn-gn {
+            background: #27ae60;
+            color: #fff;
+            border-color: #1e8449;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .btn-xs {
+            padding: 2px 8px;
+            font-size: 10px;
+        }
+
+        /* Log Bar */
+        .logbar {
+            flex-shrink: 0;
+            height: 100px;
+            margin-top: 12px;
+            background: rgba(30, 30, 40, .88);
+            backdrop-filter: blur(8px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            padding: 10px 16px;
+            overflow: hidden;
+        }
+
+        .log-msgs {
+            height: 100%;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.7;
+            font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+        }
+
+        .log-msgs::-webkit-scrollbar-thumb {
+            background: #F5A623;
+        }
+
+        .lm {
+            opacity: 0;
+            animation: logIn .3s ease-out forwards;
+        }
+
+        @keyframes logIn {
+            from {
+                opacity: 0;
+                transform: translateX(-12px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0)
+            }
+        }
+
+        .lm-time {
+            color: #666;
+        }
+
+        .lm-info {
+            color: #F5A623;
+        }
+
+        .lm-success {
+            color: #2ecc71;
+        }
+
+        .lm-warn {
+            color: #f39c12;
+        }
+
+        .lm-error {
+            color: #e74c3c;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            padding: 10px 22px;
+            background: #F5A623;
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+            border: 3px solid #d48b0e;
+            box-shadow: 4px 4px 0 #E85B8A;
+            z-index: 9000;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity .25s, transform .25s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.err {
+            background: #E85B8A;
+            border-color: #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+        }
+
+        /* Empty hint */
+        .empty-hint {
+            text-align: center;
+            padding: 30px 10px;
+            color: #ccc;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .empty-hint .em-icon {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        /* Card hover glow */
+        .func-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(245, 166, 35, .06), rgba(232, 91, 138, .06));
+            opacity: 0;
+            transition: opacity .3s;
+            pointer-events: none;
+        }
+
+        .func-card:hover::before {
+            opacity: 1;
+        }
+
+        /* card-done no hover glow */
+        .func-card.card-done::before {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-cv"></canvas>
+    <div class="page">
+        <!-- HEADER -->
+        <div class="hdr">
+            <a class="back" href="/" id="hdr-back">← 首页</a>
+            <h1>MdOut!</h1>
+            <div class="hdr-stats">
+                <div>获取 <span id="st-fetch">0</span></div>
+                <div>完成 <span id="st-done">0</span></div>
+            </div>
+        </div>
+
+        <!-- ===== CARD GRID VIEW ===== -->
+        <div class="main-area card-grid" id="view-grid">
+            <!-- Video (largest) -->
+            <div class="func-card card-video" onclick="openPanel('video')">
+                <div class="func-count" id="cnt-video">0</div>
+                <div class="func-emoji">🎬</div>
+                <div class="func-name">视频信息导出</div>
+                <div class="func-desc">
+                    导出视频的完整信息为 Markdown 文档<br>
+                    包含 UP 主、数据统计、标签、分P列表等
+                </div>
+                <div class="func-accept">BV号 · av号 · 视频链接 · b23短链</div>
+            </div>
+
+            <!-- User (medium) -->
+            <div class="func-card card-user" onclick="openPanel('user')">
+                <div class="func-count" id="cnt-user">0</div>
+                <div class="func-emoji">👤</div>
+                <div class="func-name">用户信息导出</div>
+                <div class="func-desc">导出用户空间信息，包含数据统计与收藏夹内容</div>
+                <div class="func-accept">UID · 空间链接</div>
+            </div>
+
+            <!-- Article (small) -->
+            <div class="func-card card-article" onclick="openPanel('article')">
+                <div class="func-count" id="cnt-article">0</div>
+                <div class="func-emoji">📝</div>
+                <div class="func-name">专栏导出</div>
+                <div class="func-desc">导出B站专栏文章元信息</div>
+                <div class="func-accept">cv号 · 专栏链接</div>
+            </div>
+
+            <!-- Completed -->
+            <div class="func-card card-done">
+                <div class="done-title-row">
+                    <div class="func-emoji">✅</div>
+                    <div class="func-name">已完成</div>
+                    <div class="func-count" id="cnt-done" style="position:static">0</div>
+                </div>
+                <div class="done-scroll" id="done-scroll"></div>
+                <div class="done-ft">
+                    <button class="btn btn-gh btn-xs" onclick="event.stopPropagation();clearDone()">清空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== PANEL VIEW ===== -->
+        <div class="main-area" id="view-panel" style="display:none">
+            <div class="panel-wrap">
+                <!-- Panel Header -->
+                <div class="panel-top">
+                    <button class="btn btn-pk" onclick="closePanel()">← 返回</button>
+                    <span class="panel-icon" id="p-icon">🎬</span>
+                    <span class="panel-title" id="p-title">视频信息导出</span>
+                    <span class="panel-type-hint" id="p-hint">BV号 · av号 · 视频链接</span>
+                </div>
+
+                <!-- Input Bar -->
+                <div class="panel-input">
+                    <input type="text" id="url-input" placeholder="输入链接或ID..."
+                        onkeydown="if(event.key==='Enter')addFetch()">
+                    <button class="btn btn-or" onclick="addFetch()">添加并获取</button>
+                </div>
+
+                <!-- Body: List + Preview -->
+                <div class="panel-body">
+                    <!-- List -->
+                    <div class="panel-col">
+                        <div class="panel-col-hd">
+                            <h3>📋 列表</h3>
+                            <div class="badge" id="p-badge">0</div>
+                        </div>
+                        <div class="panel-list" id="p-list"></div>
+                        <div class="panel-col-ft">
+                            <button class="btn btn-gh btn-xs" onclick="selAll()">全选</button>
+                            <button class="btn btn-gh btn-xs" onclick="selNone()">取消</button>
+                            <button class="btn btn-gh btn-xs" onclick="clearPanelCards()">清空</button>
+                            <button class="btn btn-gn" onclick="exportSelected()" style="margin-left:auto">导出选中
+                            </button>
+                            <button class="btn btn-or" onclick="exportAllReady()">导出全部</button>
+                        </div>
+                    </div>
+
+                    <!-- Preview -->
+                    <div class="panel-col">
+                        <div class="panel-col-hd">
+                            <h3>📄 预览</h3>
+                            <div class="panel-col-hd-right">
+                                <button class="btn btn-gh btn-xs" id="btn-raw" onclick="toggleRaw()">Raw</button>
+                            </div>
+                        </div>
+                        <div class="preview-area">
+                            <div class="empty-hint" id="prev-empty">
+                                <span class="em-icon">📄</span>
+                                点击左侧项目查看预览
+                            </div>
+                            <div id="prev-rich" class="md-rendered" style="display:none"></div>
+                            <pre id="prev-raw" class="md-raw" style="display:none"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOG BAR -->
+        <div class="logbar">
+            <div class="log-msgs" id="log-msgs"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        (function () {
+            /* ===== STATE ===== */
+            let currentPanel = null; // 'video' | 'user' | 'article' | null
+            let _last = null;
+            let prevLogLen = 0;
+            let showRaw = false;
+            const sel = new Set();
+
+            const PANELS = {
+                video: { icon: '🎬', title: '视频信息导出', hint: 'BV号 · av号 · 视频链接 · b23短链', placeholder: '输入BV号、av号或视频链接...' },
+                user: { icon: '👤', title: '用户信息导出', hint: 'UID · 空间链接', placeholder: '输入UID或空间链接...' },
+                article: { icon: '📝', title: '专栏导出', hint: 'cv号 · 专栏链接', placeholder: '输入cv号或专栏链接...' },
+            };
+
+            /* ===== UTILS ===== */
+            const $ = id => document.getElementById(id);
+            function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+            let _tt = null;
+            function toast(msg, err) {
+                const el = $('toast'); if (_tt) clearTimeout(_tt);
+                el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
+                _tt = setTimeout(() => el.className = 'toast', 2200);
+            }
+
+            /* ===== PANEL OPEN / CLOSE ===== */
+            window.openPanel = function (type) {
+                currentPanel = type;
+                sel.clear();
+                const cfg = PANELS[type];
+                $('p-icon').textContent = cfg.icon;
+                $('p-title').textContent = cfg.title;
+                $('p-hint').textContent = cfg.hint;
+                $('url-input').placeholder = cfg.placeholder;
+                $('url-input').value = '';
+                $('view-grid').style.display = 'none';
+                $('view-panel').style.display = '';
+                $('hdr-back').href = 'javascript:void(0)';
+                $('hdr-back').onclick = function (e) { e.preventDefault(); closePanel(); };
+                resetPreview();
+                poll();
+            };
+
+            window.closePanel = function () {
+                currentPanel = null;
+                sel.clear();
+                $('view-panel').style.display = 'none';
+                $('view-grid').style.display = '';
+                $('hdr-back').href = '/';
+                $('hdr-back').onclick = null;
+                poll();
+            };
+
+            /* ===== ADD ===== */
+            window.addFetch = async function () {
+                const v = $('url-input').value.trim();
+                if (!v) { toast('请输入链接或ID', true); return; }
+
+                // Pre-check type
+                try {
+                    const pr = await (await fetch('/api/mdout/parse', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: v })
+                    })).json();
+                    if (pr.type === 'unknown') { toast('无法识别该链接', true); return; }
+                    if (pr.type !== currentPanel) {
+                        const labels = { video: '视频', user: '用户', article: '专栏' };
+                        toast(`这是${labels[pr.type] || '其他'}链接，请去对应卡片操作`, true);
+                        return;
+                    }
+                } catch (e) { }
+
+                const r = await (await fetch('/api/mdout/add', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: v })
+                })).json();
+                if (!r.ok) { toast(r.error || '添加失败', true); return; }
+                $('url-input').value = '';
+                toast('已添加');
+            };
+
+            /* ===== ITEM CLICK / SELECT ===== */
+            window.clickItem = async function (id) {
+                if (sel.has(id)) sel.delete(id); else sel.add(id);
+                await fetch('/api/mdout/select', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_id: id })
+                });
+                poll();
+            };
+
+            window.selAll = function () {
+                if (!_last) return;
+                _last.cards.filter(c => c.item_type === currentPanel).forEach(c => sel.add(c.id));
+                poll();
+            };
+            window.selNone = function () { sel.clear(); poll(); };
+
+            /* ===== EXPORT ===== */
+            window.exportSelected = async function () {
+                const ids = [...sel].filter(id => {
+                    const c = _last?.cards?.find(x => x.id === id);
+                    return c && c.status === 'ready';
+                });
+                if (!ids.length) { toast('请选择就绪的项目', true); return; }
+                const r = await (await fetch('/api/mdout/export', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_ids: ids })
+                })).json();
+                if (r.ok) { sel.clear(); toast('已导出 ' + r.exported + ' 项'); }
+                else toast(r.error || '导出失败', true);
+            };
+
+            window.exportAllReady = async function () {
+                // Only export items of current panel type
+                if (!_last) return;
+                const ids = _last.cards.filter(c => c.item_type === currentPanel && c.status === 'ready').map(c => c.id);
+                if (!ids.length) { toast('没有可导出的项目', true); return; }
+                const r = await (await fetch('/api/mdout/export', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_ids: ids })
+                })).json();
+                if (r.ok) { sel.clear(); toast('已导出 ' + r.exported + ' 项'); }
+                else toast(r.error || '导出失败', true);
+            };
+
+            /* ===== CLEAR ===== */
+            window.clearPanelCards = async function () {
+                if (!_last) return;
+                const ids = _last.cards.filter(c => c.item_type === currentPanel).map(c => c.id);
+                if (!ids.length) return;
+                await fetch('/api/mdout/remove', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_ids: ids })
+                });
+                sel.clear();
+                resetPreview();
+            };
+
+            window.clearDone = async function () {
+                await fetch('/api/mdout/clear-completed', { method: 'POST' });
+            };
+
+            /* ===== PREVIEW ===== */
+            window.toggleRaw = function () {
+                showRaw = !showRaw;
+                $('btn-raw').textContent = showRaw ? 'Rich' : 'Raw';
+                renderPreview(_last?.selected_markdown || '');
+            };
+
+            function resetPreview() {
+                $('prev-empty').style.display = '';
+                $('prev-rich').style.display = 'none';
+                $('prev-raw').style.display = 'none';
+            }
+
+            function renderPreview(md) {
+                if (!md) { resetPreview(); return; }
+                $('prev-empty').style.display = 'none';
+                if (showRaw) {
+                    $('prev-rich').style.display = 'none';
+                    $('prev-raw').style.display = '';
+                    $('prev-raw').textContent = md;
+                } else {
+                    $('prev-raw').style.display = 'none';
+                    $('prev-rich').style.display = '';
+                    try { $('prev-rich').innerHTML = marked.parse(md); }
+                    catch (e) { $('prev-rich').textContent = md; }
+                }
+            }
+
+            /* ===== RENDER GRID ===== */
+            function renderGrid(state) {
+                const cards = state.cards;
+                const counts = { video: 0, user: 0, article: 0 };
+                cards.forEach(c => { if (counts[c.item_type] !== undefined) counts[c.item_type]++; });
+
+                ['video', 'user', 'article'].forEach(t => {
+                    const el = $('cnt-' + t);
+                    el.textContent = counts[t];
+                    el.classList.toggle('has', counts[t] > 0);
+                });
+
+                // Completed list
+                const doneEl = $('done-scroll');
+                const completed = state.completed || [];
+                $('cnt-done').textContent = completed.length;
+                $('cnt-done').classList.toggle('has', completed.length > 0);
+
+                const doneHtml = completed.length
+                    ? completed.slice(-20).reverse().map(c =>
+                        '<div class="done-item"><b>✓</b> ' + escH(c.title || c.filename || '—') + '</div>'
+                    ).join('')
+                    : '<div class="done-empty">暂无导出记录</div>';
+
+                if (doneEl._lh !== doneHtml) {
+                    doneEl.innerHTML = doneHtml;
+                    doneEl._lh = doneHtml;
+                }
+            }
+
+            /* ===== RENDER PANEL ===== */
+            function renderPanel(state) {
+                if (!currentPanel) return;
+                const items = state.cards.filter(c => c.item_type === currentPanel);
+                $('p-badge').textContent = items.length;
+
+                const statusLabels = { pending: '等待中', fetching: '获取中...', ready: '就绪', failed: '失败' };
+                const listHtml = items.length
+                    ? items.map(c => {
+                        const isSel = sel.has(c.id);
+                        const tcls = 'item-' + (c.item_type || 'video');
+                        const stHtml = statusLabels[c.status]
+                            ? '<div class="item-status ' + c.status + '">' + statusLabels[c.status] +
+                            (c.status === 'failed' && c.error ? ': ' + escH(c.error) : '') + '</div>'
+                            : '';
+                        return '<div class="item ' + tcls + (isSel ? ' sel' : '') + '" onclick="clickItem(\'' + c.id + '\')">' +
+                            '<div class="item-title">' + escH(c.title || c.input_text || '—') + '</div>' +
+                            '<div class="item-sub">' + escH(c.subtitle || c.id_value || '') + '</div>' +
+                            stHtml + '</div>';
+                    }).join('')
+                    : '<div class="empty-hint"><span class="em-icon">📋</span>在上方输入链接添加</div>';
+
+                const listEl = $('p-list');
+                if (listEl._lh !== listHtml) {
+                    const st = listEl.scrollTop;
+                    listEl.innerHTML = listHtml;
+                    listEl.scrollTop = st;
+                    listEl._lh = listHtml;
+                }
+
+                // Preview
+                renderPreview(state.selected_markdown || '');
+
+                // Clean stale selections
+                const validIds = new Set(items.map(c => c.id));
+                for (const id of sel) { if (!validIds.has(id)) sel.delete(id); }
+            }
+
+            /* ===== LOGS ===== */
+            function renderLogs(logs) {
+                if (logs.length === prevLogLen) return;
+                const el = $('log-msgs');
+                logs.slice(prevLogLen).forEach(l => {
+                    const d = document.createElement('div'); d.className = 'lm';
+                    d.innerHTML = '<span class="lm-time">[' + escH(l.time) + ']</span> <span class="lm-' + l.level + '">' + escH(l.msg) + '</span>';
+                    el.appendChild(d);
+                });
+                prevLogLen = logs.length;
+                el.scrollTop = el.scrollHeight;
+            }
+
+            /* ===== POLL ===== */
+            async function poll() {
+                try {
+                    const r = await fetch('/api/mdout/state');
+                    const s = await r.json();
+                    _last = s;
+
+                    renderGrid(s);
+                    if (currentPanel) renderPanel(s);
+                    renderLogs(s.logs);
+
+                    $('st-fetch').textContent = s.cards.length;
+                    $('st-done').textContent = (s.completed || []).length;
+                } catch (e) { }
+            }
+
+            /* ===== BG STARS ===== */
+            function initBg() {
+                const cv = $('bg-cv'), cx = cv.getContext('2d');
+                const O = '#F5A623', P = '#E85B8A';
+                let stars = [];
+
+                function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+                resize();
+                window.addEventListener('resize', resize);
+
+                for (let i = 0; i < 28; i++) stars.push({
+                    x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+                    sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2,
+                    rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2,
+                    c: Math.random() > .5 ? O : P, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2
+                });
+
+                function dS(x, y, r, sz, col, al) {
+                    if (al < .01) return;
+                    cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r); cx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5;
+                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
+                        cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
+                    }
+                    cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore();
+                }
+
+                (function loop() {
+                    cx.clearRect(0, 0, cv.width, cv.height);
+                    stars.forEach(s => {
+                        s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
+                        if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; }
+                        if (s.x < -20) s.x = innerWidth + 20;
+                        if (s.x > innerWidth + 20) s.x = -20;
+                        dS(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
+                    });
+                    requestAnimationFrame(loop);
+                })();
+            }
+
+            /* ===== INIT ===== */
+            initBg();
+            poll();
+            setInterval(poll, 600);
+        })();
+    </script>
+</body>
+
+</html>

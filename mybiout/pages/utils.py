@@ -39,6 +39,12 @@ DEFAULTS: dict[str, dict[str, str]] = {
     },
     "mdout": {
         "folder": "mdout!",
+        "sessdata": "",
+        "include_cover": "true",
+        "include_tags": "true",
+        "include_stats": "true",
+        "favorite_detail": "basic",
+        "request_delay": "0.5",
     },
 }
 

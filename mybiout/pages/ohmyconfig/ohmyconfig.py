@@ -32,6 +32,8 @@ _ALLOWED_NAME_PARTS = {
     "publish_time",
     "export_time",
 }
+_ALLOWED_FAVORITE_DETAIL = {"basic", "full"}
+_ALLOWED_REQUEST_DELAY = {"0.3", "0.5", "1.0", "2.0"}
 
 
 def validate_and_save(section: str, key: str, value: str) -> dict:
@@ -98,6 +100,35 @@ def validate_and_save(section: str, key: str, value: str) -> dict:
         v = value.strip()
         if v not in _ALLOWED_INCOMPLETE_TITLE_ACTION:
             return _err("标题补全策略值不合法")
+        utils.set_setting(section, key, v)
+        return _ok()
+
+    # --- mdout: 布尔项 ---
+    if section == "mdout" and key in ("include_cover", "include_tags", "include_stats"):
+        v = value.strip().lower()
+        if v not in _ALLOWED_BOOL:
+            return _err("开关值不对劲, 只能 true/false")
+        utils.set_setting(section, key, v)
+        return _ok()
+
+    # --- mdout: sessdata ---
+    if section == "mdout" and key == "sessdata":
+        utils.set_setting(section, key, value.strip())
+        return _ok()
+
+    # --- mdout: favorite_detail ---
+    if section == "mdout" and key == "favorite_detail":
+        v = value.strip()
+        if v not in _ALLOWED_FAVORITE_DETAIL:
+            return _err("收藏夹详情只能是 basic / full")
+        utils.set_setting(section, key, v)
+        return _ok()
+
+    # --- mdout: request_delay ---
+    if section == "mdout" and key == "request_delay":
+        v = value.strip()
+        if v not in _ALLOWED_REQUEST_DELAY:
+            return _err("请求间隔只能是 0.3 / 0.5 / 1.0 / 2.0")
         utils.set_setting(section, key, v)
         return _ok()
 

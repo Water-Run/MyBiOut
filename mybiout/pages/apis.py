@@ -38,6 +38,13 @@ async def localout_page() -> HTMLResponse:
     )
 
 
+@app.get("/mdout", response_class=HTMLResponse)
+async def mdout_page() -> HTMLResponse:
+    return HTMLResponse(
+        (_PAGES_DIR / "mdout" / "mdout.html").read_text(encoding="utf-8")
+    )
+
+
 # ======================= 设置 API =======================
 
 
@@ -194,4 +201,73 @@ async def localout_start_export(request: Request):
 async def localout_cancel_export():
     from mybiout.pages.localout.localout import cancel_export
     cancel_export()
+    return {"ok": True}
+
+
+# ======================= MdOut API =======================
+
+
+@app.get("/api/mdout/state")
+async def mdout_state():
+    from mybiout.pages.mdout.mdout import get_state
+    return get_state()
+
+
+@app.post("/api/mdout/parse")
+async def mdout_parse(request: Request):
+    body = await request.json()
+    from mybiout.pages.mdout.mdout import do_parse
+    return do_parse(body.get("text", ""))
+
+
+@app.post("/api/mdout/add")
+async def mdout_add(request: Request):
+    body = await request.json()
+    from mybiout.pages.mdout.mdout import add_and_fetch
+    result = add_and_fetch(body.get("text", ""))
+    if result["ok"]:
+        return result
+    return JSONResponse(status_code=400, content=result)
+
+
+@app.post("/api/mdout/select")
+async def mdout_select(request: Request):
+    body = await request.json()
+    from mybiout.pages.mdout.mdout import select_card
+    select_card(body.get("card_id", ""))
+    return {"ok": True}
+
+
+@app.post("/api/mdout/export")
+async def mdout_export(request: Request):
+    body = await request.json()
+    from mybiout.pages.mdout.mdout import export_cards
+    return export_cards(body.get("card_ids", []))
+
+
+@app.post("/api/mdout/export-all")
+async def mdout_export_all():
+    from mybiout.pages.mdout.mdout import export_all_ready
+    return export_all_ready()
+
+
+@app.post("/api/mdout/remove")
+async def mdout_remove(request: Request):
+    body = await request.json()
+    from mybiout.pages.mdout.mdout import remove_cards
+    remove_cards(body.get("card_ids", []))
+    return {"ok": True}
+
+
+@app.post("/api/mdout/clear")
+async def mdout_clear():
+    from mybiout.pages.mdout.mdout import clear_cards
+    clear_cards()
+    return {"ok": True}
+
+
+@app.post("/api/mdout/clear-completed")
+async def mdout_clear_completed():
+    from mybiout.pages.mdout.mdout import clear_completed
+    clear_completed()
     return {"ok": True}

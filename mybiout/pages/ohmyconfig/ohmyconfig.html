@@ -501,6 +501,7 @@
             <h1 class="page-title">设置</h1>
         </div>
 
+        <!-- ========== 通用设置 ========== -->
         <div class="section" style="transform:rotate(-0.7deg)">
             <h2 class="section-title">通用设置</h2>
 
@@ -535,6 +536,7 @@
             </div>
         </div>
 
+        <!-- ========== LocalOut 设置 ========== -->
         <div class="section" style="transform:rotate(0.45deg)">
             <h2 class="section-title">LocalOut 设置</h2>
 
@@ -585,7 +587,7 @@
 
             <div class="setting-row conditional sub-row" id="row-bili-pc-path-only-if-installed">
                 <div class="setting-label">仅在安装桌面端时作为可选路径</div>
-                <div class="setting-hint">开启后，该路径按“检测到桌面端后可选”逻辑处理（默认开启）</div>
+                <div class="setting-hint">开启后，该路径按"检测到桌面端后可选"逻辑处理（默认开启）</div>
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-bili-pc-path-only-if-installed"
@@ -597,39 +599,23 @@
 
             <div class="setting-row">
                 <div class="setting-label">名称包含（至少选择一项）</div>
-                <div class="setting-hint">用于组合导出文件名，默认勾选“视频标题”</div>
+                <div class="setting-hint">用于组合导出文件名，默认勾选"视频标题"</div>
                 <div class="setting-controls">
                     <div class="check-group">
-                        <label class="check-item">
-                            <input type="checkbox" name="name-parts" value="bv" onchange="onNamePartsChanged(this)">
-                            BV号
-                        </label>
-                        <label class="check-item">
-                            <input type="checkbox" name="name-parts" value="title" onchange="onNamePartsChanged(this)">
-                            视频标题（默认）
-                        </label>
-                        <label class="check-item">
-                            <input type="checkbox" name="name-parts" value="up" onchange="onNamePartsChanged(this)">
-                            UP主名称
-                        </label>
-                        <label class="check-item">
-                            <input type="checkbox" name="name-parts" value="group" onchange="onNamePartsChanged(this)">
-                            分组标题
-                        </label>
-                        <label class="check-item">
-                            <input type="checkbox" name="name-parts" value="part" onchange="onNamePartsChanged(this)">
-                            分P号
-                        </label>
-                        <label class="check-item">
-                            <input type="checkbox" name="name-parts" value="publish_time"
-                                onchange="onNamePartsChanged(this)">
-                            发布时间
-                        </label>
-                        <label class="check-item">
-                            <input type="checkbox" name="name-parts" value="export_time"
-                                onchange="onNamePartsChanged(this)">
-                            导出时间
-                        </label>
+                        <label class="check-item"><input type="checkbox" name="name-parts" value="bv"
+                                onchange="onNamePartsChanged(this)"> BV号</label>
+                        <label class="check-item"><input type="checkbox" name="name-parts" value="title"
+                                onchange="onNamePartsChanged(this)"> 视频标题（默认）</label>
+                        <label class="check-item"><input type="checkbox" name="name-parts" value="up"
+                                onchange="onNamePartsChanged(this)"> UP主名称</label>
+                        <label class="check-item"><input type="checkbox" name="name-parts" value="group"
+                                onchange="onNamePartsChanged(this)"> 分组标题</label>
+                        <label class="check-item"><input type="checkbox" name="name-parts" value="part"
+                                onchange="onNamePartsChanged(this)"> 分P号</label>
+                        <label class="check-item"><input type="checkbox" name="name-parts" value="publish_time"
+                                onchange="onNamePartsChanged(this)"> 发布时间</label>
+                        <label class="check-item"><input type="checkbox" name="name-parts" value="export_time"
+                                onchange="onNamePartsChanged(this)"> 导出时间</label>
                     </div>
                 </div>
             </div>
@@ -678,6 +664,7 @@
             </div>
         </div>
 
+        <!-- ========== BBDown 设置 ========== -->
         <div class="section" style="transform:rotate(-0.55deg)">
             <h2 class="section-title">BBDown 设置</h2>
 
@@ -697,6 +684,7 @@
             </div>
         </div>
 
+        <!-- ========== MdOut 设置 ========== -->
         <div class="section" style="transform:rotate(0.5deg)">
             <h2 class="section-title">MdOut 设置</h2>
 
@@ -710,15 +698,81 @@
                 </div>
             </div>
 
-            <div class="setting-row placeholder-row">
-                <div class="setting-label">更多配置项待补充</div>
-                <div class="setting-hint">预留区域</div>
+            <div class="setting-row">
+                <div class="setting-label">SESSDATA</div>
+                <div class="setting-hint">B站登录凭证 Cookie，用于获取需要登录才能访问的信息（如收藏夹详情）</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-mdout-sessdata" style="width:420px" placeholder="留空则不使用认证">
+                    <button class="btn btn-orange" onclick="confirmSessdata()">保存</button>
+                    <button class="btn btn-danger" onclick="clearSessdata()">清空</button>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">包含封面图链接</div>
+                <div class="setting-hint">在 Markdown 中以图片语法插入封面/头像链接</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-mdout-include-cover"
+                            onchange="saveToggle('mdout','include_cover',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">包含标签</div>
+                <div class="setting-hint">导出视频标签信息</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-mdout-include-tags"
+                            onchange="saveToggle('mdout','include_tags',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">包含数据统计</div>
+                <div class="setting-hint">导出播放量、点赞数、粉丝数等统计数据</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-mdout-include-stats"
+                            onchange="saveToggle('mdout','include_stats',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">收藏夹详情程度</div>
+                <div class="setting-hint">导出用户页收藏夹时的详细程度；完整模式会逐个请求收藏夹内容</div>
+                <div class="setting-controls">
+                    <select id="s-mdout-fav-detail" onchange="saveSelect('mdout','favorite_detail',this.value)">
+                        <option value="basic">基本（仅标题和数量）</option>
+                        <option value="full">完整（包含收藏内容列表）</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">请求间隔</div>
+                <div class="setting-hint">相邻 API 请求之间的等待时间，避免过快被 B 站限流</div>
+                <div class="setting-controls">
+                    <select id="s-mdout-delay" onchange="saveSelect('mdout','request_delay',this.value)">
+                        <option value="0.3">0.3s</option>
+                        <option value="0.5">0.5s（推荐）</option>
+                        <option value="1.0">1.0s</option>
+                        <option value="2.0">2.0s</option>
+                    </select>
+                </div>
             </div>
         </div>
 
         <div class="footer">MyBiOut! — 设置项已全部显示</div>
     </div>
 
+    <!-- API Key 模态框 -->
     <div class="modal-backdrop" id="api-modal">
         <div class="modal">
             <h3>明文存储提示</h3>
@@ -726,6 +780,18 @@
             <div class="modal-btns">
                 <button class="btn btn-orange" onclick="doSaveApi()">确认保存</button>
                 <button class="btn btn-ghost" onclick="closeApiModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SESSDATA 模态框 -->
+    <div class="modal-backdrop" id="sessdata-modal">
+        <div class="modal" style="transform:rotate(1deg)">
+            <h3>明文存储提示</h3>
+            <p>SESSDATA 将以明文写入配置文件。<br>它相当于你的登录凭证，请勿泄露。</p>
+            <div class="modal-btns">
+                <button class="btn btn-orange" onclick="doSaveSessdata()">确认保存</button>
+                <button class="btn btn-ghost" onclick="closeSessdataModal()">取消</button>
             </div>
         </div>
     </div>
@@ -744,89 +810,49 @@
             _toastT = setTimeout(() => { el.className = 'toast'; _toastT = null; }, 2200);
         }
 
-        async function apiGet(url) {
-            const r = await fetch(url);
-            return r.json();
-        }
+        async function apiGet(url) { return (await fetch(url)).json(); }
 
         async function apiPost(url, body) {
-            const r = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
+            const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             return { ok: r.ok, data: await r.json() };
         }
 
         function escHtml(s) {
-            return s
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#39;');
+            return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
         }
-
-        function span(cls, text) {
-            return `<span class="${cls}">${escHtml(text)}</span>`;
-        }
+        function span(cls, text) { return `<span class="${cls}">${escHtml(text)}</span>`; }
 
         function nowForExport() {
-            const d = new Date();
-            const pad = (n) => String(n).padStart(2, '0');
+            const d = new Date(), pad = n => String(n).padStart(2, '0');
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
 
         function collectNameParts() {
-            return Array.from(document.querySelectorAll('input[name="name-parts"]:checked'))
-                .map(el => el.value);
+            return Array.from(document.querySelectorAll('input[name="name-parts"]:checked')).map(el => el.value);
         }
 
         function renderCurrentPattern() {
             const selected = new Set(collectNameParts());
-
             let base = '';
-
-            if (selected.has('up')) {
-                base += `${span('seg-up', 'UP主名称')}${span('seg-sep', '--')}`;
-            }
-
-            if (selected.has('bv')) {
-                base += `${span('seg-sep', '{')}${span('seg-bv', 'BV号')}${span('seg-sep', '}')}`;
-            }
-
+            if (selected.has('up')) base += `${span('seg-up', 'UP主名称')}${span('seg-sep', '--')}`;
+            if (selected.has('bv')) base += `${span('seg-sep', '{')}${span('seg-bv', 'BV号')}${span('seg-sep', '}')}`;
             if (selected.has('group') || selected.has('part')) {
                 const mid = `${selected.has('group') ? span('seg-group', '分组标题') : ''}${selected.has('part') ? span('seg-part', '[分P号]') : ''}`;
                 base += `${span('seg-sep', '(')}${mid}${span('seg-sep', ')')}`;
             }
-
-            if (selected.has('title')) {
-                base += span('seg-title', '视频标题');
-            }
-
+            if (selected.has('title')) base += span('seg-title', '视频标题');
             const tails = [];
-            if (selected.has('publish_time')) {
-                tails.push(span('seg-publish', '发布时间'));
-            }
-            if (selected.has('export_time')) {
-                tails.push(span('seg-export', `导出于${nowForExport()}`));
-            }
-
+            if (selected.has('publish_time')) tails.push(span('seg-publish', '发布时间'));
+            if (selected.has('export_time')) tails.push(span('seg-export', `导出于${nowForExport()}`));
             if (!base && tails.length === 0) {
                 document.getElementById('name-preview-current').innerHTML = span('seg-muted', '（请至少保留一个命名字段）');
                 return;
             }
-
-            if (tails.length > 0) {
-                base += `${span('seg-sep', '--')}${tails.join(span('seg-sep', ','))}`;
-            }
-
+            if (tails.length > 0) base += `${span('seg-sep', '--')}${tails.join(span('seg-sep', ','))}`;
             document.getElementById('name-preview-current').innerHTML = base;
         }
 
-        function updateNamePreview() {
-            renderCurrentPattern();
-        }
+        function updateNamePreview() { renderCurrentPattern(); }
 
         async function loadSettings() {
             const s = await apiGet('/api/settings');
@@ -847,21 +873,25 @@
 
             const rawParts = s.localout?.name_parts ?? 'title';
             const selectedParts = new Set(rawParts.split(',').map(x => x.trim()).filter(Boolean));
-            document.querySelectorAll('input[name="name-parts"]').forEach(el => {
-                el.checked = selectedParts.has(el.value);
-            });
-
+            document.querySelectorAll('input[name="name-parts"]').forEach(el => { el.checked = selectedParts.has(el.value); });
             if (collectNameParts().length === 0) {
                 const titleBox = document.querySelector('input[name="name-parts"][value="title"]');
                 if (titleBox) titleBox.checked = true;
             }
 
             document.getElementById('s-bbdown-folder').value = s.bbdown?.folder ?? '';
+
+            // MdOut
             document.getElementById('s-mdout-folder').value = s.mdout?.folder ?? '';
+            document.getElementById('s-mdout-sessdata').value = s.mdout?.sessdata ?? '';
+            document.getElementById('s-mdout-include-cover').checked = (s.mdout?.include_cover ?? 'true') === 'true';
+            document.getElementById('s-mdout-include-tags').checked = (s.mdout?.include_tags ?? 'true') === 'true';
+            document.getElementById('s-mdout-include-stats').checked = (s.mdout?.include_stats ?? 'true') === 'true';
+            document.getElementById('s-mdout-fav-detail').value = s.mdout?.favorite_detail ?? 'basic';
+            document.getElementById('s-mdout-delay').value = s.mdout?.request_delay ?? '0.5';
 
             syncConditional();
             updateNamePreview();
-
             if (_previewTimer) clearInterval(_previewTimer);
             _previewTimer = setInterval(updateNamePreview, 1000);
         }
@@ -869,148 +899,95 @@
         function syncConditional() {
             const scanAndroid = document.getElementById('s-scan-android').checked;
             const hasBiliPcPath = (document.getElementById('s-bili-pc-path').value || '').trim().length > 0;
-
             toggle$('row-scan-interval', scanAndroid);
             toggle$('row-bili-pc-path-only-if-installed', hasBiliPcPath);
         }
-
-        function toggle$(id, show) {
-            document.getElementById(id).classList.toggle('vis', show);
-        }
+        function toggle$(id, show) { document.getElementById(id).classList.toggle('vis', show); }
 
         async function saveSetting(sec, key, val) {
             const { ok, data } = await apiPost('/api/setting', { section: sec, key, value: val });
-            if (ok) {
-                showToast('保存成功');
-                return true;
-            }
-            showToast(data.error || '保存失败', true);
-            return false;
+            if (ok) { showToast('保存成功'); return true; }
+            showToast(data.error || '保存失败', true); return false;
         }
-
-        async function saveToggle(sec, key, checked) {
-            syncConditional();
-            await saveSetting(sec, key, checked ? 'true' : 'false');
-        }
-
-        async function saveSelect(sec, key, val) {
-            await saveSetting(sec, key, val);
-        }
-
+        async function saveToggle(sec, key, checked) { syncConditional(); await saveSetting(sec, key, checked ? 'true' : 'false'); }
+        async function saveSelect(sec, key, val) { await saveSetting(sec, key, val); }
         async function saveFolder(sec, val) {
             const ok = await saveSetting(sec, 'folder', val);
-            if (!ok) {
-                const s = await apiGet('/api/settings');
-                document.getElementById('s-' + sec + '-folder').value = s[sec]?.folder ?? '';
-            }
+            if (!ok) { const s = await apiGet('/api/settings'); document.getElementById('s-' + sec + '-folder').value = s[sec]?.folder ?? ''; }
         }
-
         async function saveBiliPcPath(val) {
             const v = (val || '').trim();
             const ok = await saveSetting('localout', 'bilibili_pc_cache_path', v);
-            if (!ok) {
-                const s = await apiGet('/api/settings');
-                document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? '';
-            }
+            if (!ok) { const s = await apiGet('/api/settings'); document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? ''; }
             syncConditional();
         }
-
         async function browseBiliPcPath() {
             showToast('请在弹出的窗口中选择目录');
-            const r = await fetch('/api/browse-folder', { method: 'POST' });
-            const d = await r.json();
-            if (d.ok && d.path) {
-                document.getElementById('s-bili-pc-path').value = d.path;
-                await saveBiliPcPath(d.path);
-            }
+            const r = await fetch('/api/browse-folder', { method: 'POST' }); const d = await r.json();
+            if (d.ok && d.path) { document.getElementById('s-bili-pc-path').value = d.path; await saveBiliPcPath(d.path); }
         }
-
         async function resetBiliPcPath() {
-            const d = await apiGet('/api/default-bili-pc-cache-path');
-            const def = d.path ?? '';
-            document.getElementById('s-bili-pc-path').value = def;
-            await saveBiliPcPath(def);
+            const d = await apiGet('/api/default-bili-pc-cache-path'); const def = d.path ?? '';
+            document.getElementById('s-bili-pc-path').value = def; await saveBiliPcPath(def);
         }
-
         async function onNamePartsChanged(changedEl) {
             const parts = collectNameParts();
-            if (parts.length === 0) {
-                changedEl.checked = true;
-                showToast('至少需要保留一个命名字段', true);
-                updateNamePreview();
-                return;
-            }
-            updateNamePreview();
-            await saveSelect('localout', 'name_parts', parts.join(','));
+            if (parts.length === 0) { changedEl.checked = true; showToast('至少需要保留一个命名字段', true); updateNamePreview(); return; }
+            updateNamePreview(); await saveSelect('localout', 'name_parts', parts.join(','));
         }
-
         async function browsePath() {
             showToast('请在弹出的窗口中选择目录');
-            const r = await fetch('/api/browse-folder', { method: 'POST' });
-            const d = await r.json();
-            if (d.ok && d.path) {
-                document.getElementById('s-export-path').value = d.path;
-                await saveSetting('export', 'path', d.path);
-            }
+            const r = await fetch('/api/browse-folder', { method: 'POST' }); const d = await r.json();
+            if (d.ok && d.path) { document.getElementById('s-export-path').value = d.path; await saveSetting('export', 'path', d.path); }
         }
-
         async function desktopPath() {
             const d = await apiGet('/api/desktop-path');
-            document.getElementById('s-export-path').value = d.path;
-            await saveSetting('export', 'path', d.path);
+            document.getElementById('s-export-path').value = d.path; await saveSetting('export', 'path', d.path);
         }
-
         async function resetExportPath() {
-            const def = 'C:\\MyBiOut!';
-            document.getElementById('s-export-path').value = def;
-            await saveSetting('export', 'path', def);
+            const def = 'C:\\MyBiOut!'; document.getElementById('s-export-path').value = def; await saveSetting('export', 'path', def);
         }
 
+        /* API Key */
         function confirmApi() {
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
-            if (!k && !m) {
-                showToast('请至少填写一项', true);
-                return;
-            }
+            if (!k && !m) { showToast('请至少填写一项', true); return; }
             document.getElementById('api-modal').classList.add('show');
         }
-
         async function doSaveApi() {
             closeApiModal();
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
-            await fetch('/api/setting', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ section: 'api', key: 'key', value: k })
-            });
-            await fetch('/api/setting', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ section: 'api', key: 'model', value: m })
-            });
+            await apiPost('/api/setting', { section: 'api', key: 'key', value: k });
+            await apiPost('/api/setting', { section: 'api', key: 'model', value: m });
             showToast('API 设置已保存');
         }
-
-        function closeApiModal() {
-            document.getElementById('api-modal').classList.remove('show');
-        }
-
+        function closeApiModal() { document.getElementById('api-modal').classList.remove('show'); }
         async function clearApi() {
             document.getElementById('s-api-key').value = '';
             document.getElementById('s-api-model').value = '';
-            await fetch('/api/setting', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ section: 'api', key: 'key', value: '' })
-            });
-            await fetch('/api/setting', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ section: 'api', key: 'model', value: '' })
-            });
+            await apiPost('/api/setting', { section: 'api', key: 'key', value: '' });
+            await apiPost('/api/setting', { section: 'api', key: 'model', value: '' });
             showToast('API 设置已清空');
+        }
+
+        /* SESSDATA */
+        function confirmSessdata() {
+            const v = document.getElementById('s-mdout-sessdata').value.trim();
+            if (!v) { showToast('SESSDATA 为空', true); return; }
+            document.getElementById('sessdata-modal').classList.add('show');
+        }
+        async function doSaveSessdata() {
+            closeSessdataModal();
+            const v = document.getElementById('s-mdout-sessdata').value.trim();
+            await saveSetting('mdout', 'sessdata', v);
+        }
+        function closeSessdataModal() { document.getElementById('sessdata-modal').classList.remove('show'); }
+        async function clearSessdata() {
+            document.getElementById('s-mdout-sessdata').value = '';
+            await saveSetting('mdout', 'sessdata', '');
+            showToast('SESSDATA 已清空');
         }
 
         function resetFolder(sec) {
