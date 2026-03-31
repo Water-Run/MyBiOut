@@ -7,8 +7,9 @@ MyBiOut! FastAPI 应用定义与全部路由注册
 """
 
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -16,7 +17,6 @@ _PAGES_DIR: Path = Path(__file__).resolve().parent
 _ASSETS_DIR: Path = _PAGES_DIR.parent / "assets"
 
 app: FastAPI = FastAPI(title="MyBiOut!", version="0.1.0")
-
 app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets")
 
 
@@ -26,7 +26,43 @@ def _read_html(relative_path: str) -> HTMLResponse:
     :param: relative_path: 相对于 pages 目录的路径
     :return: HTMLResponse: 页面内容
     """
-    return HTMLResponse((_PAGES_DIR / relative_path).read_text(encoding="utf-8"))
+    html_path: Path = _PAGES_DIR / relative_path
+    html_text: str = html_path.read_text(encoding="utf-8")
+    return HTMLResponse(html_text)
+
+
+async def _read_json_dict(request: Request) -> dict[str, Any]:
+    r"""
+    将请求体读取为 JSON 对象字典
+    :param: request: FastAPI 请求对象
+    :return: dict[str, Any]: JSON 字典, 若非对象则返回空字典
+    """
+    payload: Any = await request.json()
+    return payload if isinstance(payload, dict) else {}
+
+
+def _as_str(value: Any) -> str:
+    r"""
+    将任意值安全转换为字符串
+    :param: value: 任意输入值
+    :return: str: 转换后的字符串
+    """
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _as_str_list(value: Any) -> list[str]:
+    r"""
+    将任意值安全转换为字符串列表
+    :param: value: 任意输入值
+    :return: list[str]: 字符串列表
+    """
+    if not isinstance(value, list):
+        return []
+    return [_as_str(item) for item in value]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -81,23 +117,27 @@ async def api_get_settings() -> dict[str, dict[str, str]]:
     :return: dict[str, dict[str, str]]: 分区组织的设置
     """
     from mybiout.pages.ohmyconfig.ohmyconfig import get_settings
+
     return get_settings()
 
 
 @app.post("/api/setting")
-async def api_save_setting(request: Request) -> dict[str, bool | str] | JSONResponse:
+async def api_save_setting(request: Request) -> Response:
     r"""
     保存单项设置
     :param: request: 请求对象, body 包含 section/key/value
-    :return: dict[str, bool | str] | JSONResponse: 保存结果
+    :return: Response: JSON 响应, 成功 200, 失败 400
     """
-    body: dict = await request.json()
-    section: str = body.get("section", "")
-    key: str = body.get("key", "")
-    value: str = body.get("value", "")
+    body: dict[str, Any] = await _read_json_dict(request)
+    section: str = _as_str(body.get("section", ""))
+    key: str = _as_str(body.get("key", ""))
+    value: str = _as_str(body.get("value", ""))
+
     from mybiout.pages.ohmyconfig.ohmyconfig import validate_and_save
+
     result: dict[str, bool | str] = validate_and_save(section, key, value)
-    return result if result["ok"] else JSONResponse(status_code=400, content=result)
+    status_code: int = 200 if bool(result.get("ok")) else 400
+    return JSONResponse(status_code=status_code, content=result)
 
 
 @app.post("/api/browse-folder")
@@ -107,6 +147,7 @@ def api_browse_folder() -> dict[str, bool | str]:
     :return: dict[str, bool | str]: 选择结果
     """
     from mybiout.pages.ohmyconfig.ohmyconfig import browse_folder
+
     path: str | None = browse_folder()
     return {"ok": True, "path": path} if path else {"ok": False}
 
@@ -118,6 +159,7 @@ async def api_desktop_path() -> dict[str, str]:
     :return: dict[str, str]: 路径信息
     """
     from mybiout.pages.ohmyconfig.ohmyconfig import get_desktop_path
+
     return {"path": get_desktop_path()}
 
 
@@ -128,26 +170,29 @@ async def api_default_bili_pc_cache_path() -> dict[str, str]:
     :return: dict[str, str]: 路径信息
     """
     from mybiout.pages.ohmyconfig.ohmyconfig import get_default_bili_pc_cache_path
+
     return {"path": get_default_bili_pc_cache_path()}
 
 
 @app.get("/api/localout/state")
-async def localout_state() -> dict:
+async def localout_state() -> dict[str, Any]:
     r"""
     获取 LocalOut 当前状态快照
-    :return: dict: 状态数据
+    :return: dict[str, Any]: 状态数据
     """
     from mybiout.pages.localout.localout import get_state
+
     return get_state()
 
 
 @app.get("/api/localout/available-sources")
-async def localout_available_sources() -> list[dict]:
+async def localout_available_sources() -> list[dict[str, Any]]:
     r"""
     获取可用的扫描源列表
-    :return: list[dict]: 可用源
+    :return: list[dict[str, Any]]: 可用源
     """
     from mybiout.pages.localout.localout import get_available_sources
+
     return get_available_sources()
 
 
@@ -158,25 +203,28 @@ def localout_browse_local() -> dict[str, bool | str]:
     :return: dict[str, bool | str]: 选择结果
     """
     from mybiout.pages.localout.localout import browse_local
+
     path: str | None = browse_local()
     return {"ok": True, "path": path} if path else {"ok": False}
 
 
 @app.post("/api/localout/add-source")
-async def localout_add_source(request: Request) -> dict:
+async def localout_add_source(request: Request) -> dict[str, Any]:
     r"""
     添加扫描源
     :param: request: 请求对象, body 包含 source_type/path/label/serial/package
-    :return: dict: 添加结果
+    :return: dict[str, Any]: 添加结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+
     from mybiout.pages.localout.localout import add_source
+
     return add_source(
-        source_type=body.get("source_type", ""),
-        path=body.get("path", ""),
-        label=body.get("label", ""),
-        serial=body.get("serial", ""),
-        package=body.get("package", ""),
+        source_type=_as_str(body.get("source_type", "")),
+        path=_as_str(body.get("path", "")),
+        label=_as_str(body.get("label", "")),
+        serial=_as_str(body.get("serial", "")),
+        package=_as_str(body.get("package", "")),
     )
 
 
@@ -187,6 +235,7 @@ async def localout_pause_scan() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.localout.localout import pause_scan
+
     pause_scan()
     return {"ok": True}
 
@@ -198,6 +247,7 @@ async def localout_resume_scan() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.localout.localout import resume_scan
+
     resume_scan()
     return {"ok": True}
 
@@ -209,20 +259,24 @@ async def localout_cancel_scan() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.localout.localout import cancel_scan
+
     cancel_scan()
     return {"ok": True}
 
 
 @app.post("/api/localout/add-to-tasks")
-async def localout_add_to_tasks(request: Request) -> dict:
+async def localout_add_to_tasks(request: Request) -> dict[str, Any]:
     r"""
     将源卡片添加到任务栏
     :param: request: 请求对象, body 包含 card_ids
-    :return: dict: 添加结果
+    :return: dict[str, Any]: 添加结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    card_ids: list[str] = _as_str_list(body.get("card_ids", []))
+
     from mybiout.pages.localout.localout import add_to_tasks
-    return add_to_tasks(body.get("card_ids", []))
+
+    return add_to_tasks(card_ids)
 
 
 @app.post("/api/localout/remove-source")
@@ -232,9 +286,12 @@ async def localout_remove_source(request: Request) -> dict[str, bool]:
     :param: request: 请求对象, body 包含 card_ids
     :return: dict[str, bool]: 操作结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    card_ids: list[str] = _as_str_list(body.get("card_ids", []))
+
     from mybiout.pages.localout.localout import remove_source_cards
-    remove_source_cards(body.get("card_ids", []))
+
+    remove_source_cards(card_ids)
     return {"ok": True}
 
 
@@ -245,9 +302,12 @@ async def localout_remove_tasks(request: Request) -> dict[str, bool]:
     :param: request: 请求对象, body 包含 card_ids
     :return: dict[str, bool]: 操作结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    card_ids: list[str] = _as_str_list(body.get("card_ids", []))
+
     from mybiout.pages.localout.localout import remove_task_cards
-    remove_task_cards(body.get("card_ids", []))
+
+    remove_task_cards(card_ids)
     return {"ok": True}
 
 
@@ -258,6 +318,7 @@ async def localout_clear_source() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.localout.localout import clear_source
+
     clear_source()
     return {"ok": True}
 
@@ -269,6 +330,7 @@ async def localout_clear_tasks() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.localout.localout import clear_tasks
+
     clear_tasks()
     return {"ok": True}
 
@@ -280,20 +342,24 @@ async def localout_clear_completed() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.localout.localout import clear_completed
+
     clear_completed()
     return {"ok": True}
 
 
 @app.post("/api/localout/start-export")
-async def localout_start_export(request: Request) -> dict:
+async def localout_start_export(request: Request) -> dict[str, Any]:
     r"""
     开始导出任务
     :param: request: 请求对象, body 包含 card_ids
-    :return: dict: 导出结果
+    :return: dict[str, Any]: 导出结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    card_ids: list[str] = _as_str_list(body.get("card_ids", []))
+
     from mybiout.pages.localout.localout import start_export
-    return start_export(body.get("card_ids", []))
+
+    return start_export(card_ids)
 
 
 @app.post("/api/localout/cancel-export")
@@ -303,41 +369,49 @@ async def localout_cancel_export() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.localout.localout import cancel_export
+
     cancel_export()
     return {"ok": True}
 
 
 @app.get("/api/bbdown/state")
-async def bbdown_state() -> dict:
+async def bbdown_state() -> dict[str, Any]:
     r"""
     获取 BBDown 当前状态快照
-    :return: dict: 状态数据
+    :return: dict[str, Any]: 状态数据
     """
     from mybiout.pages.bbdown.bbdown import get_state
+
     return get_state()
 
 
 @app.get("/api/bbdown/env-check")
-async def bbdown_env_check() -> dict:
+async def bbdown_env_check() -> dict[str, Any]:
     r"""
     检查 BBDown 运行环境
-    :return: dict: 环境检测结果
+    :return: dict[str, Any]: 环境检测结果
     """
     from mybiout.pages.bbdown.bbdown import env_check
+
     return env_check()
 
 
 @app.post("/api/bbdown/add")
-async def bbdown_add(request: Request) -> dict | JSONResponse:
+async def bbdown_add(request: Request) -> Response:
     r"""
     添加 BBDown 下载任务
     :param: request: 请求对象, body 包含 url/options
-    :return: dict | JSONResponse: 添加结果
+    :return: Response: JSON 响应, 成功 200, 失败 400
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    url: str = _as_str(body.get("url", ""))
+    options: Any = body.get("options")
+
     from mybiout.pages.bbdown.bbdown import add_task
-    result: dict = add_task(body.get("url", ""), body.get("options"))
-    return result if result["ok"] else JSONResponse(status_code=400, content=result)
+
+    result: dict[str, Any] = add_task(url, options)
+    status_code: int = 200 if bool(result.get("ok")) else 400
+    return JSONResponse(status_code=status_code, content=result)
 
 
 @app.post("/api/bbdown/cancel")
@@ -347,20 +421,24 @@ async def bbdown_cancel() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.bbdown.bbdown import cancel_current
+
     cancel_current()
     return {"ok": True}
 
 
 @app.post("/api/bbdown/retry")
-async def bbdown_retry(request: Request) -> dict:
+async def bbdown_retry(request: Request) -> dict[str, Any]:
     r"""
     重试失败的 BBDown 任务
     :param: request: 请求对象, body 包含 task_id
-    :return: dict: 操作结果
+    :return: dict[str, Any]: 操作结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    task_id: str = _as_str(body.get("task_id", ""))
+
     from mybiout.pages.bbdown.bbdown import retry_task
-    return retry_task(body.get("task_id", ""))
+
+    return retry_task(task_id)
 
 
 @app.post("/api/bbdown/remove")
@@ -370,9 +448,12 @@ async def bbdown_remove(request: Request) -> dict[str, bool]:
     :param: request: 请求对象, body 包含 task_id
     :return: dict[str, bool]: 操作结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    task_id: str = _as_str(body.get("task_id", ""))
+
     from mybiout.pages.bbdown.bbdown import remove_task
-    remove_task(body.get("task_id", ""))
+
+    remove_task(task_id)
     return {"ok": True}
 
 
@@ -383,6 +464,7 @@ async def bbdown_clear_completed() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.bbdown.bbdown import clear_completed
+
     clear_completed()
     return {"ok": True}
 
@@ -394,6 +476,7 @@ async def bbdown_clear_failed() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.bbdown.bbdown import clear_failed
+
     clear_failed()
     return {"ok": True}
 
@@ -405,43 +488,52 @@ async def bbdown_clear_queue() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.bbdown.bbdown import clear_queue
+
     clear_queue()
     return {"ok": True}
 
 
 @app.get("/api/mdout/state")
-async def mdout_state() -> dict:
+async def mdout_state() -> dict[str, Any]:
     r"""
     获取 MdOut 当前状态快照
-    :return: dict: 状态数据
+    :return: dict[str, Any]: 状态数据
     """
     from mybiout.pages.mdout.mdout import get_state
+
     return get_state()
 
 
 @app.post("/api/mdout/parse")
-async def mdout_parse(request: Request) -> dict:
+async def mdout_parse(request: Request) -> dict[str, Any]:
     r"""
     解析输入文本识别类型
     :param: request: 请求对象, body 包含 text
-    :return: dict: 解析结果
+    :return: dict[str, Any]: 解析结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    text: str = _as_str(body.get("text", ""))
+
     from mybiout.pages.mdout.mdout import do_parse
-    return do_parse(body.get("text", ""))
+
+    return do_parse(text)
 
 
 @app.post("/api/mdout/add")
-async def mdout_add(request: Request) -> dict | JSONResponse:
+async def mdout_add(request: Request) -> Response:
     r"""
     添加 MdOut 获取任务
     :param: request: 请求对象, body 包含 text
-    :return: dict | JSONResponse: 添加结果
+    :return: Response: JSON 响应, 成功 200, 失败 400
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    text: str = _as_str(body.get("text", ""))
+
     from mybiout.pages.mdout.mdout import add_and_fetch
-    result: dict = add_and_fetch(body.get("text", ""))
-    return result if result["ok"] else JSONResponse(status_code=400, content=result)
+
+    result: dict[str, Any] = add_and_fetch(text)
+    status_code: int = 200 if bool(result.get("ok")) else 400
+    return JSONResponse(status_code=status_code, content=result)
 
 
 @app.post("/api/mdout/select")
@@ -451,31 +543,38 @@ async def mdout_select(request: Request) -> dict[str, bool]:
     :param: request: 请求对象, body 包含 card_id
     :return: dict[str, bool]: 操作结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    card_id: str = _as_str(body.get("card_id", ""))
+
     from mybiout.pages.mdout.mdout import select_card
-    select_card(body.get("card_id", ""))
+
+    select_card(card_id)
     return {"ok": True}
 
 
 @app.post("/api/mdout/export")
-async def mdout_export(request: Request) -> dict:
+async def mdout_export(request: Request) -> dict[str, Any]:
     r"""
     导出指定 MdOut 卡片
     :param: request: 请求对象, body 包含 card_ids
-    :return: dict: 导出结果
+    :return: dict[str, Any]: 导出结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    card_ids: list[str] = _as_str_list(body.get("card_ids", []))
+
     from mybiout.pages.mdout.mdout import export_cards
-    return export_cards(body.get("card_ids", []))
+
+    return export_cards(card_ids)
 
 
 @app.post("/api/mdout/export-all")
-async def mdout_export_all() -> dict:
+async def mdout_export_all() -> dict[str, Any]:
     r"""
     导出全部就绪的 MdOut 卡片
-    :return: dict: 导出结果
+    :return: dict[str, Any]: 导出结果
     """
     from mybiout.pages.mdout.mdout import export_all_ready
+
     return export_all_ready()
 
 
@@ -486,9 +585,12 @@ async def mdout_remove(request: Request) -> dict[str, bool]:
     :param: request: 请求对象, body 包含 card_ids
     :return: dict[str, bool]: 操作结果
     """
-    body: dict = await request.json()
+    body: dict[str, Any] = await _read_json_dict(request)
+    card_ids: list[str] = _as_str_list(body.get("card_ids", []))
+
     from mybiout.pages.mdout.mdout import remove_cards
-    remove_cards(body.get("card_ids", []))
+
+    remove_cards(card_ids)
     return {"ok": True}
 
 
@@ -499,6 +601,7 @@ async def mdout_clear() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.mdout.mdout import clear_cards
+
     clear_cards()
     return {"ok": True}
 
@@ -510,5 +613,6 @@ async def mdout_clear_completed() -> dict[str, bool]:
     :return: dict[str, bool]: 操作结果
     """
     from mybiout.pages.mdout.mdout import clear_completed
+
     clear_completed()
     return {"ok": True}
