@@ -28,6 +28,8 @@ DEFAULTS: dict[str, dict[str, str]] = {
     "api": {
         "key": "",
         "model": "",
+        "base_url": "https://api.poe.com/v1",
+        "timeout": "infinite",
     },
     "localout": {
         "folder": "localout!",
@@ -153,3 +155,27 @@ def get_port() -> int:
     :return: int: 端口号
     """
     return _DEFAULT_PORT
+
+def get_api_base_url() -> str:
+    r"""
+    获取 API 基地址
+    :return: str: API 基地址
+    """
+    return get_setting("api", "base_url") or "https://api.openai.com/v1"
+
+
+def get_api_timeout_seconds() -> float | None:
+    r"""
+    获取 API 超时时间（秒）
+    :return: float | None: None 表示无限超时
+    """
+    mode: str = (get_setting("api", "timeout") or "infinite").strip().lower()
+    timeout_map: dict[str, float | None] = {
+        "infinite": None,
+        "8s": 8.0,
+        "20s": 20.0,
+        "60s": 60.0,
+        "100s": 100.0,
+        "1000s": 1000.0,
+    }
+    return timeout_map.get(mode, None)

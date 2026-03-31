@@ -18,6 +18,7 @@ _ALLOWED_INCOMPLETE_TITLE_ACTION: set[str] = {"partial_or_folder", "folder_only"
 _ALLOWED_NAME_PARTS: set[str] = {"bv", "title", "up", "group", "part", "publish_time", "export_time"}
 _ALLOWED_FAVORITE_DETAIL: set[str] = {"basic", "full"}
 _ALLOWED_REQUEST_DELAY: set[str] = {"0.3", "0.5", "1.0", "2.0"}
+_ALLOWED_API_TIMEOUT: set[str] = {"infinite", "8s", "20s", "60s", "100s", "1000s"}
 
 
 def get_settings() -> dict[str, dict[str, str]]:
@@ -112,6 +113,26 @@ def validate_and_save(section: str, key: str, value: str) -> SettingResult:
             v = value.strip()
             if v not in _ALLOWED_REQUEST_DELAY:
                 return _err("请求间隔只能是 0.3 / 0.5 / 1.0 / 2.0")
+            utils.set_setting(section, key, v)
+            return _ok()
+        
+        case ("api", "key" | "model"):
+            utils.set_setting(section, key, value.strip())
+            return _ok()
+
+        case ("api", "base_url"):
+            v: str = value.strip()
+            if not v:
+                return _err("API 地址不能为空")
+            if not (v.startswith("http://") or v.startswith("https://")):
+                return _err("API 地址需以 http:// 或 https:// 开头")
+            utils.set_setting(section, key, v.rstrip("/"))
+            return _ok()
+
+        case ("api", "timeout"):
+            v: str = value.strip().lower()
+            if v not in _ALLOWED_API_TIMEOUT:
+                return _err("超时选项不合法")
             utils.set_setting(section, key, v)
             return _ok()
 

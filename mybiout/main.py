@@ -10,11 +10,12 @@ import argparse
 import math
 import random
 import shutil
+import socket
 import sys
 import threading
 import time
 import webbrowser
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import uvicorn
 
@@ -34,10 +35,136 @@ _SPARK: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
 _MAX_PARTICLES: int = 280
 
 
+@dataclass(slots=True)
+class _ServerStartupState:
+    r"""
+    Uvicorn 后台启动状态
+    """
+
+    started: threading.Event = field(default_factory=threading.Event)
+    failed: threading.Event = field(default_factory=threading.Event)
+    reason: str = ""
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    server: uvicorn.Server | None = None
+    thread: threading.Thread | None = None
+
+    def mark_started(self) -> None:
+        r"""
+        标记服务已启动
+        """
+        with self.lock:
+            if self.failed.is_set():
+                return
+            self.started.set()
+
+    def mark_failed(self, reason: str) -> None:
+        r"""
+        标记服务启动失败
+        :param reason: 失败原因
+        """
+        with self.lock:
+            if self.started.is_set() or self.failed.is_set():
+                return
+            self.reason = reason
+            self.failed.set()
+
+
+def _probe_port_bind_error(port: int) -> str | None:
+    r"""
+    预探测端口是否可绑定
+    :param port: 端口号
+    :return: str | None: 可用返回 None，不可用返回错误原因
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", port))
+    except OSError as e:
+        detail: str = e.strerror or str(e)
+        return f"端口 {port} 不可用: {detail}"
+    return None
+
+
+def _start_server_in_background(port: int) -> _ServerStartupState:
+    r"""
+    后台启动 Uvicorn，并异步监控启动结果
+    :param port: 服务端口号
+    :return: _ServerStartupState: 启动状态对象
+    """
+    state: _ServerStartupState = _ServerStartupState()
+
+    if err := _probe_port_bind_error(port):
+        state.mark_failed(err)
+        return state
+
+    config: uvicorn.Config = uvicorn.Config(
+        "mybiout.pages.apis:app",
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+    )
+    server: uvicorn.Server = uvicorn.Server(config)
+    state.server = server
+
+    def _run() -> None:
+        r"""
+        后台线程执行 server.run()
+        """
+        try:
+            server.run()
+        except Exception as e:
+            state.mark_failed(f"Uvicorn 启动异常: {e}")
+
+    t: threading.Thread = threading.Thread(target=_run, daemon=True)
+    state.thread = t
+    t.start()
+
+    def _watch_startup() -> None:
+        r"""
+        监控 server.started 与线程生命周期，判定启动成功/失败
+        """
+        deadline: float = time.monotonic() + 20.0
+        while time.monotonic() < deadline:
+            if state.failed.is_set():
+                return
+            if server.started:
+                state.mark_started()
+                return
+            if not t.is_alive():
+                state.mark_failed("服务线程提前退出（可能端口占用或应用初始化失败）")
+                return
+            time.sleep(0.03)
+
+        if server.started:
+            state.mark_started()
+            return
+
+        state.mark_failed("服务启动超时")
+        server.should_exit = True
+
+    threading.Thread(target=_watch_startup, daemon=True).start()
+    return state
+
+
+def _wait_server_startup(state: _ServerStartupState, timeout: float = 25.0) -> bool:
+    r"""
+    等待服务启动成功或失败
+    :param state: 启动状态对象
+    :param timeout: 最大等待秒数
+    :return: bool: True=成功, False=失败或超时
+    """
+    deadline: float = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if state.started.is_set():
+            return True
+        if state.failed.is_set():
+            return False
+        time.sleep(0.05)
+    return state.started.is_set()
+
+
 def _at(row: int, col: int) -> str:
     r"""
     生成终端光标定位控制序列
-
     :param row: 行号, 1-based
     :param col: 列号, 1-based
     :return: str: ANSI 控制序列
@@ -48,7 +175,6 @@ def _at(row: int, col: int) -> str:
 def _fg(r: int, g: int, b: int) -> str:
     r"""
     生成 24-bit 真彩前景色 ANSI 控制序列
-
     :param r: 红色分量
     :param g: 绿色分量
     :param b: 蓝色分量
@@ -57,14 +183,9 @@ def _fg(r: int, g: int, b: int) -> str:
     return f"{_CSI}38;2;{r};{g};{b}m"
 
 
-def _lerp(
-    a: tuple[int, int, int],
-    b: tuple[int, int, int],
-    t: float,
-) -> tuple[int, int, int]:
+def _lerp(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
     r"""
     对 RGB 颜色做线性插值
-
     :param a: 起始颜色
     :param b: 结束颜色
     :param t: 插值比例, 自动钳制到 [0.0, 1.0]
@@ -81,7 +202,6 @@ def _lerp(
 def _fade(c: tuple[int, int, int], alpha: float) -> tuple[int, int, int]:
     r"""
     将颜色按比例淡化到黑色
-
     :param c: 原始颜色
     :param alpha: 强度比例, 自动钳制到 [0.0, 1.0]
     :return: tuple[int, int, int]: 淡化后的颜色
@@ -93,7 +213,6 @@ def _fade(c: tuple[int, int, int], alpha: float) -> tuple[int, int, int]:
 def _cjk_len(text: str) -> int:
     r"""
     估算字符串在终端中的显示宽度, CJK 字符按 2 列计
-
     :param text: 输入文本
     :return: int: 显示宽度
     """
@@ -132,48 +251,6 @@ _THEMES: tuple[_Theme, ...] = (
     _Theme((0, 80, 255), (0, 255, 200), ((100, 200, 255), (0, 255, 190), (80, 140, 255)), (0, 180, 255), ((15, 30, 70), (20, 40, 80), (10, 25, 60))),
     _Theme((255, 183, 197), (255, 105, 180), ((255, 228, 225), (255, 182, 193), (255, 240, 245)), (255, 150, 170), ((90, 50, 60), (80, 40, 55), (100, 60, 70))),
     _Theme((255, 215, 0), (180, 130, 50), ((255, 240, 150), (220, 190, 80), (255, 200, 60)), (255, 220, 100), ((50, 40, 20), (60, 50, 25), (40, 35, 18))),
-    _Theme((148, 0, 211), (75, 0, 130), ((238, 130, 238), (186, 85, 211), (147, 112, 219)), (199, 21, 133), ((70, 30, 90), (60, 20, 80), (50, 20, 70))),
-    _Theme((0, 191, 255), (30, 144, 255), ((176, 224, 230), (135, 206, 250), (173, 216, 230)), (70, 130, 180), ((40, 70, 90), (30, 60, 80), (20, 50, 70))),
-    _Theme((50, 205, 50), (124, 252, 0), ((152, 251, 152), (144, 238, 144), (173, 255, 47)), (34, 139, 34), ((30, 70, 30), (20, 60, 20), (10, 50, 10))),
-    _Theme((255, 140, 0), (255, 69, 0), ((255, 218, 185), (255, 160, 122), (255, 127, 80)), (255, 165, 0), ((90, 50, 20), (80, 40, 20), (70, 35, 15))),
-    _Theme((173, 216, 230), (230, 230, 250), ((240, 248, 255), (224, 255, 255), (245, 245, 255)), (176, 196, 222), ((60, 70, 90), (50, 60, 80), (45, 55, 75))),
-    _Theme((64, 224, 208), (138, 43, 226), ((173, 255, 240), (120, 180, 255), (210, 140, 255)), (102, 255, 224), ((20, 50, 70), (40, 30, 80), (25, 60, 85))),
-    _Theme((0, 255, 170), (255, 0, 140), ((0, 255, 255), (255, 80, 220), (255, 240, 0)), (0, 255, 200), ((25, 35, 70), (45, 20, 60), (20, 45, 55))),
-    _Theme((0, 120, 180), (0, 255, 140), ((100, 220, 255), (80, 255, 200), (180, 255, 240)), (0, 200, 170), ((10, 35, 55), (15, 45, 65), (8, 30, 48))),
-    _Theme((255, 80, 0), (120, 0, 40), ((255, 170, 80), (255, 110, 60), (220, 40, 80)), (255, 120, 40), ((70, 25, 18), (55, 18, 22), (80, 30, 15))),
-    _Theme((170, 255, 220), (255, 245, 200), ((210, 255, 230), (255, 255, 225), (190, 245, 220)), (170, 240, 210), ((45, 65, 55), (60, 70, 50), (50, 60, 52))),
-    _Theme((170, 120, 255), (255, 140, 220), ((220, 190, 255), (255, 180, 240), (190, 160, 255)), (210, 140, 255), ((45, 35, 80), (65, 40, 75), (55, 30, 70))),
-    _Theme((70, 170, 90), (180, 220, 140), ((140, 220, 150), (200, 240, 170), (100, 190, 120)), (90, 190, 110), ((25, 55, 30), (35, 60, 28), (22, 48, 24))),
-    _Theme((120, 200, 255), (220, 245, 255), ((170, 225, 255), (200, 240, 255), (235, 250, 255)), (150, 210, 255), ((30, 45, 70), (40, 55, 75), (28, 40, 60))),
-    _Theme((255, 140, 90), (255, 210, 120), ((255, 185, 140), (255, 225, 160), (255, 155, 120)), (255, 175, 110), ((70, 40, 28), (80, 50, 30), (65, 35, 24))),
-    _Theme((65, 105, 225), (255, 215, 120), ((120, 150, 255), (255, 235, 170), (170, 200, 255)), (120, 150, 245), ((25, 35, 70), (45, 40, 55), (20, 30, 60))),
-    _Theme((255, 130, 180), (120, 60, 170), ((255, 180, 215), (180, 130, 220), (255, 150, 200)), (230, 120, 190), ((60, 35, 60), (45, 30, 75), (70, 40, 68))),
-    _Theme((210, 170, 110), (140, 110, 70), ((235, 205, 150), (200, 160, 110), (170, 135, 90)), (220, 180, 120), ((60, 45, 28), (55, 40, 25), (48, 35, 22))),
-    _Theme((90, 120, 170), (180, 220, 255), ((140, 170, 220), (200, 230, 255), (120, 150, 210)), (130, 170, 230), ((20, 28, 50), (28, 35, 60), (18, 24, 45))),
-    _Theme((80, 190, 130), (30, 120, 90), ((130, 220, 160), (90, 180, 130), (160, 240, 190)), (70, 180, 120), ((18, 45, 32), (20, 55, 38), (15, 38, 28))),
-    _Theme((255, 180, 60), (140, 70, 220), ((255, 220, 120), (190, 130, 255), (255, 190, 90)), (240, 170, 80), ((45, 35, 60), (60, 35, 75), (50, 30, 65))),
-    _Theme((255, 127, 120), (80, 220, 220), ((255, 170, 160), (130, 240, 235), (255, 205, 180)), (130, 225, 220), ((55, 35, 42), (25, 60, 65), (45, 45, 55))),
-    _Theme((140, 160, 190), (255, 190, 120), ((180, 200, 220), (255, 215, 150), (160, 180, 210)), (180, 200, 230), ((35, 40, 52), (55, 48, 40), (30, 35, 48))),
-    _Theme((255, 170, 200), (255, 220, 245), ((255, 195, 220), (255, 235, 250), (245, 210, 235)), (255, 185, 210), ((70, 40, 60), (80, 50, 70), (65, 38, 55))),
-    _Theme((170, 255, 0), (0, 200, 140), ((210, 255, 90), (90, 240, 180), (235, 255, 130)), (140, 240, 80), ((35, 55, 18), (15, 60, 40), (25, 45, 20))),
-    _Theme((70, 90, 110), (220, 180, 90), ((120, 150, 180), (240, 210, 130), (170, 140, 95)), (200, 170, 100), ((18, 22, 30), (30, 28, 22), (22, 24, 20))),
-    _Theme((110, 140, 180), (190, 200, 210), ((160, 185, 215), (200, 210, 225), (140, 160, 195)), (150, 175, 210), ((28, 35, 50), (35, 42, 58), (22, 30, 45))),
-    _Theme((220, 30, 50), (150, 10, 30), ((255, 100, 110), (240, 70, 80), (200, 50, 60)), (240, 60, 70), ((75, 15, 20), (60, 10, 18), (85, 20, 25))),
-    _Theme((130, 225, 200), (80, 200, 170), ((180, 245, 225), (140, 230, 210), (200, 250, 235)), (110, 220, 195), ((25, 55, 48), (20, 50, 42), (30, 60, 52))),
-    _Theme((220, 160, 50), (180, 110, 30), ((245, 200, 100), (230, 170, 70), (200, 140, 50)), (230, 175, 60), ((65, 45, 18), (55, 38, 15), (70, 50, 22))),
-    _Theme((80, 70, 160), (110, 100, 180), ((140, 135, 210), (120, 115, 195), (160, 155, 225)), (100, 90, 190), ((22, 20, 55), (28, 25, 60), (18, 16, 48))),
-    _Theme((255, 110, 100), (255, 160, 130), ((255, 175, 155), (255, 195, 170), (255, 145, 125)), (255, 135, 115), ((72, 32, 28), (65, 38, 35), (80, 35, 30))),
-    _Theme((180, 130, 160), (140, 90, 120), ((210, 170, 195), (195, 150, 175), (225, 190, 210)), (190, 145, 175), ((50, 35, 45), (42, 28, 38), (55, 40, 50))),
-    _Theme((180, 240, 50), (40, 140, 100), ((215, 250, 110), (100, 220, 160), (230, 255, 140)), (160, 235, 70), ((38, 60, 20), (18, 50, 35), (30, 55, 22))),
-    _Theme((190, 110, 70), (150, 75, 45), ((225, 155, 110), (210, 135, 90), (200, 120, 80)), (205, 125, 80), ((58, 30, 20), (50, 25, 16), (65, 35, 22))),
-    _Theme((180, 220, 250), (200, 235, 255), ((210, 235, 255), (195, 228, 250), (225, 242, 255)), (190, 225, 250), ((35, 50, 68), (42, 58, 75), (30, 45, 62))),
-    _Theme((160, 60, 120), (120, 30, 80), ((200, 100, 160), (180, 80, 140), (170, 70, 130)), (180, 70, 140), ((48, 18, 38), (40, 12, 30), (55, 22, 42))),
-    _Theme((140, 160, 100), (110, 130, 70), ((180, 195, 140), (165, 180, 120), (155, 170, 110)), (150, 170, 110), ((35, 42, 25), (30, 38, 20), (40, 45, 28))),
-    _Theme((255, 180, 140), (240, 130, 80), ((255, 210, 175), (255, 195, 155), (250, 170, 130)), (255, 190, 150), ((68, 42, 30), (60, 38, 28), (75, 48, 35))),
-    _Theme((30, 40, 100), (50, 60, 140), ((80, 95, 170), (65, 80, 155), (100, 110, 185)), (60, 75, 160), ((10, 14, 38), (15, 18, 45), (8, 12, 32))),
-    _Theme((180, 220, 50), (80, 140, 30), ((210, 240, 100), (140, 200, 80), (225, 245, 120)), (160, 210, 60), ((40, 55, 15), (25, 48, 12), (45, 58, 18))),
-    _Theme((230, 140, 120), (180, 100, 80), ((245, 180, 160), (240, 165, 145), (220, 150, 130)), (235, 155, 135), ((62, 38, 32), (55, 32, 25), (68, 42, 35))),
-    _Theme((0, 180, 180), (220, 50, 160), ((80, 220, 220), (240, 120, 200), (140, 255, 240)), (0, 210, 200), ((15, 48, 50), (55, 20, 45), (20, 55, 58))),
 )
 
 _ROTORS: tuple[str, ...] = (
@@ -220,7 +297,6 @@ class _Particle:
     def step(self, dt: float) -> bool:
         r"""
         推进粒子物理状态
-
         :param dt: 时间步长
         :return: bool: 是否仍存活
         """
@@ -234,7 +310,6 @@ class _Particle:
     def ch(self) -> str:
         r"""
         获取当前寿命对应的盲文字符密度
-
         :return: str: 单字符
         """
         ratio: float = self.life / self.max_life if self.max_life > 0 else 0.0
@@ -248,7 +323,6 @@ class _Particle:
     def visible_color(self) -> tuple[int, int, int]:
         r"""
         获取当前可见颜色
-
         :return: tuple[int, int, int]: RGB 颜色
         """
         ratio: float = self.life / self.max_life if self.max_life > 0 else 0.0
@@ -268,7 +342,6 @@ def _burst(
 ) -> None:
     r"""
     在指定位置生成爆发粒子
-
     :param pool: 粒子池
     :param x: 爆发中心 x
     :param y: 爆发中心 y
@@ -277,7 +350,6 @@ def _burst(
     :param speed: 初速度上限
     :param life: 生命周期范围
     :param spread: 初始位置离散半径
-    :return: None: 无返回值
     """
     for _ in range(count):
         angle: float = random.uniform(0.0, math.tau)
@@ -298,12 +370,11 @@ def _burst(
         del pool[: len(pool) - _MAX_PARTICLES]
 
 
-def _play_animation(port: int) -> None:
+def _play_animation(port: int, startup_state: _ServerStartupState | None = None) -> None:
     r"""
     播放启动动画序列
-
     :param port: 服务端口号
-    :return: None: 无返回值
+    :param startup_state: 服务启动状态对象（可选）
     :raise RuntimeError: 终端尺寸过小时抛出
     """
     width, height = shutil.get_terminal_size((80, 24))
@@ -317,17 +388,12 @@ def _play_animation(port: int) -> None:
     def w(text: str) -> None:
         r"""
         向输出缓冲写入字符串
-
-        :param text: 输出文本
-        :return: None: 无返回值
         """
         buffer.append(text)
 
     def flush() -> None:
         r"""
         刷新输出缓冲到终端
-
-        :return: None: 无返回值
         """
         sys.stdout.write("".join(buffer))
         sys.stdout.flush()
@@ -342,13 +408,11 @@ def _play_animation(port: int) -> None:
     ) -> None:
         r"""
         在终端指定位置绘制文本
-
         :param row: 行号, 1-based
         :param col: 列号, 1-based
         :param text: 输出文本
         :param color: RGB 颜色
         :param bold: 是否加粗
-        :return: None: 无返回值
         """
         if row < 1 or row > height or col > width:
             return
@@ -365,11 +429,9 @@ def _play_animation(port: int) -> None:
     def clear_row(row: int, c1: int = 1, c2: int | None = None) -> None:
         r"""
         清空指定行区间
-
         :param row: 行号
         :param c1: 起始列
         :param c2: 结束列, 为空时到行尾
-        :return: None: 无返回值
         """
         if row < 1 or row > height:
             return
@@ -410,10 +472,103 @@ def _play_animation(port: int) -> None:
     bili_row: int = min(base_y + _HELI_H + 2, height - 2)
     bili_burst_done: bool = False
 
+    def _crash_sequence(heli_x: int, heli_y: int, reason: str) -> None:
+        r"""
+        启动失败时的坠机动画
+        :param heli_x: 当前直升机 x
+        :param heli_y: 当前直升机 y
+        :param reason: 失败原因
+        """
+        crash_colors: tuple[tuple[int, int, int], ...] = ((255, 200, 80), (255, 120, 60), (255, 70, 70))
+        cx: int = heli_x
+        cy: int = heli_y
+        local_prev_r: int = heli_y
+        local_prev_c: int = heli_x
+
+        for step in range(18):
+            for dr in range(_HELI_H):
+                clear_row(local_prev_r + dr, max(1, local_prev_c), min(width, local_prev_c + _HELI_W + 3))
+
+            cx = min(width - _HELI_W, cx + 1 + (1 if step > 10 else 0))
+            cy = min(height - _HELI_H - 1, cy + 1)
+
+            _burst(
+                particles,
+                cx + _HELI_W * 0.45,
+                cy + _HELI_H * 0.75,
+                10 + step // 2,
+                crash_colors,
+                speed=8.0,
+                life=(0.25, 0.9),
+                spread=1.5,
+            )
+
+            particles[:] = [p for p in particles if p.step(0.045)]
+            for p in particles:
+                px: int = int(p.x)
+                py: int = int(p.y)
+                if 1 <= py <= height and 1 <= px <= width:
+                    put(py, px, p.ch, color=p.visible_color)
+
+            rotor: str = _ROTORS[step % len(_ROTORS)]
+            for ci, ch in enumerate(rotor):
+                col: int = cx + ci
+                if ch != " ":
+                    put(cy, col, ch, color=(255, 120, 80), bold=True)
+
+            for bi, line in enumerate(_BODY):
+                row: int = cy + 1 + bi
+                for ci, ch in enumerate(line):
+                    col: int = cx + ci
+                    if ch != " ":
+                        put(row, col, ch, color=(255, 90, 90), bold=True)
+
+            local_prev_r, local_prev_c = cy, cx
+            flush()
+            time.sleep(0.03)
+
+        _burst(
+            particles,
+            cx + _HELI_W * 0.5,
+            cy + _HELI_H * 0.8,
+            85,
+            ((255, 230, 120), (255, 150, 80), (255, 80, 80)),
+            speed=10.0,
+            life=(0.3, 1.3),
+            spread=2.5,
+        )
+
+        for _ in range(22):
+            particles[:] = [p for p in particles if p.step(0.05)]
+            for p in particles:
+                px: int = int(p.x)
+                py: int = int(p.y)
+                if 1 <= py <= height and 1 <= px <= width:
+                    put(py, px, p.ch, color=p.visible_color)
+            flush()
+            time.sleep(0.025)
+
+        title: str = "✖ 服务启动失败，坠机"
+        reason_line: str = f"原因: {reason or '未知错误'}"
+        if len(reason_line) > max(12, width - 4):
+            reason_line = reason_line[: max(9, width - 7)] + "..."
+
+        tr: int = max(2, height // 2 - 1)
+        clear_row(tr, 1, width)
+        clear_row(tr + 1, 1, width)
+        put(tr, max(1, (width - len(title)) // 2), title, color=(255, 90, 90), bold=True)
+        put(tr + 1, max(1, (width - len(reason_line)) // 2), reason_line, color=(255, 200, 120), bold=True)
+        flush()
+        time.sleep(0.35)
+
     for frame in range(frame_count):
         t: float = frame / frame_count
         heli_x: int = int((width + 6) + ((-_HELI_W - 6) - (width + 6)) * t)
         heli_y: int = int(base_y + wave_amp * math.sin(wave_freq * t * math.tau))
+
+        if startup_state is not None and startup_state.failed.is_set():
+            _crash_sequence(heli_x, heli_y, startup_state.reason)
+            raise RuntimeError(startup_state.reason or "服务启动失败")
 
         for dr in range(_HELI_H):
             clear_row(prev_r + dr, max(1, prev_c), min(width, prev_c + _HELI_W + 2))
@@ -603,6 +758,12 @@ def _play_animation(port: int) -> None:
         flush()
         time.sleep(0.08)
 
+    startup_hint: str = (
+        "  ✦ 服务已就绪, 浏览器即将自动打开"
+        if startup_state is not None and startup_state.started.is_set()
+        else "  ✦ 服务启动中..."
+    )
+
     info_top: int = sep_row + 2
     info_left: int = max(1, (width - 58) // 2)
     info_lines: list[tuple[str, tuple[int, int, int]]] = [
@@ -612,7 +773,7 @@ def _play_animation(port: int) -> None:
         ("  ✦ GitHub │ https://github.com/Water-Run/MyBiOut", theme.ga),
         ("  ✦ Author │ WaterRun", theme.gb),
         ("", (0, 0, 0)),
-        ("  ✦ 服务已就绪, 浏览器即将自动打开", _lerp(theme.ga, theme.gb, 0.5)),
+        (startup_hint, _lerp(theme.ga, theme.gb, 0.5)),
     ]
     for idx, (line, color) in enumerate(info_lines):
         row: int = info_top + idx
@@ -672,7 +833,6 @@ _BANNER_FALLBACK: str = r"""
 def main() -> None:
     r"""
     程序主入口, 解析命令行并启动 FastAPI 服务
-
     :return: None: 无返回值
     """
     default_port: int = get_port()
@@ -690,9 +850,23 @@ def main() -> None:
     args: argparse.Namespace = parser.parse_args()
     port: int = args.port
 
+    startup_state: _ServerStartupState = _start_server_in_background(port)
+    animation_error: Exception | None = None
+
     try:
-        _play_animation(port)
-    except Exception:
+        _play_animation(port, startup_state)
+    except Exception as e:
+        animation_error = e
+
+    if startup_state.failed.is_set():
+        print(_BANNER_FALLBACK)
+        print(f"  ✦ 端口: {port}")
+        print(f"  ✦ 启动失败: {startup_state.reason or '未知原因'}")
+        print("  ✦ 请检查端口占用/配置后重试")
+        print()
+        return
+
+    if animation_error is not None:
         print(_BANNER_FALLBACK)
         print(f"  ✦ 端口: {port}")
         print(f"  ✦ 访问: http://localhost:{port}")
@@ -700,24 +874,33 @@ def main() -> None:
         print("  ✦ Author: WaterRun")
         print()
 
+    if not _wait_server_startup(startup_state, timeout=25.0):
+        print(_BANNER_FALLBACK)
+        print(f"  ✦ 端口: {port}")
+        print(f"  ✦ 启动失败: {startup_state.reason or '服务启动超时'}")
+        print()
+        return
+
     def _open_browser() -> None:
         r"""
         延迟后自动打开浏览器访问地址
-
         :return: None: 无返回值
         """
-        time.sleep(1.5)
+        time.sleep(0.35)
         webbrowser.open(f"http://localhost:{port}")
 
     threading.Thread(target=_open_browser, daemon=True).start()
 
-    uvicorn.run(
-        "mybiout.pages.apis:app",
-        host="127.0.0.1",
-        port=port,
-        log_level="warning",
-    )
+    try:
+        while startup_state.thread is not None and startup_state.thread.is_alive():
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        if startup_state.server is not None:
+            startup_state.server.should_exit = True
+        if startup_state.thread is not None:
+            startup_state.thread.join(timeout=5.0)
 
 
 if __name__ == "__main__":
     main()
+    

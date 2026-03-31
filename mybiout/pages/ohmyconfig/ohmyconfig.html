@@ -512,21 +512,37 @@
             </div>
 
             <div class="setting-row">
-                <div class="setting-label">大模型 API (OpenAI)</div>
+                <div class="setting-label">大模型 API (OpenAI兼容)</div>
                 <div class="setting-hint">可选项，不配置时仅无法使用依赖该能力的功能</div>
                 <div class="setting-controls" style="flex-direction:column;align-items:flex-start;gap:7px">
                     <div style="display:flex;align-items:center;gap:8px">
                         <span class="inline-label">Key:</span>
                         <input type="text" id="s-api-key" style="width:380px" placeholder="sk-...">
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px">
-                        <span class="inline-label">Model:</span>
-                        <input type="text" id="s-api-model" style="width:380px" placeholder="gpt-4o-mini">
-                    </div>
-                    <div style="display:flex;gap:10px;margin-top:2px">
-                        <button class="btn btn-orange" onclick="confirmApi()">保存</button>
-                        <button class="btn btn-danger" onclick="clearApi()">清空</button>
-                    </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="inline-label">Model:</span>
+                    <input type="text" id="s-api-model" style="width:380px" placeholder="gpt-4o-mini">
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="inline-label">Base:</span>
+                    <input type="text" id="s-api-base-url" style="width:380px" placeholder="https://api.openai.com/v1"
+                        onchange="saveText('api','base_url',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="inline-label">超时:</span>
+                    <select id="s-api-timeout" onchange="saveSelect('api','timeout',this.value)">
+                        <option value="infinite">直到灵符耗尽</option>
+                        <option value="8s">很短</option>
+                        <option value="20s">短</option>
+                        <option value="60s">没那么短</option>
+                        <option value="100s">挺长的</option>
+                        <option value="1000s">相当长</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:2px">
+                    <button class="btn btn-orange" onclick="confirmApi()">保存</button>
+                    <button class="btn btn-danger" onclick="clearApi()">清空</button>
+                </div>
                 </div>
             </div>
         </div>
@@ -962,6 +978,8 @@
             document.getElementById('s-export-path').value = s.export?.path ?? '';
             document.getElementById('s-api-key').value = s.api?.key ?? '';
             document.getElementById('s-api-model').value = s.api?.model ?? '';
+            document.getElementById('s-api-base-url').value = s.api?.base_url ?? 'https://api.openai.com/v1';
+            document.getElementById('s-api-timeout').value = s.api?.timeout ?? 'infinite';
 
             document.getElementById('s-localout-folder').value = s.localout?.folder ?? '';
             document.getElementById('s-scan-android').checked = s.localout?.scan_android === 'true';
@@ -1072,16 +1090,28 @@
             closeApiModal();
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
+            const b = document.getElementById('s-api-base-url').value.trim();
+            const t = document.getElementById('s-api-timeout').value;
+
             await apiPost('/api/setting', { section: 'api', key: 'key', value: k });
             await apiPost('/api/setting', { section: 'api', key: 'model', value: m });
+            await apiPost('/api/setting', { section: 'api', key: 'base_url', value: b || 'https://api.openai.com/v1' });
+            await apiPost('/api/setting', { section: 'api', key: 'timeout', value: t || 'infinite' });
+
             showToast('API 设置已保存');
         }
         function closeApiModal() { document.getElementById('api-modal').classList.remove('show'); }
         async function clearApi() {
             document.getElementById('s-api-key').value = '';
             document.getElementById('s-api-model').value = '';
+            document.getElementById('s-api-base-url').value = 'https://api.openai.com/v1';
+            document.getElementById('s-api-timeout').value = 'infinite';
+
             await apiPost('/api/setting', { section: 'api', key: 'key', value: '' });
             await apiPost('/api/setting', { section: 'api', key: 'model', value: '' });
+            await apiPost('/api/setting', { section: 'api', key: 'base_url', value: 'https://api.openai.com/v1' });
+            await apiPost('/api/setting', { section: 'api', key: 'timeout', value: 'infinite' });
+
             showToast('API 设置已清空');
         }
 

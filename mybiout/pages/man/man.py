@@ -162,6 +162,18 @@ def _get_project_context() -> str:
         _log("warn", f"pmc 执行异常: {e}")
     return ""
 
+def _build_chat_url(base_url: str) -> str:
+    r"""
+    规范化并构造 chat completions URL
+    :param: base_url: 配置的 API 地址
+    :return: str: 完整 chat completions 地址
+    """
+    b: str = (base_url or "https://api.openai.com/v1").strip().rstrip("/")
+    if b.endswith("/chat/completions"):
+        return b
+    if not b.endswith("/v1"):
+        b += "/v1"
+    return f"{b}/chat/completions"
 
 def _call_llm(prompt: str, context: str) -> str:
     r"""
@@ -195,15 +207,16 @@ def _call_llm(prompt: str, context: str) -> str:
         "Content-Type": "application/json",
     }
 
-    with httpx.Client(timeout=300.0) as client:
+    base_url: str = utils.get_api_base_url()
+    chat_url: str = _build_chat_url(base_url)
+    timeout_seconds: float | None = utils.get_api_timeout_seconds()
+
+    with httpx.Client(timeout=timeout_seconds) as client:
         r: httpx.Response = client.post(
-            "https://api.openai.com/v1/chat/completions",
+            chat_url,
             headers=headers,
             json={"model": model, "messages": messages},
         )
-        r.raise_for_status()
-        data: dict = r.json()
-        return data["choices"][0]["message"]["content"]
 
 
 def chat(prompt: str, force_bs: bool = False) -> dict:

@@ -51,5 +51,5 @@ MyBiOut! --port 2026
 
 ## 测试
 
-- Windows 11, Fedora 43, Linux Mint 22
+- Windows 11  
 - 小米13(Hyper OS 3), 一加8(原生Android 15)
