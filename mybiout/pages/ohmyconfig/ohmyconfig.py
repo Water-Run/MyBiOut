@@ -103,6 +103,27 @@ def validate_and_save(section: str, key: str, value: str) -> dict:
         utils.set_setting(section, key, v)
         return _ok()
 
+    # --- bbdown: 布尔项 ---
+    if section == "bbdown" and key in ("download_danmaku", "skip_subtitle", "skip_cover", "use_aria2c"):
+        v = value.strip().lower()
+        if v not in _ALLOWED_BOOL:
+            return _err("开关值不对劲, 只能 true/false")
+        utils.set_setting(section, key, v)
+        return _ok()
+
+    # --- bbdown: cookie ---
+    if section == "bbdown" and key == "cookie":
+        utils.set_setting(section, key, value.strip())
+        return _ok()
+
+    # --- bbdown: 文本项 (encoding_priority, quality_priority, file_pattern, multi_file_pattern) ---
+    if section == "bbdown" and key in (
+        "encoding_priority", "quality_priority",
+        "file_pattern", "multi_file_pattern",
+    ):
+        utils.set_setting(section, key, value.strip())
+        return _ok()
+
     # --- mdout: 布尔项 ---
     if section == "mdout" and key in ("include_cover", "include_tags", "include_stats"):
         v = value.strip().lower()

@@ -36,6 +36,15 @@ DEFAULTS: dict[str, dict[str, str]] = {
     },
     "bbdown": {
         "folder": "bbdown!",
+        "cookie": "",
+        "encoding_priority": "",
+        "quality_priority": "",
+        "download_danmaku": "false",
+        "skip_subtitle": "false",
+        "skip_cover": "false",
+        "file_pattern": "<videoTitle>",
+        "multi_file_pattern": "<videoTitle>/[P<pageNumberWithZero>]<pageTitle>",
+        "use_aria2c": "false",
     },
     "mdout": {
         "folder": "mdout!",

@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200">
+    <title>BBDown! — MyBiOut!</title>
+    <link rel="icon" href="/assets/logo-fullres.png" type="image/png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #E85B8A;
+            border-radius: 3px;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: url('/assets/bg.png') center center / cover no-repeat fixed;
+            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+            cursor: default;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #bg-cv {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            width: 1200px;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            padding: 18px 20px 14px;
+        }
+
+        /* ===== HEADER ===== */
+        .hdr {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .back {
+            background: #E85B8A;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 18px;
+            border: 3px solid #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+            transition: transform .12s, box-shadow .12s;
+        }
+
+        .back:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        .hdr h1 {
+            font-size: 32px;
+            font-weight: 900;
+            color: #F5A623;
+            text-shadow: 3px 3px 0 #E85B8A;
+            transform: rotate(-0.6deg);
+        }
+
+        .hdr-right {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .env-tag {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border: 2px solid;
+            white-space: nowrap;
+        }
+
+        .env-ok {
+            color: #27ae60;
+            border-color: #27ae60;
+            background: rgba(39, 174, 96, .08);
+        }
+
+        .env-err {
+            color: #e74c3c;
+            border-color: #e74c3c;
+            background: rgba(231, 76, 60, .08);
+        }
+
+        .hdr-link {
+            font-size: 12px;
+            font-weight: 700;
+            color: #E85B8A;
+            border-bottom: 2px dashed #E85B8A;
+            padding-bottom: 1px;
+            transition: color .2s, border-color .2s;
+        }
+
+        .hdr-link:hover {
+            color: #F5A623;
+            border-color: #F5A623;
+        }
+
+        /* ===== INPUT BAR ===== */
+        .input-bar {
+            flex-shrink: 0;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            padding: 12px 16px;
+        }
+
+        .input-bar input {
+            flex: 1;
+            padding: 9px 14px;
+            border: 2px solid #F5A623;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            background: #fff;
+            transition: border-color .2s;
+        }
+
+        .input-bar input:focus {
+            border-color: #E85B8A;
+        }
+
+        /* ===== COLUMNS ===== */
+        .cols {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 270px 1fr 1fr;
+            gap: 14px;
+            min-height: 0;
+        }
+
+        .col {
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform .22s;
+        }
+
+        .col:hover {
+            transform: rotate(0deg) !important;
+        }
+
+        .col:nth-child(1) {
+            transform: rotate(-0.3deg);
+        }
+
+        .col:nth-child(2) {
+            transform: rotate(0.2deg);
+        }
+
+        .col:nth-child(3) {
+            transform: rotate(-0.25deg);
+        }
+
+        .col-hd {
+            padding: 12px 14px 8px;
+            border-bottom: 3px dashed #F5A623;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .col-hd h2 {
+            font-size: 17px;
+            font-weight: 900;
+            color: #E85B8A;
+            white-space: nowrap;
+        }
+
+        .badge {
+            background: #F5A623;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border: 2px solid #d48b0e;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .col-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+        }
+
+        .col-ft {
+            padding: 8px 12px;
+            border-top: 2px solid rgba(245, 166, 35, .2);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        /* ===== OPTIONS ===== */
+        .opt-group {
+            margin-bottom: 12px;
+        }
+
+        .opt-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #E85B8A;
+            margin-bottom: 4px;
+        }
+
+        .opt-group select,
+        .opt-group input[type="text"] {
+            width: 100%;
+            padding: 5px 8px;
+            border: 2px solid #F5A623;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+            background: #fff;
+            transition: border-color .2s;
+        }
+
+        .opt-group select:focus,
+        .opt-group input[type="text"]:focus {
+            border-color: #E85B8A;
+        }
+
+        .opt-check {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #444;
+            margin-bottom: 6px;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .opt-check input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            accent-color: #E85B8A;
+            cursor: pointer;
+        }
+
+        .opt-divider {
+            border: none;
+            border-top: 2px dashed rgba(245, 166, 35, .25);
+            margin: 10px 0;
+        }
+
+        .env-block {
+            background: rgba(245, 166, 35, .06);
+            border: 1px dashed #F5A623;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            font-size: 11px;
+            line-height: 1.8;
+        }
+
+        .env-block .e-ok {
+            color: #27ae60;
+            font-weight: 700;
+        }
+
+        .env-block .e-err {
+            color: #e74c3c;
+            font-weight: 700;
+        }
+
+        .env-block a {
+            color: #E85B8A;
+            font-weight: 700;
+            border-bottom: 1px dashed #E85B8A;
+        }
+
+        .env-block a:hover {
+            color: #F5A623;
+            border-color: #F5A623;
+        }
+
+        /* ===== TASK CARD ===== */
+        .task {
+            background: #fff;
+            border: 2px solid #eee;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            position: relative;
+            transition: border-color .18s, box-shadow .18s, transform .18s;
+            border-left: 4px solid #ccc;
+        }
+
+        .task:hover {
+            transform: translateX(3px);
+            box-shadow: 0 3px 10px rgba(232, 91, 138, .12);
+            border-color: #F5A623;
+        }
+
+        .task-queued {
+            border-left-color: #bbb;
+        }
+
+        .task-downloading {
+            border-left-color: #F5A623;
+        }
+
+        .task-success {
+            border-left-color: #27ae60;
+        }
+
+        .task-failed {
+            border-left-color: #e74c3c;
+        }
+
+        .task-cancelled {
+            border-left-color: #f39c12;
+        }
+
+        .task-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 3px;
+        }
+
+        .task-url {
+            font-size: 11px;
+            color: #999;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 4px;
+        }
+
+        .task-prog {
+            width: 100%;
+            height: 12px;
+            background: #eee;
+            border: 1px solid #ddd;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .task-prog-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #E85B8A, #F5A623, #E85B8A);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s linear infinite;
+            transition: width .3s ease;
+        }
+
+        .task-prog-text {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 700;
+            color: #666;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 0% center;
+            }
+
+            100% {
+                background-position: 200% center;
+            }
+        }
+
+        .task-status {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 1px 6px;
+            display: inline-block;
+        }
+
+        .task-status.st-queued {
+            background: #f0f0f0;
+            color: #888;
+        }
+
+        .task-status.st-downloading {
+            background: linear-gradient(90deg, #E85B8A, #F5A623, #E85B8A);
+            background-size: 200% auto;
+            color: #fff;
+            animation: shimmer 1.5s linear infinite;
+        }
+
+        .task-status.st-success {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .task-status.st-failed {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .task-status.st-cancelled {
+            background: #f39c12;
+            color: #fff;
+        }
+
+        .task-speed {
+            font-size: 10px;
+            color: #F5A623;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+
+        .task-actions {
+            margin-top: 4px;
+            display: flex;
+            gap: 4px;
+        }
+
+        .task-error {
+            font-size: 10px;
+            color: #e74c3c;
+            margin-top: 2px;
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 2px solid;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: transform .1s, box-shadow .1s, opacity .2s;
+        }
+
+        .btn:active {
+            transform: translate(1px, 1px) !important;
+        }
+
+        .btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .btn-pk {
+            background: #E85B8A;
+            color: #fff;
+            border-color: #c44876;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .btn-or {
+            background: #F5A623;
+            color: #fff;
+            border-color: #d48b0e;
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .btn-gh {
+            background: transparent;
+            color: #E85B8A;
+            border-color: #E85B8A;
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        .btn-gn {
+            background: #27ae60;
+            color: #fff;
+            border-color: #1e8449;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .btn-dn {
+            background: #e74c3c;
+            color: #fff;
+            border-color: #c0392b;
+            box-shadow: 3px 3px 0 #888;
+        }
+
+        .btn-xs {
+            padding: 2px 8px;
+            font-size: 10px;
+        }
+
+        /* ===== LOG BAR ===== */
+        .logbar {
+            flex-shrink: 0;
+            height: 115px;
+            margin-top: 12px;
+            display: flex;
+            gap: 14px;
+            background: rgba(30, 30, 40, .88);
+            backdrop-filter: blur(8px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            padding: 10px 16px;
+            overflow: hidden;
+        }
+
+        .log-msgs {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.7;
+            font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+        }
+
+        .log-msgs::-webkit-scrollbar-thumb {
+            background: #F5A623;
+        }
+
+        .lm {
+            opacity: 0;
+            animation: logIn .3s ease-out forwards;
+        }
+
+        @keyframes logIn {
+            from {
+                opacity: 0;
+                transform: translateX(-12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .lm-time {
+            color: #666;
+        }
+
+        .lm-info {
+            color: #F5A623;
+        }
+
+        .lm-success {
+            color: #2ecc71;
+        }
+
+        .lm-warn {
+            color: #f39c12;
+        }
+
+        .lm-error {
+            color: #e74c3c;
+        }
+
+        .log-right {
+            width: 180px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prog-bar {
+            width: 100%;
+            height: 18px;
+            background: #333;
+            border: 2px solid #F5A623;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .prog-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #E85B8A, #F5A623, #E85B8A);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s linear infinite;
+            transition: width .3s ease;
+        }
+
+        .prog-text {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, .5);
+        }
+
+        .log-label {
+            font-size: 11px;
+            color: #888;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            padding: 10px 22px;
+            background: #F5A623;
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+            border: 3px solid #d48b0e;
+            box-shadow: 4px 4px 0 #E85B8A;
+            z-index: 9000;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity .25s, transform .25s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.err {
+            background: #E85B8A;
+            border-color: #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+        }
+
+        .empty-hint {
+            text-align: center;
+            padding: 40px 10px;
+            color: #ccc;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .empty-hint .em-icon {
+            font-size: 38px;
+            display: block;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-cv"></canvas>
+    <div class="page">
+        <!-- HEADER -->
+        <div class="hdr">
+            <a class="back" href="/">← 首页</a>
+            <h1>BBDown!</h1>
+            <div class="hdr-right">
+                <div class="env-tag" id="env-bb">⏳ BBDown</div>
+                <div class="env-tag" id="env-ff">⏳ ffmpeg</div>
+                <a class="hdr-link" href="https://github.com/nilaoda/BBDown" target="_blank" rel="noopener">BBDown 仓库
+                    ↗</a>
+            </div>
+        </div>
+
+        <!-- INPUT BAR -->
+        <div class="input-bar">
+            <input type="text" id="url-input" placeholder="输入 BV号 / av号 / ep号 / ss号 / 视频链接 / b23短链..."
+                onkeydown="if(event.key==='Enter')addTask()">
+            <button class="btn btn-gn" onclick="addTask()" id="btn-add">▶ 下载</button>
+        </div>
+
+        <!-- COLUMNS -->
+        <div class="cols">
+            <!-- OPTIONS -->
+            <div class="col">
+                <div class="col-hd">
+                    <h2>⚙ 选项</h2>
+                </div>
+                <div class="col-body">
+                    <div class="env-block" id="env-detail">检测环境中...</div>
+
+                    <div class="opt-group">
+                        <div class="opt-label">API 模式</div>
+                        <select id="opt-api">
+                            <option value="default">默认</option>
+                            <option value="tv">TV 接口</option>
+                            <option value="app">APP 接口</option>
+                            <option value="intl">国际版接口</option>
+                        </select>
+                    </div>
+                    <div class="opt-group">
+                        <div class="opt-label">画质偏好 (留空用设置默认)</div>
+                        <input type="text" id="opt-quality" placeholder="如: 8K 超高清,1080P 高码率">
+                    </div>
+                    <div class="opt-group">
+                        <div class="opt-label">编码偏好 (留空用设置默认)</div>
+                        <input type="text" id="opt-encoding" placeholder="如: hevc,av1,avc">
+                    </div>
+                    <div class="opt-group">
+                        <div class="opt-label">下载内容</div>
+                        <select id="opt-content">
+                            <option value="default">完整视频</option>
+                            <option value="audio_only">仅音频</option>
+                            <option value="video_only">仅视频</option>
+                            <option value="danmaku_only">仅弹幕</option>
+                            <option value="sub_only">仅字幕</option>
+                            <option value="cover_only">仅封面</option>
+                        </select>
+                    </div>
+                    <div class="opt-group">
+                        <div class="opt-label">分P选择 (留空下载默认)</div>
+                        <input type="text" id="opt-page" placeholder="ALL / 1,3,5 / 1-10 / LAST">
+                    </div>
+                    <hr class="opt-divider">
+                    <label class="opt-check"><input type="checkbox" id="opt-danmaku"> 额外下载弹幕</label>
+                    <label class="opt-check"><input type="checkbox" id="opt-skip-sub"> 跳过字幕</label>
+                    <label class="opt-check"><input type="checkbox" id="opt-skip-cover"> 跳过封面</label>
+                </div>
+            </div>
+
+            <!-- QUEUE -->
+            <div class="col">
+                <div class="col-hd">
+                    <h2>📋 队列</h2>
+                    <div class="badge" id="badge-queue">0</div>
+                </div>
+                <div class="col-body" id="queue-list"></div>
+                <div class="col-ft">
+                    <button class="btn btn-gh btn-xs" onclick="clearQueue()">清空排队</button>
+                    <button class="btn btn-gh btn-xs" onclick="clearFailed()">清空失败</button>
+                    <button class="btn btn-dn btn-xs" onclick="cancelCurrent()" id="btn-cancel"
+                        style="display:none;margin-left:auto">取消下载</button>
+                </div>
+            </div>
+
+            <!-- COMPLETED -->
+            <div class="col">
+                <div class="col-hd">
+                    <h2>✅ 完成</h2>
+                    <div class="badge" id="badge-done">0</div>
+                </div>
+                <div class="col-body" id="done-list"></div>
+                <div class="col-ft">
+                    <button class="btn btn-gh btn-xs" onclick="clearDone()">清空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOG BAR -->
+        <div class="logbar">
+            <div class="log-msgs" id="log-msgs"></div>
+            <div class="log-right">
+                <div class="log-label" id="prog-label">就绪</div>
+                <div class="prog-bar">
+                    <div class="prog-fill" id="prog-fill"></div>
+                    <div class="prog-text" id="prog-text">0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        (function () {
+            /* ===== HELPERS ===== */
+            const $ = id => document.getElementById(id);
+            function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+            let _tt = null;
+            function toast(msg, err) {
+                const el = $('toast'); if (_tt) clearTimeout(_tt);
+                el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
+                _tt = setTimeout(() => el.className = 'toast', 2200);
+            }
+
+            let prevLogLen = 0;
+
+            /* ===== ENV CHECK ===== */
+            async function checkEnv() {
+                try {
+                    const r = await (await fetch('/api/bbdown/env-check')).json();
+                    const bb = $('env-bb'), ff = $('env-ff');
+                    bb.textContent = r.bbdown_available ? '✅ BBDown' : '❌ BBDown';
+                    bb.className = 'env-tag ' + (r.bbdown_available ? 'env-ok' : 'env-err');
+                    ff.textContent = r.ffmpeg_available ? '✅ ffmpeg' : '❌ ffmpeg';
+                    ff.className = 'env-tag ' + (r.ffmpeg_available ? 'env-ok' : 'env-err');
+
+                    let html = '';
+                    if (r.bbdown_available) {
+                        html += '<span class="e-ok">✅ BBDown 就绪</span><br>';
+                    } else {
+                        html += '<span class="e-err">❌ BBDown 未找到</span><br>';
+                    }
+                    if (r.ffmpeg_available) {
+                        html += '<span class="e-ok">✅ ffmpeg 就绪</span>';
+                    } else {
+                        html += '<span class="e-err">❌ ffmpeg 未找到</span><br>';
+                        html += '<a href="https://ffmpeg.org/download.html" target="_blank">去下载 ffmpeg ↗</a>';
+                    }
+                    $('env-detail').innerHTML = html;
+                    $('btn-add').disabled = !r.bbdown_available;
+                } catch (e) {
+                    $('env-detail').innerHTML = '<span class="e-err">环境检测失败</span>';
+                }
+            }
+
+            /* ===== ADD TASK ===== */
+            window.addTask = async function () {
+                const url = $('url-input').value.trim();
+                if (!url) { toast('请输入链接', true); return; }
+
+                const options = {
+                    api_mode: $('opt-api').value,
+                    quality: $('opt-quality').value.trim(),
+                    encoding: $('opt-encoding').value.trim(),
+                    content: $('opt-content').value,
+                    page: $('opt-page').value.trim(),
+                    download_danmaku: $('opt-danmaku').checked,
+                    skip_subtitle: $('opt-skip-sub').checked,
+                    skip_cover: $('opt-skip-cover').checked,
+                };
+
+                const r = await (await fetch('/api/bbdown/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, options })
+                })).json();
+
+                if (r.ok) {
+                    $('url-input').value = '';
+                    toast('已添加下载任务');
+                } else {
+                    toast(r.error || '添加失败', true);
+                }
+            };
+
+            /* ===== ACTIONS ===== */
+            window.cancelCurrent = async function () {
+                await fetch('/api/bbdown/cancel', { method: 'POST' });
+            };
+            window.retryTask = async function (id) {
+                await (await fetch('/api/bbdown/retry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: id })
+                })).json();
+            };
+            window.removeTask = async function (id) {
+                await fetch('/api/bbdown/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: id })
+                });
+            };
+            window.clearQueue = async function () {
+                await fetch('/api/bbdown/clear-queue', { method: 'POST' });
+            };
+            window.clearFailed = async function () {
+                await fetch('/api/bbdown/clear-failed', { method: 'POST' });
+            };
+            window.clearDone = async function () {
+                await fetch('/api/bbdown/clear-completed', { method: 'POST' });
+            };
+
+            /* ===== RENDER ===== */
+            const statusLabel = {
+                queued: '排队中', downloading: '下载中...', success: '✓ 完成',
+                failed: '失败', cancelled: '已取消'
+            };
+
+            function taskHtml(t) {
+                const showProg = t.status === 'downloading';
+                const showActions = t.status === 'failed' || t.status === 'cancelled' || t.status === 'queued';
+                let h = '<div class="task task-' + t.status + '">';
+                h += '<div class="task-title">' + escH(t.title) + '</div>';
+                h += '<div class="task-url">' + escH(t.url) + '</div>';
+                if (showProg) {
+                    h += '<div class="task-prog"><div class="task-prog-fill" style="width:' + (t.progress * 100) + '%"></div>';
+                    h += '<div class="task-prog-text">' + Math.round(t.progress * 100) + '%</div></div>';
+                }
+                h += '<span class="task-status st-' + t.status + '">' + statusLabel[t.status] + '</span>';
+                if (showProg && t.speed) h += '<span class="task-speed">' + escH(t.speed) + '</span>';
+                if (t.status === 'failed' && t.error) h += '<div class="task-error">' + escH(t.error) + '</div>';
+                if (showActions) {
+                    h += '<div class="task-actions">';
+                    if (t.status === 'failed' || t.status === 'cancelled') {
+                        h += '<button class="btn btn-or btn-xs" onclick="event.stopPropagation();retryTask(\'' + t.id + '\')">重试</button>';
+                    }
+                    h += '<button class="btn btn-gh btn-xs" onclick="event.stopPropagation();removeTask(\'' + t.id + '\')">移除</button>';
+                    h += '</div>';
+                }
+                h += '</div>';
+                return h;
+            }
+
+            function doneHtml(t) {
+                return '<div class="task task-success">' +
+                    '<div class="task-title">' + escH(t.title) + '</div>' +
+                    '<div class="task-url">' + escH(t.url) + '</div>' +
+                    '<span class="task-status st-success">✓ 完成</span>' +
+                    '</div>';
+            }
+
+            function renderTasks(tasks, completed, isDownloading) {
+                /* Queue column */
+                const qEl = $('queue-list');
+                const qHtml = tasks.length
+                    ? tasks.map(taskHtml).join('')
+                    : '<div class="empty-hint"><span class="em-icon">📋</span>在上方输入链接添加任务</div>';
+                if (qEl._lh !== qHtml) { const st = qEl.scrollTop; qEl.innerHTML = qHtml; qEl.scrollTop = st; qEl._lh = qHtml; }
+
+                /* Done column */
+                const dEl = $('done-list');
+                const dHtml = completed.length
+                    ? completed.map(doneHtml).join('')
+                    : '<div class="empty-hint"><span class="em-icon">🎉</span>完成的下载将出现在这里</div>';
+                if (dEl._lh !== dHtml) { const st = dEl.scrollTop; dEl.innerHTML = dHtml; dEl.scrollTop = st; dEl._lh = dHtml; }
+
+                $('badge-queue').textContent = tasks.length;
+                $('badge-done').textContent = completed.length;
+                $('btn-cancel').style.display = isDownloading ? '' : 'none';
+
+                /* Progress in log bar */
+                const active = tasks.find(t => t.status === 'downloading');
+                if (active) {
+                    $('prog-fill').style.width = (active.progress * 100) + '%';
+                    $('prog-text').textContent = Math.round(active.progress * 100) + '%';
+                    $('prog-label').textContent = '下载中: ' + (active.title || '').slice(0, 18);
+                } else {
+                    $('prog-fill').style.width = '0%';
+                    $('prog-text').textContent = '0%';
+                    $('prog-label').textContent = '就绪';
+                }
+            }
+
+            function renderLogs(logs) {
+                if (logs.length === prevLogLen) return;
+                const el = $('log-msgs');
+                logs.slice(prevLogLen).forEach(l => {
+                    const d = document.createElement('div'); d.className = 'lm';
+                    d.innerHTML = '<span class="lm-time">[' + escH(l.time) + ']</span> <span class="lm-' + l.level + '">' + escH(l.msg) + '</span>';
+                    el.appendChild(d);
+                });
+                prevLogLen = logs.length;
+                el.scrollTop = el.scrollHeight;
+            }
+
+            /* ===== POLL ===== */
+            async function poll() {
+                try {
+                    const r = await fetch('/api/bbdown/state');
+                    const s = await r.json();
+                    renderTasks(s.tasks, s.completed, s.is_downloading);
+                    renderLogs(s.logs);
+                } catch (e) { }
+            }
+
+            /* ===== BG STARS ===== */
+            function initBg() {
+                const cv = $('bg-cv'), cx = cv.getContext('2d');
+                const O = '#F5A623', P = '#E85B8A';
+                let stars = [];
+                function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+                resize(); window.addEventListener('resize', resize);
+                for (let i = 0; i < 28; i++) stars.push({
+                    x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+                    sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2,
+                    rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2,
+                    c: Math.random() > .5 ? O : P, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2
+                });
+                function dS(x, y, r, sz, col, al) {
+                    if (al < .01) return;
+                    cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r); cx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5;
+                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
+                        cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
+                    }
+                    cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore();
+                }
+                (function loop() {
+                    cx.clearRect(0, 0, cv.width, cv.height);
+                    stars.forEach(s => {
+                        s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
+                        if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; }
+                        if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20;
+                        dS(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
+                    });
+                    requestAnimationFrame(loop);
+                })();
+            }
+
+            /* ===== INIT ===== */
+            initBg();
+            checkEnv();
+            poll();
+            setInterval(poll, 500);
+            setInterval(checkEnv, 15000);
+        })();
+    </script>
+</body>
+
+</html>

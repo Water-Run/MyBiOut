@@ -38,6 +38,13 @@ async def localout_page() -> HTMLResponse:
     )
 
 
+@app.get("/bbdown", response_class=HTMLResponse)
+async def bbdown_page() -> HTMLResponse:
+    return HTMLResponse(
+        (_PAGES_DIR / "bbdown" / "bbdown.html").read_text(encoding="utf-8")
+    )
+
+
 @app.get("/mdout", response_class=HTMLResponse)
 async def mdout_page() -> HTMLResponse:
     return HTMLResponse(
@@ -201,6 +208,74 @@ async def localout_start_export(request: Request):
 async def localout_cancel_export():
     from mybiout.pages.localout.localout import cancel_export
     cancel_export()
+    return {"ok": True}
+
+
+# ======================= BBDown API =======================
+
+
+@app.get("/api/bbdown/state")
+async def bbdown_state():
+    from mybiout.pages.bbdown.bbdown import get_state
+    return get_state()
+
+
+@app.get("/api/bbdown/env-check")
+async def bbdown_env_check():
+    from mybiout.pages.bbdown.bbdown import env_check
+    return env_check()
+
+
+@app.post("/api/bbdown/add")
+async def bbdown_add(request: Request):
+    body = await request.json()
+    from mybiout.pages.bbdown.bbdown import add_task
+    result = add_task(body.get("url", ""), body.get("options"))
+    if result["ok"]:
+        return result
+    return JSONResponse(status_code=400, content=result)
+
+
+@app.post("/api/bbdown/cancel")
+async def bbdown_cancel():
+    from mybiout.pages.bbdown.bbdown import cancel_current
+    cancel_current()
+    return {"ok": True}
+
+
+@app.post("/api/bbdown/retry")
+async def bbdown_retry(request: Request):
+    body = await request.json()
+    from mybiout.pages.bbdown.bbdown import retry_task
+    return retry_task(body.get("task_id", ""))
+
+
+@app.post("/api/bbdown/remove")
+async def bbdown_remove(request: Request):
+    body = await request.json()
+    from mybiout.pages.bbdown.bbdown import remove_task
+    remove_task(body.get("task_id", ""))
+    return {"ok": True}
+
+
+@app.post("/api/bbdown/clear-completed")
+async def bbdown_clear_completed():
+    from mybiout.pages.bbdown.bbdown import clear_completed
+    clear_completed()
+    return {"ok": True}
+
+
+@app.post("/api/bbdown/clear-failed")
+async def bbdown_clear_failed():
+    from mybiout.pages.bbdown.bbdown import clear_failed
+    clear_failed()
+    return {"ok": True}
+
+
+@app.post("/api/bbdown/clear-queue")
+async def bbdown_clear_queue():
+    from mybiout.pages.bbdown.bbdown import clear_queue
+    clear_queue()
     return {"ok": True}
 
 

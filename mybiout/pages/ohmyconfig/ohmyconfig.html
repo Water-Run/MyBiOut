@@ -400,11 +400,6 @@
             font-weight: 900;
         }
 
-        .placeholder-row {
-            opacity: .35;
-            font-style: italic;
-        }
-
         .inline-label {
             font-size: 13px;
             color: #E85B8A;
@@ -678,9 +673,104 @@
                 </div>
             </div>
 
-            <div class="setting-row placeholder-row">
-                <div class="setting-label">更多配置项待补充</div>
-                <div class="setting-hint">预留区域</div>
+            <div class="setting-row">
+                <div class="setting-label">B站 Cookie (SESSDATA)</div>
+                <div class="setting-hint">用于下载需要登录才能获取的视频（如高画质、付费内容等），传入 BBDown 的 -c 参数</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-bbdown-cookie" style="width:420px" placeholder="留空则不使用认证">
+                    <button class="btn btn-orange" onclick="confirmBBCookie()">保存</button>
+                    <button class="btn btn-danger" onclick="clearBBCookie()">清空</button>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">画质偏好</div>
+                <div class="setting-hint">按优先级排列，逗号分隔；留空则由 BBDown 自动选择最高画质</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-bbdown-quality" style="width:420px"
+                        placeholder="如: 8K 超高清,1080P 高码率,1080P 高清"
+                        onchange="saveText('bbdown','quality_priority',this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">编码偏好</div>
+                <div class="setting-hint">按优先级排列，逗号分隔；留空则由 BBDown 自动选择</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-bbdown-encoding" style="width:420px" placeholder="如: hevc,av1,avc"
+                        onchange="saveText('bbdown','encoding_priority',this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">单P文件名模板</div>
+                <div class="setting-hint">BBDown 的 -F 参数；可用变量: &lt;videoTitle&gt; &lt;bvid&gt; &lt;ownerName&gt;
+                    &lt;publishDate&gt; 等</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-bbdown-file-pattern" style="width:420px"
+                        onchange="saveText('bbdown','file_pattern',this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">多P文件名模板</div>
+                <div class="setting-hint">BBDown 的 -M 参数；多P时目录/文件命名规则</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-bbdown-multi-pattern" style="width:420px"
+                        onchange="saveText('bbdown','multi_file_pattern',this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">默认下载弹幕</div>
+                <div class="setting-hint">每次下载时自动附带弹幕文件</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-bbdown-danmaku"
+                            onchange="saveToggle('bbdown','download_danmaku',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">默认跳过字幕</div>
+                <div class="setting-hint">下载时不获取字幕</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-bbdown-skip-sub"
+                            onchange="saveToggle('bbdown','skip_subtitle',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">默认跳过封面</div>
+                <div class="setting-hint">下载时不获取封面图</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-bbdown-skip-cover"
+                            onchange="saveToggle('bbdown','skip_cover',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">使用 aria2c 下载</div>
+                <div class="setting-hint">启用后使用 aria2c 作为下载器（需系统已安装 aria2c）</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-bbdown-aria2c"
+                            onchange="saveToggle('bbdown','use_aria2c',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
             </div>
         </div>
 
@@ -796,6 +886,18 @@
         </div>
     </div>
 
+    <!-- BBDown Cookie 模态框 -->
+    <div class="modal-backdrop" id="bbcookie-modal">
+        <div class="modal" style="transform:rotate(-0.8deg)">
+            <h3>明文存储提示</h3>
+            <p>B站 Cookie 将以明文写入配置文件。<br>它相当于你的登录凭证，请勿泄露。</p>
+            <div class="modal-btns">
+                <button class="btn btn-orange" onclick="doSaveBBCookie()">确认保存</button>
+                <button class="btn btn-ghost" onclick="closeBBCookieModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
@@ -879,7 +981,17 @@
                 if (titleBox) titleBox.checked = true;
             }
 
+            // BBDown
             document.getElementById('s-bbdown-folder').value = s.bbdown?.folder ?? '';
+            document.getElementById('s-bbdown-cookie').value = s.bbdown?.cookie ?? '';
+            document.getElementById('s-bbdown-quality').value = s.bbdown?.quality_priority ?? '';
+            document.getElementById('s-bbdown-encoding').value = s.bbdown?.encoding_priority ?? '';
+            document.getElementById('s-bbdown-file-pattern').value = s.bbdown?.file_pattern ?? '<videoTitle>';
+            document.getElementById('s-bbdown-multi-pattern').value = s.bbdown?.multi_file_pattern ?? '<videoTitle>/[P<pageNumberWithZero>]<pageTitle>';
+            document.getElementById('s-bbdown-danmaku').checked = s.bbdown?.download_danmaku === 'true';
+            document.getElementById('s-bbdown-skip-sub').checked = s.bbdown?.skip_subtitle === 'true';
+            document.getElementById('s-bbdown-skip-cover').checked = s.bbdown?.skip_cover === 'true';
+            document.getElementById('s-bbdown-aria2c').checked = s.bbdown?.use_aria2c === 'true';
 
             // MdOut
             document.getElementById('s-mdout-folder').value = s.mdout?.folder ?? '';
@@ -911,6 +1023,7 @@
         }
         async function saveToggle(sec, key, checked) { syncConditional(); await saveSetting(sec, key, checked ? 'true' : 'false'); }
         async function saveSelect(sec, key, val) { await saveSetting(sec, key, val); }
+        async function saveText(sec, key, val) { await saveSetting(sec, key, val); }
         async function saveFolder(sec, val) {
             const ok = await saveSetting(sec, 'folder', val);
             if (!ok) { const s = await apiGet('/api/settings'); document.getElementById('s-' + sec + '-folder').value = s[sec]?.folder ?? ''; }
@@ -972,7 +1085,7 @@
             showToast('API 设置已清空');
         }
 
-        /* SESSDATA */
+        /* SESSDATA (MdOut) */
         function confirmSessdata() {
             const v = document.getElementById('s-mdout-sessdata').value.trim();
             if (!v) { showToast('SESSDATA 为空', true); return; }
@@ -988,6 +1101,24 @@
             document.getElementById('s-mdout-sessdata').value = '';
             await saveSetting('mdout', 'sessdata', '');
             showToast('SESSDATA 已清空');
+        }
+
+        /* BBDown Cookie */
+        function confirmBBCookie() {
+            const v = document.getElementById('s-bbdown-cookie').value.trim();
+            if (!v) { showToast('Cookie 为空', true); return; }
+            document.getElementById('bbcookie-modal').classList.add('show');
+        }
+        async function doSaveBBCookie() {
+            closeBBCookieModal();
+            const v = document.getElementById('s-bbdown-cookie').value.trim();
+            await saveSetting('bbdown', 'cookie', v);
+        }
+        function closeBBCookieModal() { document.getElementById('bbcookie-modal').classList.remove('show'); }
+        async function clearBBCookie() {
+            document.getElementById('s-bbdown-cookie').value = '';
+            await saveSetting('bbdown', 'cookie', '');
+            showToast('BBDown Cookie 已清空');
         }
 
         function resetFolder(sec) {
