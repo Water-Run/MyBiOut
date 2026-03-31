@@ -1,20 +1,25 @@
-"""MyBiOut! 基础工具 —— 配置读写与通用方法"""
+r"""
+MyBiOut! 基础工具模块, 负责配置文件的读写与通用方法
+
+:file: mybiout/pages/utils.py
+:author: WaterRun
+:time: 2026-03-31
+"""
 
 import configparser
 from pathlib import Path
 
-_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.ini"
-_DEFAULT_PORT = 23333
-
-# ============================== 默认值辅助 ==============================
+_CONFIG_PATH: Path = Path(__file__).resolve().parent.parent / "config.ini"
+_DEFAULT_PORT: int = 23333
 
 
 def get_default_bilibili_pc_cache_path() -> str:
-    """默认的哔哩哔哩电脑端缓存路径: C:\\Users\\[用户名]\\Videos\\bilibili"""
+    r"""
+    获取默认的哔哩哔哩电脑端缓存路径
+    :return: str: 默认缓存路径
+    """
     return str(Path.home() / "Videos" / "bilibili")
 
-
-# ============================== 默认值 ==============================
 
 DEFAULTS: dict[str, dict[str, str]] = {
     "export": {
@@ -57,12 +62,13 @@ DEFAULTS: dict[str, dict[str, str]] = {
     },
 }
 
-# ============================== 读写 ==============================
-
 
 def load_config() -> configparser.ConfigParser:
-    """读取配置文件, 不存在则全部走默认值."""
-    cfg = configparser.ConfigParser()
+    r"""
+    读取配置文件, 不存在则使用默认值
+    :return: configparser.ConfigParser: 加载后的配置解析器
+    """
+    cfg: configparser.ConfigParser = configparser.ConfigParser()
     for section, kvs in DEFAULTS.items():
         cfg[section] = dict(kvs)
     if _CONFIG_PATH.exists():
@@ -71,54 +77,79 @@ def load_config() -> configparser.ConfigParser:
 
 
 def save_config(cfg: configparser.ConfigParser) -> None:
-    """将配置写回文件."""
+    r"""
+    将配置写回文件
+    :param: cfg: 配置解析器实例
+    """
     with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
         f.write("# MyBiOut! 配置文件\n\n")
         cfg.write(f)
 
 
-# ============================== 查 / 改 ==============================
-
-
 def get_all_settings() -> dict[str, dict[str, str]]:
-    """返回全部设置, 按 section→key→value 组织."""
-    cfg = load_config()
+    r"""
+    获取全部设置, 按 section → key → value 组织
+    :return: dict[str, dict[str, str]]: 全部设置项
+    """
+    cfg: configparser.ConfigParser = load_config()
     return {sec: dict(cfg[sec]) for sec in cfg.sections()}
 
 
 def get_setting(section: str, key: str) -> str:
-    """取一项."""
-    cfg = load_config()
-    fallback = DEFAULTS.get(section, {}).get(key, "")
+    r"""
+    获取单项设置值
+    :param: section: 配置分区名
+    :param: key: 配置键名
+    :return: str: 配置值, 不存在时返回默认值
+    """
+    cfg: configparser.ConfigParser = load_config()
+    fallback: str = DEFAULTS.get(section, {}).get(key, "")
     return cfg.get(section, key, fallback=fallback)
 
 
 def set_setting(section: str, key: str, value: str) -> None:
-    """存一项."""
-    cfg = load_config()
+    r"""
+    保存单项设置值
+    :param: section: 配置分区名
+    :param: key: 配置键名
+    :param: value: 配置值
+    """
+    cfg: configparser.ConfigParser = load_config()
     if section not in cfg:
         cfg[section] = {}
     cfg[section][key] = value
     save_config(cfg)
 
 
-# ============================== 便捷方法 ==============================
-
-
 def get_export_path() -> Path:
-    """获取导出根路径, 不存在则创建."""
-    p = Path(get_setting("export", "path"))
+    r"""
+    获取导出根路径, 不存在则自动创建
+    :return: Path: 导出根目录
+    """
+    p: Path = Path(get_setting("export", "path"))
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
 def get_api_key() -> str:
+    r"""
+    获取 API Key
+    :return: str: API Key 值
+    """
     return get_setting("api", "key")
 
 
 def get_api_model() -> str:
+    r"""
+    获取 API 模型名称
+    :return: str: 模型名称
+    """
     return get_setting("api", "model")
 
 
 def get_port() -> int:
+    r"""
+    获取默认服务端口号
+    :return: int: 端口号
+    """
     return _DEFAULT_PORT

@@ -1,14 +1,21 @@
-"""MyBiOut! 主入口"""
+r"""
+MyBiOut! 主入口模块, 解析命令行参数并启动 FastAPI 服务
+
+:file: mybiout/main.py
+:author: WaterRun
+:time: 2026-03-31
+"""
 
 import argparse
 import threading
+import time
 import webbrowser
 
 import uvicorn
 
 from mybiout.pages.utils import get_port
 
-_BANNER = r"""
+_BANNER: str = r"""
   __  __       ____  _  ___        _   _
  |  \/  |_   _| __ )(_)/ _ \ _   _| |_| |
  | |\/| | | | |  _ \| | | | | | | | __| |
@@ -19,10 +26,12 @@ _BANNER = r"""
 
 
 def main() -> None:
-    """主入口函数"""
-    default_port = get_port()
+    r"""
+    主入口函数, 解析命令行参数并启动 uvicorn 服务
+    """
+    default_port: int = get_port()
 
-    parser = argparse.ArgumentParser(
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
         prog="MyBiOut!",
         description="MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集",
     )
@@ -32,7 +41,7 @@ def main() -> None:
         default=default_port,
         help=f"指定服务端口号 (默认: {default_port})",
     )
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
     port: int = args.port
 
     print(_BANNER)
@@ -41,7 +50,9 @@ def main() -> None:
     print()
 
     def _open_browser() -> None:
-        import time
+        r"""
+        延迟后自动打开浏览器访问本地服务
+        """
         time.sleep(1.5)
         webbrowser.open(f"http://localhost:{port}")
 
@@ -57,3 +68,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    

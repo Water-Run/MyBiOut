@@ -1,29 +1,36 @@
-"""BBDown! — BBDown 可视化封装 服务层"""
+r"""
+BBDown! 可视化封装服务层, 管理 BBDown 下载任务队列
 
-import os
+:file: mybiout/pages/bbdown/bbdown.py
+:author: WaterRun
+:time: 2026-03-31
+"""
+
 import re
 import shutil
 import subprocess
 import sys
 import threading
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 from mybiout.pages import utils
 
-# ============================== 路径 ==============================
-
-_BIN_DIR = Path(__file__).resolve().parent.parent.parent / "bin"
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
-_POPEN_EXTRA: dict = {}
+_BIN_DIR: Path = Path(__file__).resolve().parent.parent.parent / "bin"
+_ANSI_RE: re.Pattern[str] = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+_POPEN_EXTRA: dict[str, int] = {}
 if sys.platform == "win32":
-    _POPEN_EXTRA["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
+    _POPEN_EXTRA["creationflags"] = 0x08000000
 
 
 def _find_bbdown() -> str | None:
-    """查找 BBDown 可执行文件"""
-    candidates = [
+    r"""
+    查找 BBDown 可执行文件
+    :return: str | None: 可执行文件路径, 未找到返回 None
+    """
+    candidates: list[Path] = [
         _BIN_DIR / "BBDown" / "BBDown.exe",
         _BIN_DIR / "BBDown" / "BBDown",
         _BIN_DIR / "BBDown.exe",
@@ -36,8 +43,11 @@ def _find_bbdown() -> str | None:
 
 
 def _find_ffmpeg() -> str | None:
-    """查找 ffmpeg"""
-    candidates = [
+    r"""
+    查找 ffmpeg 可执行文件
+    :return: str | None: 可执行文件路径, 未找到返回 None
+    """
+    candidates: list[Path] = [
         _BIN_DIR / "BBDown" / "ffmpeg.exe",
         _BIN_DIR / "BBDown" / "ffmpeg",
         _BIN_DIR / "ffmpeg.exe",
@@ -49,47 +59,60 @@ def _find_ffmpeg() -> str | None:
     return shutil.which("ffmpeg")
 
 
-# ============================== 工具 ==============================
-
-
 def _uid() -> str:
+    r"""
+    生成 12 位唯一标识
+    :return: str: UUID 前 12 位
+    """
     return uuid.uuid4().hex[:12]
 
 
 def _ts() -> str:
+    r"""
+    获取当前时间短格式
+    :return: str: HH:MM:SS
+    """
     return datetime.now().strftime("%H:%M:%S")
 
 
 def _ts_full() -> str:
+    r"""
+    获取当前时间完整格式
+    :return: str: YYYY-MM-DD HH:MM:SS
+    """
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _clean(line: str) -> str:
+    r"""
+    清除 ANSI 转义序列并去除首尾空白
+    :param: line: 原始行文本
+    :return: str: 清理后的文本
+    """
     return _ANSI_RE.sub("", line).strip()
 
 
-# ============================== BBDownTask ==============================
-
-
+@dataclass(slots=True)
 class BBDownTask:
-    __slots__ = (
-        "id", "url", "title", "status", "progress", "speed",
-        "error", "options", "output_file", "created_at",
-    )
-
-    def __init__(self, **kw):
-        self.id: str = kw.get("id", _uid())
-        self.url: str = kw.get("url", "")
-        self.title: str = kw.get("title", "")
-        self.status: str = kw.get("status", "queued")
-        self.progress: float = kw.get("progress", 0.0)
-        self.speed: str = kw.get("speed", "")
-        self.error: str = kw.get("error", "")
-        self.options: dict = kw.get("options", {})
-        self.output_file: str = kw.get("output_file", "")
-        self.created_at: str = kw.get("created_at", _ts_full())
+    r"""
+    BBDown 下载任务数据模型
+    """
+    id: str = field(default_factory=_uid)
+    url: str = ""
+    title: str = ""
+    status: str = "queued"
+    progress: float = 0.0
+    speed: str = ""
+    error: str = ""
+    options: dict = field(default_factory=dict)
+    output_file: str = ""
+    created_at: str = field(default_factory=_ts_full)
 
     def to_dict(self) -> dict:
+        r"""
+        转换为前端可用的字典
+        :return: dict: 任务字典
+        """
         return {
             "id": self.id,
             "url": self.url,
@@ -104,26 +127,39 @@ class BBDownTask:
         }
 
 
-# ============================== 全局状态 ==============================
-
-
 class _State:
-    def __init__(self):
-        self.lock = threading.RLock()
+    r"""
+    BBDown 全局运行状态管理
+    """
+
+    def __init__(self) -> None:
+        r"""
+        初始化全局状态
+        """
+        self.lock: threading.RLock = threading.RLock()
         self.tasks: list[BBDownTask] = []
         self.completed: list[BBDownTask] = []
         self.logs: list[dict] = []
         self._worker: threading.Thread | None = None
-        self._cancel = threading.Event()
+        self._cancel: threading.Event = threading.Event()
         self._process: subprocess.Popen | None = None
 
-    def log(self, level: str, msg: str):
+    def log(self, level: str, msg: str) -> None:
+        r"""
+        记录日志
+        :param: level: 日志级别
+        :param: msg: 日志消息
+        """
         with self.lock:
             self.logs.append({"time": _ts(), "level": level, "msg": msg})
             if len(self.logs) > 500:
                 self.logs = self.logs[-300:]
 
     def snapshot(self) -> dict:
+        r"""
+        获取当前状态快照
+        :return: dict: 状态数据
+        """
         with self.lock:
             return {
                 "tasks": [t.to_dict() for t in self.tasks],
@@ -133,151 +169,127 @@ class _State:
             }
 
 
-S = _State()
-
-
-# ============================== 命令构建 ==============================
+S: _State = _State()
 
 
 def _build_command(task: BBDownTask) -> list[str]:
-    """构建 BBDown 命令行"""
-    bbdown = _find_bbdown()
+    r"""
+    根据任务选项构建 BBDown 命令行参数列表
+    :param: task: 下载任务
+    :return: list[str]: 命令行参数列表
+    :raise: RuntimeError: BBDown 未找到时抛出
+    """
+    bbdown: str | None = _find_bbdown()
     if not bbdown:
         raise RuntimeError("BBDown 可执行文件未找到")
 
-    cmd = [bbdown]
-    opts = task.options or {}
+    cmd: list[str] = [bbdown]
+    opts: dict = task.options or {}
 
-    # Cookie
-    cookie = utils.get_setting("bbdown", "cookie").strip()
+    cookie: str = utils.get_setting("bbdown", "cookie").strip()
     if cookie:
         cmd.extend(["-c", f"SESSDATA={cookie}"])
 
-    # API mode
-    api_mode = opts.get("api_mode", "default")
-    if api_mode == "tv":
-        cmd.append("-tv")
-    elif api_mode == "app":
-        cmd.append("-app")
-    elif api_mode == "intl":
-        cmd.append("-intl")
+    match opts.get("api_mode", "default"):
+        case "tv":
+            cmd.append("-tv")
+        case "app":
+            cmd.append("-app")
+        case "intl":
+            cmd.append("-intl")
 
-    # Quality
-    quality = opts.get("quality", "").strip()
-    if not quality:
-        quality = utils.get_setting("bbdown", "quality_priority").strip()
+    quality: str = (opts.get("quality", "") or utils.get_setting("bbdown", "quality_priority")).strip()
     if quality:
         cmd.extend(["-q", quality])
 
-    # Encoding
-    encoding = opts.get("encoding", "").strip()
-    if not encoding:
-        encoding = utils.get_setting("bbdown", "encoding_priority").strip()
+    encoding: str = (opts.get("encoding", "") or utils.get_setting("bbdown", "encoding_priority")).strip()
     if encoding:
         cmd.extend(["-e", encoding])
 
-    # Content type
-    content = opts.get("content", "default")
-    if content == "audio_only":
-        cmd.append("--audio-only")
-    elif content == "video_only":
-        cmd.append("--video-only")
-    elif content == "danmaku_only":
-        cmd.append("--danmaku-only")
-    elif content == "sub_only":
-        cmd.append("--sub-only")
-    elif content == "cover_only":
-        cmd.append("--cover-only")
+    content: str = opts.get("content", "default")
+    match content:
+        case "audio_only":
+            cmd.append("--audio-only")
+        case "video_only":
+            cmd.append("--video-only")
+        case "danmaku_only":
+            cmd.append("--danmaku-only")
+        case "sub_only":
+            cmd.append("--sub-only")
+        case "cover_only":
+            cmd.append("--cover-only")
 
-    # Download danmaku
-    want_danmaku = opts.get("download_danmaku", False)
-    if not want_danmaku:
-        want_danmaku = utils.get_setting("bbdown", "download_danmaku") == "true"
+    want_danmaku: bool = opts.get("download_danmaku", False) or utils.get_setting("bbdown", "download_danmaku") == "true"
     if want_danmaku and content == "default":
         cmd.append("-dd")
 
-    # Skip options
-    want_skip_sub = opts.get("skip_subtitle", False)
-    if not want_skip_sub:
-        want_skip_sub = utils.get_setting("bbdown", "skip_subtitle") == "true"
+    want_skip_sub: bool = opts.get("skip_subtitle", False) or utils.get_setting("bbdown", "skip_subtitle") == "true"
     if want_skip_sub:
         cmd.append("--skip-subtitle")
 
-    want_skip_cover = opts.get("skip_cover", False)
-    if not want_skip_cover:
-        want_skip_cover = utils.get_setting("bbdown", "skip_cover") == "true"
+    want_skip_cover: bool = opts.get("skip_cover", False) or utils.get_setting("bbdown", "skip_cover") == "true"
     if want_skip_cover:
         cmd.append("--skip-cover")
 
-    # Page selection
-    page = opts.get("page", "").strip()
+    page: str = opts.get("page", "").strip()
     if page:
         cmd.extend(["-p", page])
 
-    # File pattern
-    file_pattern = utils.get_setting("bbdown", "file_pattern").strip()
+    file_pattern: str = utils.get_setting("bbdown", "file_pattern").strip()
     if file_pattern:
         cmd.extend(["-F", file_pattern])
-    multi_file_pattern = utils.get_setting("bbdown", "multi_file_pattern").strip()
+
+    multi_file_pattern: str = utils.get_setting("bbdown", "multi_file_pattern").strip()
     if multi_file_pattern:
         cmd.extend(["-M", multi_file_pattern])
 
-    # Work directory
-    export_root = utils.get_export_path()
-    folder = utils.get_setting("bbdown", "folder")
-    work_dir = export_root / folder
+    work_dir: Path = utils.get_export_path() / utils.get_setting("bbdown", "folder")
     work_dir.mkdir(parents=True, exist_ok=True)
     cmd.extend(["--work-dir", str(work_dir)])
 
-    # aria2c
     if utils.get_setting("bbdown", "use_aria2c") == "true":
         cmd.append("--use-aria2c")
 
-    # ffmpeg path (tell BBDown where ffmpeg is)
-    ffmpeg = _find_ffmpeg()
-    if ffmpeg:
+    if ffmpeg := _find_ffmpeg():
         cmd.extend(["--ffmpeg-path", ffmpeg])
 
     cmd.append(task.url)
     return cmd
 
 
-# ============================== 解析 ==============================
-
-
 def _parse_progress(line: str) -> tuple[float | None, str | None]:
-    """尝试从 BBDown 输出解析进度和速度"""
-    prog = None
-    speed = None
-    m = re.search(r"(\d+\.?\d*)%", line)
-    if m:
+    r"""
+    从 BBDown 输出行解析下载进度和速度
+    :param: line: 输出行文本
+    :return: tuple[float | None, str | None]: (进度, 速度)
+    """
+    prog: float | None = None
+    speed: str | None = None
+    if m := re.search(r"(\d+\.?\d*)%", line):
         prog = min(float(m.group(1)) / 100.0, 1.0)
-    m = re.search(r"(\d+\.?\d*\s*[KMG]?i?B/s)", line, re.I)
-    if m:
+    if m := re.search(r"(\d+\.?\d*\s*[KMG]?i?B/s)", line, re.I):
         speed = m.group(1)
     return prog, speed
 
 
 def _parse_title(line: str) -> str | None:
-    """尝试从 BBDown 输出提取视频标题"""
-    for pattern in [
-        r"标题[：:]\s*(.+)",
-        r"Title[：:]\s*(.+)",
-        r"视频标题[：:]\s*(.+)",
-    ]:
-        m = re.search(pattern, line)
-        if m:
+    r"""
+    从 BBDown 输出行提取视频标题
+    :param: line: 输出行文本
+    :return: str | None: 标题或 None
+    """
+    for pattern in (r"标题[：:]\s*(.+)", r"Title[：:]\s*(.+)", r"视频标题[：:]\s*(.+)"):
+        if m := re.search(pattern, line):
             return m.group(1).strip()
     return None
 
 
-# ============================== Worker ==============================
-
-
-def _worker_fn():
-    """后台 worker: 逐个处理下载队列"""
+def _worker_fn() -> None:
+    r"""
+    后台 worker 线程函数, 逐个处理下载队列
+    """
     while True:
-        task = None
+        task: BBDownTask | None = None
         with S.lock:
             if S._cancel.is_set():
                 S._worker = None
@@ -297,10 +309,10 @@ def _worker_fn():
         S.log("info", f"开始下载: {task.url}")
 
         try:
-            cmd = _build_command(task)
+            cmd: list[str] = _build_command(task)
             S.log("info", f"执行命令 ({len(cmd)} 个参数)")
 
-            process = subprocess.Popen(
+            process: subprocess.Popen = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -315,20 +327,15 @@ def _worker_fn():
                 S._process = process
 
             while True:
-                line = process.stdout.readline()
+                line: str = process.stdout.readline()
                 if not line and process.poll() is not None:
                     break
-                if not line:
-                    continue
-
-                clean_line = _clean(line)
-                if not clean_line:
+                if not (clean_line := _clean(line)):
                     continue
 
                 S.log("info", clean_line)
 
-                title = _parse_title(clean_line)
-                if title:
+                if title := _parse_title(clean_line):
                     with S.lock:
                         task.title = title
 
@@ -381,26 +388,33 @@ def _worker_fn():
         S._worker = None
 
 
-def _ensure_worker():
+def _ensure_worker() -> None:
+    r"""
+    确保后台 worker 线程正在运行
+    """
     with S.lock:
         if S._worker is None or not S._worker.is_alive():
             S._cancel.clear()
-            t = threading.Thread(target=_worker_fn, daemon=True)
+            t: threading.Thread = threading.Thread(target=_worker_fn, daemon=True)
             S._worker = t
             t.start()
 
 
-# ============================== 公共 API ==============================
-
-
 def get_state() -> dict:
+    r"""
+    获取当前状态快照
+    :return: dict: 状态数据
+    """
     return S.snapshot()
 
 
-def env_check() -> dict:
-    """环境检查"""
-    bbdown_path = _find_bbdown()
-    ffmpeg_path = _find_ffmpeg()
+def env_check() -> dict[str, bool | str]:
+    r"""
+    检查运行环境中 BBDown 和 ffmpeg 的可用性
+    :return: dict[str, bool | str]: 环境检测结果
+    """
+    bbdown_path: str | None = _find_bbdown()
+    ffmpeg_path: str | None = _find_ffmpeg()
     return {
         "bbdown_available": bbdown_path is not None,
         "bbdown_path": bbdown_path or "",
@@ -410,14 +424,19 @@ def env_check() -> dict:
 
 
 def add_task(url: str, options: dict | None = None) -> dict:
-    """添加下载任务"""
+    r"""
+    添加下载任务到队列
+    :param: url: 视频链接或 ID
+    :param: options: 下载选项字典
+    :return: dict: 添加结果
+    """
     url = url.strip()
     if not url:
         return {"ok": False, "error": "URL 不能为空"}
     if not _find_bbdown():
         return {"ok": False, "error": "BBDown 未找到"}
 
-    task = BBDownTask(url=url, options=options or {})
+    task: BBDownTask = BBDownTask(url=url, options=options or {})
     with S.lock:
         S.tasks.append(task)
     S.log("info", f"已添加任务: {url}")
@@ -425,26 +444,35 @@ def add_task(url: str, options: dict | None = None) -> dict:
     return {"ok": True, "task_id": task.id}
 
 
-def cancel_current():
-    """取消当前下载"""
+def cancel_current() -> None:
+    r"""
+    取消当前正在进行的下载
+    """
     S._cancel.set()
     with S.lock:
         if S._process:
             try:
                 S._process.kill()
             except Exception:
-                pass
+                ...
     S.log("info", "正在取消当前下载...")
 
 
-def remove_task(task_id: str):
-    """移除排队中的任务"""
+def remove_task(task_id: str) -> None:
+    r"""
+    移除排队中或失败的任务
+    :param: task_id: 任务 ID
+    """
     with S.lock:
         S.tasks = [t for t in S.tasks if not (t.id == task_id and t.status in ("queued", "failed", "cancelled"))]
 
 
 def retry_task(task_id: str) -> dict:
-    """重试失败/取消的任务"""
+    r"""
+    重试失败或取消的任务
+    :param: task_id: 任务 ID
+    :return: dict: 操作结果
+    """
     with S.lock:
         for t in S.tasks:
             if t.id == task_id and t.status in ("failed", "cancelled"):
@@ -457,22 +485,28 @@ def retry_task(task_id: str) -> dict:
     return {"ok": False, "error": "未找到可重试的任务"}
 
 
-def clear_completed():
-    """清空已完成列表"""
+def clear_completed() -> None:
+    r"""
+    清空已完成列表
+    """
     with S.lock:
         S.completed.clear()
     S.log("info", "已清空完成列表")
 
 
-def clear_failed():
-    """清空失败/取消的任务"""
+def clear_failed() -> None:
+    r"""
+    清空失败和取消的任务
+    """
     with S.lock:
         S.tasks = [t for t in S.tasks if t.status not in ("failed", "cancelled")]
     S.log("info", "已清空失败任务")
 
 
-def clear_queue():
-    """清空排队中的任务"""
+def clear_queue() -> None:
+    r"""
+    清空排队中的任务
+    """
     with S.lock:
         S.tasks = [t for t in S.tasks if t.status != "queued"]
     S.log("info", "已清空排队任务")
