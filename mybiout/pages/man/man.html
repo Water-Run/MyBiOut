@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200">
+    <title>Man! — MyBiOut!</title>
+    <link rel="icon" href="/assets/logo-fullres.png" type="image/png">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #E85B8A;
+            border-radius: 3px;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: url('/assets/bg.png') center center / cover no-repeat fixed;
+            font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+            cursor: default;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #bg-cv {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            width: 1200px;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            padding: 18px 20px 14px;
+        }
+
+        /* ===== HEADER ===== */
+        .hdr {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .back {
+            background: #E85B8A;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 18px;
+            border: 3px solid #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+            transition: transform .12s, box-shadow .12s;
+        }
+
+        .back:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        .hdr h1 {
+            font-size: 32px;
+            font-weight: 900;
+            color: #F5A623;
+            text-shadow: 3px 3px 0 #E85B8A;
+            transform: rotate(-0.6deg);
+        }
+
+        .hdr-sub {
+            font-size: 13px;
+            color: #E85B8A;
+            font-weight: 700;
+        }
+
+        /* ===== MAIN SPLIT ===== */
+        .main-split {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            min-height: 0;
+        }
+
+        /* ===== LEFT: MANUAL ===== */
+        .manual-panel {
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: rotate(-0.2deg);
+            transition: transform .22s;
+        }
+
+        .manual-panel:hover {
+            transform: rotate(0deg);
+        }
+
+        .manual-hd {
+            padding: 12px 18px 8px;
+            border-bottom: 3px dashed #F5A623;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .manual-hd h2 {
+            font-size: 17px;
+            font-weight: 900;
+            color: #E85B8A;
+        }
+
+        .manual-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 18px 22px 28px;
+            font-size: 14px;
+            color: #333;
+            line-height: 1.8;
+        }
+
+        .manual-body h2 {
+            font-size: 20px;
+            font-weight: 900;
+            color: #E85B8A;
+            margin-top: 28px;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px dashed #F5A623;
+        }
+
+        .manual-body h2::before {
+            content: "✦ ";
+            color: #F5A623;
+        }
+
+        .manual-body h3 {
+            font-size: 16px;
+            font-weight: 800;
+            color: #F5A623;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+
+        .manual-body p {
+            margin-bottom: 10px;
+        }
+
+        .manual-body code {
+            background: rgba(245, 166, 35, .1);
+            padding: 1px 6px;
+            font-size: 13px;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            color: #E85B8A;
+            border: 1px solid rgba(245, 166, 35, .2);
+        }
+
+        .manual-body pre {
+            background: rgba(30, 30, 40, .88);
+            color: #F5A623;
+            padding: 12px 16px;
+            margin: 8px 0 12px;
+            font-size: 13px;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            line-height: 1.6;
+            overflow-x: auto;
+            border: 2px solid #F5A623;
+        }
+
+        .manual-body pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .manual-body ul {
+            padding-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        .manual-body li {
+            margin-bottom: 4px;
+        }
+
+        .manual-body li::marker {
+            color: #E85B8A;
+        }
+
+        .manual-body .dep-card {
+            background: rgba(245, 166, 35, .06);
+            border: 1px dashed #F5A623;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+        }
+
+        .manual-body .dep-card b {
+            color: #E85B8A;
+        }
+
+        .manual-body .dep-card a {
+            color: #F5A623;
+            font-weight: 700;
+            border-bottom: 1px dashed #F5A623;
+        }
+
+        .manual-body .dep-card a:hover {
+            color: #E85B8A;
+            border-color: #E85B8A;
+        }
+
+        .manual-body blockquote {
+            border-left: 3px solid #E85B8A;
+            padding-left: 12px;
+            color: #888;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+
+        .manual-body hr {
+            border: none;
+            border-top: 2px dashed #F5A623;
+            margin: 20px 0;
+        }
+
+        .manual-body .badge-inline {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 1px 8px;
+            background: #E85B8A;
+            color: #fff;
+            margin: 0 2px;
+            vertical-align: middle;
+        }
+
+        /* ===== RIGHT: CHAT ===== */
+        .chat-panel {
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F5A623;
+            box-shadow: 5px 5px 0 #E85B8A;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: rotate(0.25deg);
+            transition: transform .22s;
+        }
+
+        .chat-panel:hover {
+            transform: rotate(0deg);
+        }
+
+        .chat-header {
+            padding: 14px 18px 10px;
+            border-bottom: 3px dashed #F5A623;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .kobe-wrap {
+            width: 48px;
+            height: 72px;
+            flex-shrink: 0;
+        }
+
+        .kobe-wrap svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chat-header-text h2 {
+            font-size: 17px;
+            font-weight: 900;
+            color: #E85B8A;
+            white-space: nowrap;
+        }
+
+        .chat-header-text p {
+            font-size: 11px;
+            color: #888;
+            font-weight: 700;
+        }
+
+        .chat-msgs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 14px;
+        }
+
+        .msg {
+            margin-bottom: 14px;
+            display: flex;
+            gap: 8px;
+            animation: msgIn .3s ease-out;
+        }
+
+        @keyframes msgIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg-user {
+            flex-direction: row-reverse;
+        }
+
+        .msg-avatar {
+            width: 28px;
+            height: 42px;
+            flex-shrink: 0;
+            color: #E85B8A;
+            opacity: .7;
+        }
+
+        .msg-avatar svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .msg-user .msg-avatar {
+            display: none;
+        }
+
+        .msg-bubble {
+            max-width: 80%;
+            padding: 10px 14px;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .msg-user .msg-bubble {
+            background: #E85B8A;
+            color: #fff;
+            border: 2px solid #c44876;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .msg-bot .msg-bubble {
+            background: #fff;
+            color: #333;
+            border: 2px solid #F5A623;
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .msg-bubble h1,
+        .msg-bubble h2,
+        .msg-bubble h3 {
+            font-size: 14px;
+            color: #E85B8A;
+            margin: 8px 0 4px;
+        }
+
+        .msg-bubble code {
+            background: rgba(245, 166, 35, .1);
+            padding: 0 4px;
+            font-size: 12px;
+            font-family: "Cascadia Code", "Consolas", monospace;
+        }
+
+        .msg-bubble pre {
+            background: rgba(30, 30, 40, .88);
+            color: #F5A623;
+            padding: 8px 10px;
+            margin: 6px 0;
+            font-size: 12px;
+            overflow-x: auto;
+            border: 1px solid #F5A623;
+        }
+
+        .msg-bubble pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .msg-bubble p {
+            margin: 4px 0;
+        }
+
+        .msg-bubble ul,
+        .msg-bubble ol {
+            padding-left: 16px;
+        }
+
+        .msg-source {
+            font-size: 10px;
+            font-weight: 700;
+            margin-top: 4px;
+            padding: 1px 8px;
+            display: inline-block;
+        }
+
+        .msg-source.src-llm {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .msg-source.src-bullshit {
+            background: #F5A623;
+            color: #fff;
+        }
+
+        .msg-note {
+            font-size: 10px;
+            color: #999;
+            margin-top: 2px;
+            font-style: italic;
+        }
+
+        .msg-loading {
+            display: flex;
+            gap: 5px;
+            padding: 8px 0;
+        }
+
+        .msg-loading span {
+            width: 8px;
+            height: 8px;
+            background: #E85B8A;
+            display: inline-block;
+            animation: bounce .6s ease-in-out infinite;
+        }
+
+        .msg-loading span:nth-child(2) {
+            animation-delay: .15s;
+        }
+
+        .msg-loading span:nth-child(3) {
+            animation-delay: .3s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .chat-welcome {
+            text-align: center;
+            padding: 30px 20px;
+            color: #ccc;
+        }
+
+        .chat-welcome .cw-icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+        }
+
+        .chat-welcome p {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .chat-welcome .cw-sub {
+            font-size: 11px;
+            color: #ddd;
+        }
+
+        .chat-input-bar {
+            flex-shrink: 0;
+            padding: 10px 14px;
+            border-top: 2px solid rgba(245, 166, 35, .2);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .chat-input-bar input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #F5A623;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            background: #fff;
+            transition: border-color .2s;
+        }
+
+        .chat-input-bar input:focus {
+            border-color: #E85B8A;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 2px solid;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: transform .1s, box-shadow .1s, opacity .2s;
+        }
+
+        .btn:active {
+            transform: translate(1px, 1px) !important;
+        }
+
+        .btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .btn-pk {
+            background: #E85B8A;
+            color: #fff;
+            border-color: #c44876;
+            box-shadow: 3px 3px 0 #F5A623;
+        }
+
+        .btn-or {
+            background: #F5A623;
+            color: #fff;
+            border-color: #d48b0e;
+            box-shadow: 3px 3px 0 #E85B8A;
+        }
+
+        .btn-gh {
+            background: transparent;
+            color: #E85B8A;
+            border-color: #E85B8A;
+            box-shadow: 2px 2px 0 #F5A623;
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            padding: 10px 22px;
+            background: #F5A623;
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+            border: 3px solid #d48b0e;
+            box-shadow: 4px 4px 0 #E85B8A;
+            z-index: 9000;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity .25s, transform .25s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.err {
+            background: #E85B8A;
+            border-color: #c44876;
+            box-shadow: 4px 4px 0 #F5A623;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-cv"></canvas>
+    <div class="page">
+        <!-- HEADER -->
+        <div class="hdr">
+            <a class="back" href="/">← 首页</a>
+            <h1>Man!</h1>
+            <span class="hdr-sub">ManualScript 手册 & AI 助手</span>
+        </div>
+
+        <!-- MAIN SPLIT -->
+        <div class="main-split">
+            <!-- LEFT: MANUAL -->
+            <div class="manual-panel">
+                <div class="manual-hd">
+                    <h2>📖 MyBiOut! 手册</h2>
+                </div>
+                <div class="manual-body">
+
+                    <h2>概述</h2>
+                    <p><code>MyBiOut!</code>（My-Bilibili-Output，导出我的哔哩哔哩）是一个综合性的、一站式开箱即用的哔哩哔哩导出工具集。</p>
+                    <p>使用 <code>FastAPI</code> 构建，网页前端部署在 <code>localhost</code>。系统包含三大功能模块：本地缓存导出、BBDown 可视化封装、Markdown
+                        格式化导出。</p>
+                    <blockquote>当前仅支持 Windows 环境运行</blockquote>
+
+                    <h2>安装与启动</h2>
+                    <h3>安装</h3>
+                    <p>通过 PyPI 安装（需要 Python 3.14+ 环境）：</p>
+                    <pre><code>pip install mybiout</code></pre>
+
+                    <h3>启动服务</h3>
+                    <p>使用以下命令启动（不区分大小写）：</p>
+                    <pre><code>MyBiOut!</code></pre>
+                    <p>默认在 <code>23333</code> 端口启动服务。访问 <code>http://localhost:23333</code> 打开界面。</p>
+
+                    <h3>自定义端口</h3>
+                    <pre><code>MyBiOut! --port 端口号</code></pre>
+                    <p>例如：<code>MyBiOut! --port 2026</code></p>
+
+                    <h3>启动动画</h3>
+                    <p>启动时会播放一段终端动画，包含直升机飞行、盲文粒子特效、随机配色主题等。终端尺寸不足时自动降级为静态 Banner。</p>
+
+                    <hr>
+
+                    <h2>功能模块</h2>
+
+                    <h3>🎞️ LocalOut! — 本地缓存导出</h3>
+                    <p>导出本地的哔哩哔哩视频缓存，支持以下来源：</p>
+                    <ul>
+                        <li><b>PC 桌面端缓存</b>：自动解析 <code>videoInfo.json</code>，合并 <code>.m4s</code> 文件</li>
+                        <li><b>Android 设备缓存（ADB）</b>：通过 USB 连接扫描设备上的缓存，解析 <code>entry.json</code></li>
+                        <li><b>自定义本地路径</b>：浏览选择任意包含缓存的目录</li>
+                    </ul>
+                    <p>操作流程：<span class="badge-inline">添加源</span> → <span class="badge-inline">扫描</span> → <span
+                            class="badge-inline">选择视频</span> → <span class="badge-inline">添加到任务</span> → <span
+                            class="badge-inline">导出</span></p>
+                    <p>支持自定义导出文件名（BV号、标题、UP主、分P号、时间等任意组合）、并发导出控制、不完整标题降级策略等。</p>
+
+                    <h3>📥 BBDown! — 视频下载</h3>
+                    <p>对知名命令行工具 <code>BBDown</code> 的可视化封装。在网页界面上输入视频链接即可下载。</p>
+                    <p>支持的输入格式：</p>
+                    <ul>
+                        <li>BV号、av号、ep号、ss号</li>
+                        <li>完整视频链接</li>
+                        <li>b23 短链</li>
+                    </ul>
+                    <p>可配置项包括：API 模式（默认/TV/APP/国际版）、画质偏好、编码偏好、下载内容（完整视频/仅音频/仅弹幕等）、分P选择、弹幕下载、字幕跳过等。</p>
+                    <p>下载任务自动排队，支持取消、重试、清空操作。</p>
+
+                    <h3>📝 MdOut! — Markdown 导出</h3>
+                    <p>将 B 站内容导出为格式化的 Markdown 文档，支持三种类型：</p>
+                    <ul>
+                        <li><b>视频信息</b>：包含 UP 主、数据统计、标签、分P列表等</li>
+                        <li><b>用户信息</b>：包含用户资料、数据统计、收藏夹内容</li>
+                        <li><b>专栏文章</b>：包含文章元信息、数据统计</li>
+                    </ul>
+                    <p>内置 Markdown 预览，支持 Rich/Raw 切换查看。导出前可实时预览最终效果。</p>
+
+                    <hr>
+
+                    <h2>⚙ 设置（OhMyConfig）</h2>
+                    <p>通过首页「哦，我的设置」链接进入设置页面。所有设置分为四组：</p>
+                    <ul>
+                        <li><b>通用设置</b>：导出根目录（默认 <code>C:\MyBiOut!</code>）、大模型 API 配置</li>
+                        <li><b>LocalOut 设置</b>：输出目录名、Android 扫描开关、PC 缓存路径、文件命名规则、FFmpeg 并发数等</li>
+                        <li><b>BBDown 设置</b>：Cookie、画质/编码偏好、文件名模板、弹幕/字幕/封面选项等</li>
+                        <li><b>MdOut 设置</b>：SESSDATA、导出选项（封面/标签/统计）、收藏夹详情程度、请求间隔等</li>
+                    </ul>
+                    <p>涉及敏感信息（API Key、Cookie、SESSDATA）的设置会弹出明文存储风险提示。</p>
+                    <p>设置以 <code>config.ini</code> 存储在项目目录下。</p>
+
+                    <hr>
+
+                    <h2>Man! 手册页</h2>
+                    <p>就是你现在正在看的这个页面。</p>
+                    <p>左侧是传统手册，右侧是「What can I say about...」AI 对话助手。</p>
+                    <p>对话助手使用设置中配置的大模型 API，并通过 <code>pmc</code> 工具打包项目完整源代码作为上下文。如果未配置 API
+                        或调用失败，将降级为内置的「狗屁不通文章生成器」——产生一段与你的问题主题相关但毫无意义的文字。</p>
+                    <p>点击「直接说」按钮可跳过 API 调用，直接使用狗屁不通文章生成器。</p>
+
+                    <hr>
+
+                    <h2>依赖与致谢</h2>
+
+                    <div class="dep-card">
+                        <b>BBDown</b> — 知名哔哩哔哩命令行下载工具<br>
+                        <a href="https://github.com/nilaoda/BBDown" target="_blank">github.com/nilaoda/BBDown ↗</a><br>
+                        MyBiOut! 的 BBDown 模块是对其的可视化封装，核心下载能力完全依赖此项目。致敬 nilaoda 大佬的卓越工作！
+                    </div>
+
+                    <div class="dep-card">
+                        <b>FFmpeg</b> — 音视频处理的瑞士军刀<br>
+                        <a href="https://ffmpeg.org/" target="_blank">ffmpeg.org ↗</a><br>
+                        用于 LocalOut 模块中 .m4s 文件的合并与转码。没有 FFmpeg 就没有视频导出。
+                    </div>
+
+                    <div class="dep-card">
+                        <b>biliffm4s</b> — 对 FFmpeg 的 Python 封装<br>
+                        <a href="https://github.com/Water-Run/-m4s-Python-biliffm4s"
+                            target="_blank">github.com/Water-Run/-m4s-Python-biliffm4s ↗</a><br>
+                        提供了 .m4s 音视频合并的 Python 接口。
+                    </div>
+
+                    <div class="dep-card">
+                        <b>pmc (pack-my-code)</b> — 极简代码上下文打包工具<br>
+                        <a href="https://github.com/Water-Run/pack-my-code"
+                            target="_blank">github.com/Water-Run/pack-my-code ↗</a><br>
+                        在 Man! 页面中用于打包项目完整代码，作为大模型对话的上下文。
+                    </div>
+
+                    <div class="dep-card">
+                        <b>狗屁不通文章生成器 (BullshitGenerator)</b><br>
+                        <a href="https://github.com/menzi11/BullshitGenerator"
+                            target="_blank">github.com/menzi11/BullshitGenerator ↗</a><br>
+                        当大模型不可用时的幽默降级方案。原项目用于 GUI 文本渲染测试，这里用来生成「AI 回复」。生成的文章真的狗屁不通，请勿用于正规用途！
+                    </div>
+
+                    <div class="dep-card">
+                        <b>FastAPI / Uvicorn</b> — 现代高性能 Python Web 框架<br>
+                        <b>httpx</b> — 现代 Python HTTP 客户端<br>
+                        <b>marked.js</b> — JavaScript Markdown 解析器
+                    </div>
+
+                    <hr>
+
+                    <h2>环境要求</h2>
+                    <ul>
+                        <li><b>Python 3.14+</b></li>
+                        <li><b>Windows</b> 操作系统</li>
+                        <li><b>FFmpeg</b>（LocalOut 导出必需）</li>
+                        <li><b>BBDown</b>（BBDown 下载必需）</li>
+                        <li><b>ADB</b>（可选，Android 设备缓存扫描）</li>
+                        <li><b>pmc</b>（可选，Man 页面 AI 对话上下文打包）</li>
+                    </ul>
+
+                    <hr>
+
+                    <h2>许可证</h2>
+                    <p>本项目使用 <b>WTFPL</b>（Do What The Fuck You Want To Public License）发布。</p>
+                    <blockquote>You just DO WHAT THE FUCK YOU WANT TO.</blockquote>
+
+                    <hr>
+                    <p style="text-align:center;color:#ccc;font-size:12px;margin-top:20px">
+                        MyBiOut! — 导出我的哔哩哔哩<br>
+                        Made with ❤️ by WaterRun
+                    </p>
+                </div>
+            </div>
+
+            <!-- RIGHT: CHAT -->
+            <div class="chat-panel">
+                <div class="chat-header">
+                    <div class="kobe-wrap">
+                        <!-- Kobe fadeaway silhouette (self-drawn SVG) -->
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 210" aria-label="Mamba silhouette">
+                            <defs>
+                                <linearGradient id="kg" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#E85B8A" />
+                                    <stop offset="100%" stop-color="#F5A623" />
+                                </linearGradient>
+                            </defs>
+                            <g fill="url(#kg)">
+                                <ellipse cx="65" cy="16" rx="10" ry="11" transform="rotate(-8 65 16)" />
+                                <path d="M56,26 L74,28 L70,46 L52,44Z" />
+                                <path d="M48,42 L74,46 L70,88 L44,84Z" />
+                                <path d="M72,30 L80,24 L88,16 L94,8 L98,4 L96,2 L90,6 L84,14 L76,22 L68,30Z" />
+                                <ellipse cx="99" cy="2" rx="4" ry="3.5" transform="rotate(-15 99 2)" />
+                                <circle cx="106" cy="-4" r="7" fill="none" stroke="url(#kg)" stroke-width="2" />
+                                <path d="M105,-11 L105,3" stroke="url(#kg)" stroke-width="1" fill="none" />
+                                <path d="M99,-4 L112,-4" stroke="url(#kg)" stroke-width="1" fill="none" />
+                                <path d="M50,32 L36,38 L28,36 L26,40 L34,44 L48,38Z" />
+                                <path d="M42,84 L72,88 L70,104 L40,100Z" />
+                                <path
+                                    d="M62,102 L72,134 L80,164 L84,186 L88,198 L82,200 L78,188 L72,168 L64,138 L56,108Z" />
+                                <path
+                                    d="M44,100 L34,132 L26,162 L22,184 L18,196 L24,198 L28,186 L34,166 L42,136 L50,106Z" />
+                                <path d="M86,196 L94,196 L96,202 L84,202Z" />
+                                <path d="M18,194 L12,196 L10,202 L26,202Z" />
+                            </g>
+                        </svg>
+                    </div>
+                    <div class="chat-header-text">
+                        <h2>What can I say about...</h2>
+                        <p>Mamba Out 🐍 · 向 MyBiOut! 提问任何事</p>
+                    </div>
+                </div>
+
+                <div class="chat-msgs" id="chat-msgs">
+                    <div class="chat-welcome">
+                        <div class="cw-icon">🐍</div>
+                        <p>Mamba Mentality</p>
+                        <div class="cw-sub">输入问题，我会用大模型结合项目源代码回答<br>未配置 API 时将降级为「狗屁不通文章生成器」<br>点击「直接说」可跳过 API 直接生成
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-bar">
+                    <input type="text" id="chat-input" placeholder="Ask me anything about MyBiOut!..."
+                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat(false)}">
+                    <button class="btn btn-pk" id="btn-send" onclick="sendChat(false)">发送</button>
+                    <button class="btn btn-or" id="btn-bs" onclick="sendChat(true)">直接说</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        (function () {
+            const $ = id => document.getElementById(id);
+            function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+            let _tt = null;
+            function toast(msg, err) {
+                const el = $('toast'); if (_tt) clearTimeout(_tt);
+                el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
+                _tt = setTimeout(() => el.className = 'toast', 2200);
+            }
+
+            let sending = false;
+
+            /* Kobe mini SVG for bot avatar */
+            const kobeMiniSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 210">
+                <g fill="#E85B8A" opacity="0.6">
+                    <ellipse cx="65" cy="16" rx="10" ry="11" transform="rotate(-8 65 16)"/>
+                    <path d="M56,26 L74,28 L70,46 L52,44Z"/>
+                    <path d="M48,42 L74,46 L70,88 L44,84Z"/>
+                    <path d="M72,30 L80,24 L88,16 L94,8 L98,4 L96,2 L90,6 L84,14 L76,22 L68,30Z"/>
+                    <circle cx="106" cy="-4" r="7" fill="none" stroke="#E85B8A" stroke-width="2"/>
+                    <path d="M50,32 L36,38 L28,36 L26,40 L34,44 L48,38Z"/>
+                    <path d="M42,84 L72,88 L70,104 L40,100Z"/>
+                    <path d="M62,102 L72,134 L80,164 L84,186 L88,198 L82,200 L78,188 L72,168 L64,138 L56,108Z"/>
+                    <path d="M44,100 L34,132 L26,162 L22,184 L18,196 L24,198 L28,186 L34,166 L42,136 L50,106Z"/>
+                </g>
+            </svg>`;
+
+            function addUserMsg(text) {
+                const welcome = $('chat-msgs').querySelector('.chat-welcome');
+                if (welcome) welcome.remove();
+
+                const div = document.createElement('div');
+                div.className = 'msg msg-user';
+                div.innerHTML = `<div class="msg-bubble">${escH(text)}</div>`;
+                $('chat-msgs').appendChild(div);
+                $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+            }
+
+            function addLoading() {
+                const div = document.createElement('div');
+                div.className = 'msg msg-bot';
+                div.id = 'msg-loading';
+                div.innerHTML = `<div class="msg-avatar">${kobeMiniSvg}</div>
+                    <div class="msg-bubble"><div class="msg-loading"><span></span><span></span><span></span></div></div>`;
+                $('chat-msgs').appendChild(div);
+                $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+            }
+
+            function removeLoading() {
+                const el = $('msg-loading');
+                if (el) el.remove();
+            }
+
+            function addBotMsg(reply, source, note) {
+                removeLoading();
+
+                let contentHtml;
+                if (source === 'llm') {
+                    try { contentHtml = marked.parse(reply); }
+                    catch (e) { contentHtml = escH(reply).replace(/\n/g, '<br>'); }
+                } else {
+                    contentHtml = escH(reply).replace(/\n/g, '<br>');
+                }
+
+                const srcClass = source === 'llm' ? 'src-llm' : 'src-bullshit';
+                const srcLabel = source === 'llm' ? '🤖 大模型' : '📝 狗屁不通文章生成器';
+
+                let html = `<div class="msg-avatar">${kobeMiniSvg}</div>
+                    <div style="max-width:80%">
+                        <div class="msg-bubble">${contentHtml}</div>
+                        <div class="msg-source ${srcClass}">${srcLabel}</div>`;
+                if (note) {
+                    html += `<div class="msg-note">${escH(note)}</div>`;
+                }
+                html += `</div>`;
+
+                const div = document.createElement('div');
+                div.className = 'msg msg-bot';
+                div.innerHTML = html;
+                $('chat-msgs').appendChild(div);
+                $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+            }
+
+            window.sendChat = async function (forceBs) {
+                if (sending) return;
+                const input = $('chat-input');
+                const text = input.value.trim();
+                if (!text) { toast('请输入问题', true); return; }
+
+                sending = true;
+                $('btn-send').disabled = true;
+                $('btn-bs').disabled = true;
+                input.value = '';
+
+                addUserMsg(text);
+                addLoading();
+
+                try {
+                    const r = await fetch('/api/man/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: text, force_bs: !!forceBs })
+                    });
+                    const data = await r.json();
+
+                    if (data.ok) {
+                        addBotMsg(data.reply, data.source, data.note || '');
+                    } else {
+                        removeLoading();
+                        toast(data.error || '请求失败', true);
+                    }
+                } catch (e) {
+                    removeLoading();
+                    toast('网络错误: ' + e.message, true);
+                } finally {
+                    sending = false;
+                    $('btn-send').disabled = false;
+                    $('btn-bs').disabled = false;
+                    input.focus();
+                }
+            };
+
+            /* ===== BG STARS ===== */
+            function initBg() {
+                const cv = $('bg-cv'), cx = cv.getContext('2d');
+                const O = '#F5A623', P = '#E85B8A';
+                let stars = [];
+                function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+                resize(); window.addEventListener('resize', resize);
+                for (let i = 0; i < 28; i++) stars.push({
+                    x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+                    sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2,
+                    rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2,
+                    c: Math.random() > .5 ? O : P, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2
+                });
+                function dS(x, y, r, sz, col, al) {
+                    if (al < .01) return;
+                    cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r); cx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5;
+                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
+                        cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
+                    }
+                    cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore();
+                }
+                (function loop() {
+                    cx.clearRect(0, 0, cv.width, cv.height);
+                    stars.forEach(s => {
+                        s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
+                        if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; }
+                        if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20;
+                        dS(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
+                    });
+                    requestAnimationFrame(loop);
+                })();
+            }
+
+            initBg();
+        })();
+    </script>
+</body>
+
+</html>

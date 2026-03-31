@@ -110,6 +110,15 @@ async def mdout_page() -> HTMLResponse:
     return _read_html("mdout/mdout.html")
 
 
+@app.get("/man", response_class=HTMLResponse)
+async def man_page() -> HTMLResponse:
+    r"""
+    ManualScript 手册页路由
+    :return: HTMLResponse: Man 页 HTML
+    """
+    return _read_html("man/man.html")
+
+
 @app.get("/api/settings")
 async def api_get_settings() -> dict[str, dict[str, str]]:
     r"""
@@ -616,3 +625,19 @@ async def mdout_clear_completed() -> dict[str, bool]:
 
     clear_completed()
     return {"ok": True}
+
+
+@app.post("/api/man/chat")
+async def man_chat(request: Request) -> dict[str, Any]:
+    r"""
+    Man 页面 AI 对话接口
+    :param: request: 请求对象, body 包含 prompt 和可选 force_bs
+    :return: dict[str, Any]: 对话结果, 包含 reply/source/note
+    """
+    body: dict[str, Any] = await _read_json_dict(request)
+    prompt: str = _as_str(body.get("prompt", ""))
+    force_bs: bool = bool(body.get("force_bs", False))
+
+    from mybiout.pages.man.man import chat
+
+    return chat(prompt, force_bs=force_bs)
