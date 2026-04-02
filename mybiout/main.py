@@ -3,7 +3,7 @@ MyBiOut! 主入口模块, 解析命令行参数并启动 FastAPI 服务
 
 :file: mybiout/main.py
 :author: WaterRun
-:time: 2026-03-31
+:time: 2026-04-02
 """
 
 import argparse
@@ -16,6 +16,7 @@ import threading
 import time
 import webbrowser
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import uvicorn
 
@@ -33,6 +34,103 @@ _BR_M: str = "⠃⠅⠆⠉⠊⠌⠑⠒⠔⡁⡂⡄⡈⡐⡠⢁⢂⢄⢈⢐⢠⣀
 _BR_H: str = "⠿⡿⢿⣿⣾⣽⣻⣷⣯⣟⡷⡯⡟⠷⠯⠟⣶⣵⣳"
 _SPARK: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
 _MAX_PARTICLES: int = 280
+
+_BIN_DIR: Path = Path(__file__).resolve().parent / "bin"
+
+
+# ===== 环境检查 =====
+
+
+@dataclass(frozen=True, slots=True)
+class _EnvItem:
+    r"""
+    单项环境检查结果
+    """
+    name: str
+    available: bool
+    hint: str
+
+
+def _check_environment() -> list[_EnvItem]:
+    r"""
+    检查运行环境中各必需依赖项的可用性
+    :return: list[_EnvItem]: 检查结果列表
+    """
+    results: list[_EnvItem] = []
+
+    # ffmpeg
+    ffmpeg_found: bool = shutil.which("ffmpeg") is not None
+    if not ffmpeg_found:
+        for p in (
+            _BIN_DIR / "BBDown" / "ffmpeg.exe",
+            _BIN_DIR / "BBDown" / "ffmpeg",
+            _BIN_DIR / "ffmpeg.exe",
+            _BIN_DIR / "ffmpeg",
+        ):
+            if p.exists():
+                ffmpeg_found = True
+                break
+    results.append(_EnvItem(
+        "ffmpeg", ffmpeg_found,
+        "下载: https://ffmpeg.org/download.html\n"
+        "      下载后将 ffmpeg.exe 所在目录添加至系统 PATH 环境变量\n"
+        "      或将 ffmpeg.exe 放入 mybiout/bin/ 目录下",
+    ))
+
+    # BBDown
+    bbdown_found: bool = shutil.which("BBDown") is not None or shutil.which("bbdown") is not None
+    if not bbdown_found:
+        for p in (
+            _BIN_DIR / "BBDown" / "BBDown.exe",
+            _BIN_DIR / "BBDown" / "BBDown",
+            _BIN_DIR / "BBDown.exe",
+            _BIN_DIR / "BBDown",
+        ):
+            if p.exists():
+                bbdown_found = True
+                break
+    results.append(_EnvItem(
+        "BBDown", bbdown_found,
+        "下载: https://github.com/nilaoda/BBDown/releases\n"
+        "      将 BBDown 可执行文件放入系统 PATH 或 mybiout/bin/BBDown/ 目录下",
+    ))
+
+    # biliffm4s
+    biliffm4s_found: bool = False
+    try:
+        import biliffm4s  # noqa: F401
+        biliffm4s_found = True
+    except ImportError:
+        ...
+    results.append(_EnvItem(
+        "biliffm4s", biliffm4s_found,
+        "安装: pip install biliffm4s\n"
+        "      仓库: https://github.com/Water-Run/-m4s-Python-biliffm4s",
+    ))
+
+    return results
+
+
+def _print_env_detail(checks: list[_EnvItem]) -> None:
+    r"""
+    在终端打印环境检查详细报告
+    :param checks: 检查结果列表
+    """
+    print()
+    print("  ── 环境检查 ──")
+    for c in checks:
+        icon: str = "✅" if c.available else "❌"
+        status: str = "就绪" if c.available else "未找到"
+        print(f"  {icon} {c.name:<12} {status}")
+        if not c.available:
+            for hint_line in c.hint.split("\n"):
+                print(f"      {hint_line.strip()}")
+    print()
+    print("  请安装全部缺失组件后重新启动 MyBiOut!")
+    print()
+
+
+# ===== 服务启动状态 =====
 
 
 @dataclass(slots=True)
@@ -160,6 +258,9 @@ def _wait_server_startup(state: _ServerStartupState, timeout: float = 25.0) -> b
             return False
         time.sleep(0.05)
     return state.started.is_set()
+
+
+# ===== 终端动画工具 =====
 
 
 def _at(row: int, col: int) -> str:
@@ -548,8 +649,8 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
             flush()
             time.sleep(0.025)
 
-        title: str = "✖ 服务启动失败，坠机"
-        reason_line: str = f"原因: {reason or '未知错误'}"
+        title: str = "✖ Man!"
+        reason_line: str = f"孩子: {reason or '未知错误'}"
         if len(reason_line) > max(12, width - 4):
             reason_line = reason_line[: max(9, width - 7)] + "..."
 
@@ -850,7 +951,18 @@ def main() -> None:
     args: argparse.Namespace = parser.parse_args()
     port: int = args.port
 
-    startup_state: _ServerStartupState = _start_server_in_background(port)
+    # ===== 环境检查 =====
+    env_checks: list[_EnvItem] = _check_environment()
+    env_missing: list[_EnvItem] = [c for c in env_checks if not c.available]
+
+    if env_missing:
+        # 环境缺失 → 创建预失败状态 → 动画将坠机
+        missing_names: str = ", ".join(c.name for c in env_missing)
+        startup_state: _ServerStartupState = _ServerStartupState()
+        startup_state.mark_failed(f"缺少必需组件: {missing_names}")
+    else:
+        startup_state = _start_server_in_background(port)
+
     animation_error: Exception | None = None
 
     try:
@@ -862,8 +974,11 @@ def main() -> None:
         print(_BANNER_FALLBACK)
         print(f"  ✦ 端口: {port}")
         print(f"  ✦ 启动失败: {startup_state.reason or '未知原因'}")
-        print("  ✦ 请检查端口占用/配置后重试")
-        print()
+        if env_missing:
+            _print_env_detail(env_checks)
+        else:
+            print("  ✦ 请检查端口占用/配置后重试")
+            print()
         return
 
     if animation_error is not None:
@@ -903,4 +1018,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    

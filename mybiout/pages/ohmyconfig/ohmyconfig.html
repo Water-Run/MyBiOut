@@ -562,30 +562,6 @@
             </div>
 
             <div class="setting-row">
-                <div class="setting-label">扫描已连接 Android 设备</div>
-                <div class="setting-hint">扫描 USB 连接设备中的哔哩哔哩缓存目录</div>
-                <div class="setting-controls">
-                    <label class="toggle">
-                        <input type="checkbox" id="s-scan-android"
-                            onchange="saveToggle('localout','scan_android',this.checked)">
-                        <div class="toggle-track"></div>
-                    </label>
-                </div>
-            </div>
-
-            <div class="setting-row conditional sub-row" id="row-scan-interval">
-                <div class="setting-label">扫描间隔</div>
-                <div class="setting-hint">仅对 Android 设备扫描生效；间隔越短发现越及时，但资源占用更高</div>
-                <div class="setting-controls">
-                    <select id="s-scan-interval" onchange="saveSelect('localout','scan_interval',this.value)">
-                        <option value="1s">1s</option>
-                        <option value="8s">8s</option>
-                        <option value="45s">45s</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="setting-row">
                 <div class="setting-label">哔哩哔哩桌面端缓存路径</div>
                 <div class="setting-hint">默认 C:\Users\[当前用户名]\Videos\bilibili；留空表示不扫描桌面端缓存</div>
                 <div class="setting-controls">
@@ -982,11 +958,9 @@
             document.getElementById('s-api-timeout').value = s.api?.timeout ?? 'infinite';
 
             document.getElementById('s-localout-folder').value = s.localout?.folder ?? '';
-            document.getElementById('s-scan-android').checked = s.localout?.scan_android === 'true';
             document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? '';
             document.getElementById('s-bili-pc-path-only-if-installed').checked =
                 (s.localout?.bilibili_pc_cache_optional_when_installed ?? 'true') === 'true';
-            document.getElementById('s-scan-interval').value = s.localout?.scan_interval ?? '1s';
             document.getElementById('s-ffmpeg').value = s.localout?.ffmpeg_concurrent ?? '3';
             document.getElementById('s-incomplete-title-action').value =
                 s.localout?.incomplete_title_action ?? 'partial_or_folder';
@@ -1027,9 +1001,7 @@
         }
 
         function syncConditional() {
-            const scanAndroid = document.getElementById('s-scan-android').checked;
             const hasBiliPcPath = (document.getElementById('s-bili-pc-path').value || '').trim().length > 0;
-            toggle$('row-scan-interval', scanAndroid);
             toggle$('row-bili-pc-path-only-if-installed', hasBiliPcPath);
         }
         function toggle$(id, show) { document.getElementById(id).classList.toggle('vis', show); }

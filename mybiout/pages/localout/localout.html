@@ -270,7 +270,7 @@
             border-left-color: #2980b9;
         }
 
-        .card-android_adb {
+        .card-drive {
             border-left-color: #27ae60;
         }
 
@@ -415,23 +415,28 @@
             box-shadow: 3px 3px 0 #888;
         }
 
-        /* Dropdown */
-        .dd {
-            position: relative;
-            display: inline-block;
+        /* ===== DROPDOWN (fixed overlay, rendered outside column to avoid overflow clipping) ===== */
+        .dd-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 8999;
+        }
+
+        .dd-backdrop.open {
+            display: block;
         }
 
         .dd-menu {
             display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            z-index: 100;
+            position: fixed;
+            z-index: 9000;
             background: #fff;
             border: 2px solid #F5A623;
             box-shadow: 4px 4px 0 #E85B8A;
-            min-width: 220px;
-            max-height: 260px;
+            min-width: 300px;
+            max-width: 420px;
+            max-height: 380px;
             overflow-y: auto;
         }
 
@@ -440,12 +445,15 @@
         }
 
         .dd-item {
-            padding: 8px 14px;
+            padding: 10px 14px;
             font-size: 13px;
             color: #333;
             cursor: pointer;
             border-bottom: 1px solid #f5f5f5;
             transition: background .12s;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
         }
 
         .dd-item:hover {
@@ -457,9 +465,31 @@
             border-bottom: none;
         }
 
-        .dd-item .dd-sub {
+        .dd-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            line-height: 1.2;
+        }
+
+        .dd-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .dd-name {
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dd-path {
             font-size: 11px;
             color: #aaa;
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         /* ===== LOG BAR ===== */
@@ -585,7 +615,7 @@
             font-size: 13px;
             border: 3px solid #d48b0e;
             box-shadow: 4px 4px 0 #E85B8A;
-            z-index: 9000;
+            z-index: 9999;
             opacity: 0;
             transform: translateY(12px);
             transition: opacity .25s, transform .25s;
@@ -643,10 +673,7 @@
                     <div class="badge" id="badge-src">0</div>
                     <span class="scan-spin hidden" id="scan-spin">✦</span>
                     <div class="col-hd-right">
-                        <div class="dd">
-                            <button class="btn btn-or" id="btn-add-src" onclick="toggleDD()">添加源 ▼</button>
-                            <div class="dd-menu" id="dd-menu"></div>
-                        </div>
+                        <button class="btn btn-or" id="btn-add-src" onclick="toggleDD()">添加源 ▼</button>
                     </div>
                 </div>
                 <div class="col-search"><input placeholder="搜索标题 / UP主 / BV号..." id="src-search"></div>
@@ -707,13 +734,16 @@
         </div>
     </div>
 
+    <!-- Dropdown rendered at body level to escape column overflow:hidden -->
+    <div class="dd-backdrop" id="dd-backdrop" onclick="closeDD()"></div>
+    <div class="dd-menu" id="dd-menu"></div>
     <div class="toast" id="toast"></div>
 
     <script>
         (function () {
             /* ===== GLOBALS ===== */
             const selSrc = new Set(), selTask = new Set();
-            let prevLogLen = 0, ddOpen = false, polling = null;
+            let prevLogLen = 0, ddOpen = false, polling = null, _lastState = null;
 
             /* ===== TOAST ===== */
             let _tt = null;
@@ -728,33 +758,50 @@
             /* ===== HELPERS ===== */
             const $ = id => document.getElementById(id);
             function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            function escAttr(s) { return escH(s || '').replace(/'/g, '&#39;'); }
 
-            /* ===== DROPDOWN ===== */
+            /* ===== DROPDOWN (fixed overlay) ===== */
             async function toggleDD() {
                 if (ddOpen) { closeDD(); return; }
+                const btn = $('btn-add-src');
+                const rect = btn.getBoundingClientRect();
                 const menu = $('dd-menu');
-                menu.innerHTML = '<div class="dd-item" style="color:#aaa">加载中...</div>';
+                menu.style.top = (rect.bottom + 4) + 'px';
+                menu.style.left = rect.left + 'px';
+                menu.innerHTML = '<div class="dd-item"><span class="dd-icon">⏳</span><div class="dd-body"><div class="dd-name" style="color:#aaa">加载中...</div></div></div>';
                 menu.classList.add('open');
+                $('dd-backdrop').classList.add('open');
                 ddOpen = true;
                 try {
                     const r = await fetch('/api/localout/available-sources');
                     const srcs = await r.json();
                     menu.innerHTML = srcs.map(s => {
+                        const icon = escH(s.icon || '📁');
                         if (s.type === 'browse') {
-                            return `<div class="dd-item" onclick="doBrowse()">${escH(s.label)}</div>`;
+                            return `<div class="dd-item" onclick="doBrowse()">
+                                <span class="dd-icon">${icon}</span>
+                                <div class="dd-body"><div class="dd-name">${escH(s.label)}</div></div>
+                            </div>`;
                         }
-                        return `<div class="dd-item" onclick="doAddSource('${escH(s.type)}','${escH(s.path || '')}','${escH(s.label)}','${escH(s.serial || '')}','${escH(s.package || '')}')">
-                        ${escH(s.label)}
-                        ${s.path ? '<div class="dd-sub">' + escH(s.path) + '</div>' : ''}
-                    </div>`;
+                        return `<div class="dd-item" onclick="doAddSource('${escAttr(s.type)}','${escAttr(s.path)}','${escAttr(s.label)}','${escAttr(s.serial)}','${escAttr(s.package)}')">
+                            <span class="dd-icon">${icon}</span>
+                            <div class="dd-body">
+                                <div class="dd-name">${escH(s.label)}</div>
+                                ${s.path ? '<div class="dd-path">' + escH(s.path) + '</div>' : ''}
+                            </div>
+                        </div>`;
                     }).join('');
-                } catch (e) { menu.innerHTML = '<div class="dd-item" style="color:#e74c3c">加载失败</div>'; }
+                } catch (e) {
+                    menu.innerHTML = '<div class="dd-item"><span class="dd-icon">❌</span><div class="dd-body"><div class="dd-name" style="color:#e74c3c">加载失败</div></div></div>';
+                }
             }
-            function closeDD() { $('dd-menu').classList.remove('open'); ddOpen = false; }
-            document.addEventListener('click', e => {
-                if (ddOpen && !e.target.closest('.dd')) closeDD();
-            });
+            function closeDD() {
+                $('dd-menu').classList.remove('open');
+                $('dd-backdrop').classList.remove('open');
+                ddOpen = false;
+            }
             window.toggleDD = toggleDD;
+            window.closeDD = closeDD;
 
             async function doBrowse() {
                 closeDD();
@@ -782,6 +829,41 @@
             window.resumeScan = () => fetch('/api/localout/resume-scan', { method: 'POST' });
             window.cancelScan = () => fetch('/api/localout/cancel-scan', { method: 'POST' });
 
+            /* ===== AUTO-DETECT DRIVES ===== */
+            let _scannedIds = new Set();
+            let _prevDriveIds = new Set();
+            let _pendingScans = [];
+
+            async function autoDetectDrives() {
+                try {
+                    const srcs = await (await fetch('/api/localout/available-sources')).json();
+                    const nowIds = new Set();
+                    for (const s of srcs) {
+                        if (s.type === 'drive') {
+                            nowIds.add(s.id);
+                            if (!_scannedIds.has(s.id)) {
+                                _scannedIds.add(s.id);
+                                _pendingScans.push(s);
+                            }
+                        }
+                    }
+                    /* drive disconnected → allow re-scan on reconnect */
+                    for (const id of _prevDriveIds) {
+                        if (!nowIds.has(id)) _scannedIds.delete(id);
+                    }
+                    _prevDriveIds = nowIds;
+                    tryNextPendingScan();
+                } catch (e) { }
+            }
+
+            function tryNextPendingScan() {
+                if (_pendingScans.length === 0) return;
+                if (_lastState && _lastState.scan_status !== 'idle') return;
+                const s = _pendingScans.shift();
+                toast(`发现新设备，正在扫描: ${s.label}`);
+                doAddSource(s.type, s.path, s.label, '', '');
+            }
+
             /* ===== CARD RENDERING ===== */
             function cardHtml(c, col) {
                 const selSet = col === 'src' ? selSrc : col === 'task' ? selTask : null;
@@ -807,10 +889,8 @@
             }
 
             function renderCol(col, cards) {
-                const containerId = col + '-cards';
-                const searchId = col + '-search';
-                const container = $(containerId);
-                const q = $(searchId).value.toLowerCase();
+                const container = $(col + '-cards');
+                const q = $(col + '-search').value.toLowerCase();
                 const filtered = q ? cards.filter(c =>
                     (c.title || '').toLowerCase().includes(q) ||
                     (c.up_name || '').toLowerCase().includes(q) ||
@@ -834,7 +914,7 @@
                 const s = col === 'src' ? selSrc : col === 'task' ? selTask : null;
                 if (!s) return;
                 s.has(id) ? s.delete(id) : s.add(id);
-                poll(); // force re-render
+                poll();
             };
 
             /* ===== SELECTION ===== */
@@ -926,7 +1006,6 @@
             }
 
             /* ===== POLLING ===== */
-            let _lastState = null;
             async function poll() {
                 try {
                     const r = await fetch('/api/localout/state');
@@ -951,6 +1030,9 @@
                     for (const id of selSrc) { if (!srcIds.has(id)) selSrc.delete(id); }
                     const taskIds = new Set(s.task_cards.map(c => c.id));
                     for (const id of selTask) { if (!taskIds.has(id)) selTask.delete(id); }
+
+                    /* Drive scan queue: start next when idle */
+                    tryNextPendingScan();
                 } catch (e) { }
             }
 
@@ -1016,6 +1098,8 @@
             initBgStars();
             poll();
             polling = setInterval(poll, 500);
+            autoDetectDrives();
+            setInterval(autoDetectDrives, 3000);
         })();
     </script>
 </body>

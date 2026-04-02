@@ -3,7 +3,7 @@ MyBiOut! 设置页服务层, 负责设置的校验、浏览与业务逻辑
 
 :file: mybiout/pages/ohmyconfig/ohmyconfig.py
 :author: WaterRun
-:time: 2026-03-31
+:time: 2026-04-02
 """
 
 from pathlib import Path
@@ -13,7 +13,6 @@ from mybiout.pages import utils
 type SettingResult = dict[str, bool | str]
 
 _ALLOWED_BOOL: set[str] = {"true", "false"}
-_ALLOWED_SCAN_INTERVAL: set[str] = {"1s", "8s", "45s"}
 _ALLOWED_INCOMPLETE_TITLE_ACTION: set[str] = {"partial_or_folder", "folder_only", "skip"}
 _ALLOWED_NAME_PARTS: set[str] = {"bv", "title", "up", "group", "part", "publish_time", "export_time"}
 _ALLOWED_FAVORITE_DETAIL: set[str] = {"basic", "full"}
@@ -47,8 +46,8 @@ def validate_and_save(section: str, key: str, value: str) -> SettingResult:
         case ("localout" | "bbdown" | "mdout", "folder"):
             return _validate_folder(section, value)
 
-        case ("localout", "scan_android" | "bilibili_pc_cache_optional_when_installed"):
-            return _save_bool(section, key, value)
+        case ("localout", "bilibili_pc_cache_optional_when_installed"):
+                    return _save_bool(section, key, value)
 
         case ("localout", "bilibili_pc_cache_path"):
             utils.set_setting(section, key, value.strip())

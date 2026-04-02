@@ -3,7 +3,7 @@ MyBiOut! 基础工具模块, 负责配置文件的读写与通用方法
 
 :file: mybiout/pages/utils.py
 :author: WaterRun
-:time: 2026-03-31
+:time: 2026-04-02
 """
 
 import configparser
@@ -33,10 +33,8 @@ DEFAULTS: dict[str, dict[str, str]] = {
     },
     "localout": {
         "folder": "localout!",
-        "scan_android": "true",
         "bilibili_pc_cache_path": get_default_bilibili_pc_cache_path(),
         "bilibili_pc_cache_optional_when_installed": "true",
-        "scan_interval": "1s",
         "name_parts": "title",
         "incomplete_title_action": "partial_or_folder",
         "ffmpeg_concurrent": "3",
