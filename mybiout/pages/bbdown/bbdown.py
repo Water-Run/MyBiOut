@@ -428,6 +428,7 @@ def env_check() -> dict[str, bool | str]:
         "bbdown_path": bbdown_path or "",
         "ffmpeg_available": ffmpeg_path is not None,
         "ffmpeg_path": ffmpeg_path or "",
+        "has_sessdata": bool(utils.get_sessdata().strip()),
     }
 
 

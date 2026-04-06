@@ -3,7 +3,7 @@ MyBiOut! 基础工具模块, 负责配置文件的读写与通用方法
 
 :file: mybiout/pages/utils.py
 :author: WaterRun
-:time: 2026-04-02
+:time: 2026-04-06
 """
 
 import configparser
@@ -193,3 +193,13 @@ def get_sessdata() -> str:
         if old:
             return old
     return ""
+
+def reset_all_settings() -> None:
+    r"""
+    将全部设置恢复为默认值
+    """
+    cfg: configparser.ConfigParser = configparser.ConfigParser()
+    for section, kvs in DEFAULTS.items():
+        cfg[section] = dict(kvs)
+    save_config(cfg)
+    

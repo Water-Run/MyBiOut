@@ -226,6 +226,14 @@ def _err(msg: str) -> SettingResult:
     """
     return {"ok": False, "error": msg}
 
+def reset_all() -> dict[str, bool]:
+    r"""
+    恢复全部默认设置
+    :return: dict: 操作结果
+    """
+    utils.reset_all_settings()
+    return {"ok": True}
+
 def auto_get_sessdata() -> str | None:
     r"""
     尝试从 Chrome/Edge 浏览器自动读取 SESSDATA

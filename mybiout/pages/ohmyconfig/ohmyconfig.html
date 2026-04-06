@@ -677,16 +677,6 @@
             </div>
 
             <div class="setting-row">
-                <div class="setting-label">B站 Cookie (SESSDATA)</div>
-                <div class="setting-hint">用于下载需要登录才能获取的视频（如高画质、付费内容等），传入 BBDown 的 -c 参数</div>
-                <div class="setting-controls">
-                    <input type="text" id="s-bbdown-cookie" style="width:420px" placeholder="留空则不使用认证">
-                    <button class="btn btn-orange" onclick="confirmBBCookie()">保存</button>
-                    <button class="btn btn-danger" onclick="clearBBCookie()">清空</button>
-                </div>
-            </div>
-
-            <div class="setting-row">
                 <div class="setting-label">画质偏好</div>
                 <div class="setting-hint">按优先级排列，逗号分隔；留空则由 BBDown 自动选择最高画质</div>
                 <div class="setting-controls">
@@ -792,16 +782,6 @@
             </div>
 
             <div class="setting-row">
-                <div class="setting-label">SESSDATA</div>
-                <div class="setting-hint">B站登录凭证 Cookie，用于获取需要登录才能访问的信息（如收藏夹详情）</div>
-                <div class="setting-controls">
-                    <input type="text" id="s-mdout-sessdata" style="width:420px" placeholder="留空则不使用认证">
-                    <button class="btn btn-orange" onclick="confirmSessdata()">保存</button>
-                    <button class="btn btn-danger" onclick="clearSessdata()">清空</button>
-                </div>
-            </div>
-
-            <div class="setting-row">
                 <div class="setting-label">包含封面图链接</div>
                 <div class="setting-hint">在 Markdown 中以图片语法插入封面/头像链接</div>
                 <div class="setting-controls">
@@ -862,6 +842,18 @@
             </div>
         </div>
 
+        <!-- ========== 危险操作 ========== -->
+        <div class="section" style="transform:rotate(0deg)">
+            <h2 class="section-title">危险操作</h2>
+            <div class="setting-row">
+                <div class="setting-label">一键恢复默认设置</div>
+                <div class="setting-hint">将所有设置重置为初始值，包括 API Key、SESSDATA 等敏感信息</div>
+                <div class="setting-controls">
+                    <button class="btn btn-danger" onclick="confirmResetAll()">恢复默认设置</button>
+                </div>
+            </div>
+        </div>
+
         <div class="footer">MyBiOut! — 设置项已全部显示</div>
     </div>
 
@@ -883,20 +875,20 @@
             <h3>明文存储提示</h3>
             <p>SESSDATA 将以明文写入配置文件。<br>它相当于你的登录凭证，请勿泄露。</p>
             <div class="modal-btns">
-                <button class="btn btn-orange" onclick="doSaveSessdata()">确认保存</button>
+                <button class="btn btn-orange" onclick="doSaveSessdataShared()">确认保存</button>
                 <button class="btn btn-ghost" onclick="closeSessdataModal()">取消</button>
             </div>
         </div>
     </div>
 
-    <!-- BBDown Cookie 模态框 -->
-    <div class="modal-backdrop" id="bbcookie-modal">
-        <div class="modal" style="transform:rotate(-0.8deg)">
-            <h3>明文存储提示</h3>
-            <p>B站 Cookie 将以明文写入配置文件。<br>它相当于你的登录凭证，请勿泄露。</p>
+    <!-- 重置确认模态框 -->
+    <div class="modal-backdrop" id="reset-modal">
+        <div class="modal" style="transform:rotate(0.5deg)">
+            <h3>⚠ 确认重置</h3>
+            <p>这将把所有设置恢复为默认值。<br>API Key、SESSDATA 等配置将被清空。<br>此操作不可撤销！</p>
             <div class="modal-btns">
-                <button class="btn btn-orange" onclick="doSaveBBCookie()">确认保存</button>
-                <button class="btn btn-ghost" onclick="closeBBCookieModal()">取消</button>
+                <button class="btn btn-danger" onclick="doResetAll()">确认重置</button>
+                <button class="btn btn-ghost" onclick="closeResetModal()">取消</button>
             </div>
         </div>
     </div>
@@ -987,7 +979,6 @@
 
             // BBDown
             document.getElementById('s-bbdown-folder').value = s.bbdown?.folder ?? '';
-            document.getElementById('s-bbdown-cookie').value = s.bbdown?.cookie ?? '';
             document.getElementById('s-bbdown-quality').value = s.bbdown?.quality_priority ?? '';
             document.getElementById('s-bbdown-encoding').value = s.bbdown?.encoding_priority ?? '';
             document.getElementById('s-bbdown-file-pattern').value = s.bbdown?.file_pattern ?? '<videoTitle>';
@@ -999,7 +990,6 @@
 
             // MdOut
             document.getElementById('s-mdout-folder').value = s.mdout?.folder ?? '';
-            document.getElementById('s-mdout-sessdata').value = s.mdout?.sessdata ?? '';
             document.getElementById('s-mdout-include-cover').checked = (s.mdout?.include_cover ?? 'true') === 'true';
             document.getElementById('s-mdout-include-tags').checked = (s.mdout?.include_tags ?? 'true') === 'true';
             document.getElementById('s-mdout-include-stats').checked = (s.mdout?.include_stats ?? 'true') === 'true';
@@ -1099,49 +1089,6 @@
             showToast('API 设置已清空');
         }
 
-        /* SESSDATA (MdOut) */
-        function confirmSessdata() {
-            const v = document.getElementById('s-mdout-sessdata').value.trim();
-            if (!v) { showToast('SESSDATA 为空', true); return; }
-            document.getElementById('sessdata-modal').classList.add('show');
-        }
-        async function doSaveSessdata() {
-            closeSessdataModal();
-            // 统一保存到 export.sessdata
-            const v = (document.getElementById('s-sessdata') || document.getElementById('s-mdout-sessdata')).value.trim();
-            await saveSetting('export', 'sessdata', v);
-        }
-        function closeSessdataModal() { document.getElementById('sessdata-modal').classList.remove('show'); }
-        async function clearSessdata() {
-            document.getElementById('s-mdout-sessdata').value = '';
-            await saveSetting('mdout', 'sessdata', '');
-            showToast('SESSDATA 已清空');
-        }
-
-        /* BBDown Cookie */
-        function confirmBBCookie() {
-            const v = document.getElementById('s-bbdown-cookie').value.trim();
-            if (!v) { showToast('Cookie 为空', true); return; }
-            document.getElementById('bbcookie-modal').classList.add('show');
-        }
-        async function doSaveBBCookie() {
-            closeBBCookieModal();
-            const v = document.getElementById('s-bbdown-cookie').value.trim();
-            await saveSetting('bbdown', 'cookie', v);
-        }
-        function closeBBCookieModal() { document.getElementById('bbcookie-modal').classList.remove('show'); }
-        async function clearBBCookie() {
-            document.getElementById('s-bbdown-cookie').value = '';
-            await saveSetting('bbdown', 'cookie', '');
-            showToast('BBDown Cookie 已清空');
-        }
-
-        function resetFolder(sec) {
-            const defs = { localout: 'localout!', bbdown: 'bbdown!', mdout: 'mdout!' };
-            document.getElementById('s-' + sec + '-folder').value = defs[sec];
-            saveFolder(sec, defs[sec]);
-        }
-
         /* 统一 SESSDATA */
         function confirmSessdataShared() {
             const v = document.getElementById('s-sessdata').value.trim();
@@ -1175,6 +1122,26 @@
             }
         }
 
+        function confirmResetAll() {
+                document.getElementById('reset-modal').classList.add('show');
+            }
+            function closeResetModal() { document.getElementById('reset-modal').classList.remove('show'); }
+            async function doResetAll() {
+                closeResetModal();
+                try {
+                    const r = await fetch('/api/reset-all-settings', { method: 'POST' });
+                    const d = await r.json();
+                    if (d.ok) {
+                        showToast('已恢复默认设置，正在重新加载...');
+                        setTimeout(() => loadSettings(), 500);
+                    } else {
+                        showToast('重置失败', true);
+                    }
+                } catch (e) { showToast('重置失败: ' + e.message, true); }
+            }
+
+            function closeSessdataModal() { document.getElementById('sessdata-modal').classList.remove('show'); }
+            
         loadSettings();
     </script>
 </body>

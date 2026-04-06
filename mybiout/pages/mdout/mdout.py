@@ -473,6 +473,7 @@ class MdCard:
     status: str = "pending"
     error: str = ""
     filename: str = ""
+    output_path: str = ""
 
     def to_dict(self) -> dict:
         r"""
@@ -484,6 +485,7 @@ class MdCard:
             "id_value": self.id_value, "title": self.title, "subtitle": self.subtitle,
             "has_markdown": bool(self.markdown), "status": self.status,
             "error": self.error, "filename": self.filename,
+            "output_path": self.output_path,
         }
 
 
@@ -752,6 +754,7 @@ def export_cards(card_ids: list[str]) -> dict:
             with S.lock:
                 card.status = "success"
                 card.filename = out.name
+                card.output_path = str(out)
                 S.cards = [c for c in S.cards if c.id != card.id]
                 S.completed.append(card)
             exported += 1
@@ -806,4 +809,12 @@ def clear_completed() -> None:
     with S.lock:
         S.completed.clear()
     S.log("info", "已清空完成列表")
-    
+
+def get_export_folder_path() -> str:
+    r"""
+    获取 MdOut 导出目录的完整路径
+    :return: str: 目录路径
+    """
+    output_dir: Path = utils.get_export_path() / utils.get_setting("mdout", "folder")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return str(output_dir)

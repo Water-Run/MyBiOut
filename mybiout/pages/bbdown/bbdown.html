@@ -700,6 +700,7 @@
             <div class="hdr-right">
                 <div class="env-tag" id="env-bb">⏳ BBDown</div>
                 <div class="env-tag" id="env-ff">⏳ ffmpeg</div>
+                <div class="env-tag" id="env-sess">⏳ Session</div>
                 <a class="hdr-link" href="https://github.com/nilaoda/BBDown" target="_blank" rel="noopener">BBDown 仓库
                     ↗</a>
             </div>
@@ -831,6 +832,14 @@
                 else html += '<span class="e-err">❌ BBDown 未找到</span><br>';
                 if (r.ffmpeg_available) html += '<span class="e-ok">✅ ffmpeg 就绪</span>';
                 else { html += '<span class="e-err">❌ ffmpeg 未找到</span><br>'; html += '<a href="https://ffmpeg.org/download.html" target="_blank">去下载 ffmpeg ↗</a>'; }
+                const sess = $('env-sess');
+                if (r.has_sessdata) {
+                    sess.textContent = '✅ Session'; sess.className = 'env-tag env-ok';
+                    html += '<br><span class="e-ok">✅ SESSDATA 已配置</span>';
+                } else {
+                    sess.textContent = '⚠ 无Session'; sess.className = 'env-tag env-err';
+                    html += '<br><span class="e-err">⚠ 未配置 SESSDATA</span> <a href="/ohmyconfig">去设置 ↗</a>';
+                }
                 $('env-detail').innerHTML = html;
                 $('btn-add').disabled = !r.bbdown_available;
             } catch (e) {
@@ -904,14 +913,9 @@
 
         function doneHtml(t) {
             const fname = basename(t.output_file) || t.title || '—';
-            const dirPath = t.output_dir || '';
-            const filePath = t.output_file || dirPath;
-            let h = '<div class="task task-success" style="cursor:pointer" onclick="openInExplorer(\'' + escH(filePath).replace(/'/g, "\\'").replace(/\\/g, "\\\\") + '\')" title="点击在资源管理器中打开">';
-            h += '<div class="task-title">📄 ' + escH(fname) + '</div>';
-            h += '<div class="task-url" style="color:#27ae60">' + escH(t.title || t.url) + '</div>';
-            if (t.output_file) h += '<div class="task-url" style="font-size:10px;color:#aaa;margin-top:2px">' + escH(t.output_file) + '</div>';
-            h += '<span class="task-status st-success">✓ 完成</span>';
-            h += '<span style="font-size:10px;color:#aaa;margin-left:6px">点击打开目录</span>';
+            const filePath = t.output_file || t.output_dir || '';
+            let h = '<div class="task task-success" style="cursor:pointer" onclick="openInExplorer(\'' + escH(filePath).replace(/'/g, "\\'").replace(/\\/g, "\\\\") + '\')" title="点击打开目录">';
+            h += '<div class="task-title" style="display:flex;align-items:center;gap:6px"><span>📄 ' + escH(fname) + '</span><span class="task-status st-success" style="font-size:10px">✓</span></div>';
             h += '</div>';
             return h;
         }

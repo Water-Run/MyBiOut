@@ -3,7 +3,7 @@ MyBiOut! FastAPI 应用定义与全部路由注册
 
 :file: mybiout/pages/apis.py
 :author: WaterRun
-:time: 2026-03-31
+:time: 2026-04-06
 """
 
 from pathlib import Path
@@ -664,6 +664,25 @@ async def api_auto_sessdata() -> dict[str, bool | str]:
     if result:
         return {"ok": True, "sessdata": result}
     return {"ok": False, "error": "无法自动获取, 请手动填写"}
+
+
+@app.post("/api/reset-all-settings")
+async def api_reset_all_settings() -> dict[str, bool]:
+    r"""
+    恢复全部默认设置
+    """
+    from mybiout.pages.ohmyconfig.ohmyconfig import reset_all
+    return reset_all()
+
+
+@app.post("/api/mdout/open-folder")
+async def mdout_open_folder() -> dict[str, bool | str]:
+    r"""
+    打开 MdOut 导出目录
+    """
+    from mybiout.pages.mdout.mdout import get_export_folder_path
+    from mybiout.pages.bbdown.bbdown import open_in_explorer
+    return open_in_explorer(get_export_folder_path())
 
 
 @app.post("/api/man/chat-stream")

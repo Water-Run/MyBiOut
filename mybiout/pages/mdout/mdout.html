@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1200">
+    <meta name="referrer" content="no-referrer">
     <title>MdOut! — MyBiOut!</title>
     <link rel="icon" href="/assets/logo-fullres.png" type="image/png">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -273,6 +274,13 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            cursor: pointer;
+            transition: background .15s, color .15s;
+        }
+
+        .done-item:hover {
+            background: rgba(245, 166, 35, .08);
+            color: #E85B8A;
         }
 
         .done-item b {
@@ -901,8 +909,8 @@
                             <button class="btn btn-gh btn-xs" onclick="selAll()">全选</button>
                             <button class="btn btn-gh btn-xs" onclick="selNone()">取消</button>
                             <button class="btn btn-gh btn-xs" onclick="clearPanelCards()">清空</button>
-                            <button class="btn btn-gn" onclick="exportSelected()" style="margin-left:auto">导出选中
-                            </button>
+                            <button class="btn btn-gh btn-xs" onclick="openExportFolder()" style="margin-left:auto">📂 打开文件夹</button>
+                            <button class="btn btn-gn" onclick="exportSelected()">导出选中</button>
                             <button class="btn btn-or" onclick="exportAllReady()">导出全部</button>
                         </div>
                     </div>
@@ -954,6 +962,7 @@
             /* ===== UTILS ===== */
             const $ = id => document.getElementById(id);
             function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            function escAttr(s) { return escH(s || '').replace(/'/g, '&#39;').replace(/\\/g, '\\\\'); }
 
             let _tt = null;
             function toast(msg, err) {
@@ -1080,6 +1089,20 @@
                 await fetch('/api/mdout/clear-completed', { method: 'POST' });
             };
 
+            window.openExportFolder = async function () {
+                const r = await (await fetch('/api/mdout/open-folder', { method: 'POST' })).json();
+                if (!r.ok) toast(r.error || '无法打开文件夹', true);
+            };
+
+            window.openFile = async function (path) {
+                if (!path) { toast('文件路径不存在', true); return; }
+                const r = await (await fetch('/api/open-explorer', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path })
+                })).json();
+                if (!r.ok) toast(r.error || '无法打开', true);
+            };
+
             /* ===== PREVIEW ===== */
             window.toggleRaw = function () {
                 showRaw = !showRaw;
@@ -1128,7 +1151,7 @@
 
                 const doneHtml = completed.length
                     ? completed.slice(-20).reverse().map(c =>
-                        '<div class="done-item"><b>✓</b> ' + escH(c.title || c.filename || '—') + '</div>'
+                        '<div class="done-item" ondblclick="openFile(\'' + escAttr(c.output_path) + '\')" title="双击打开文件"><b>✓</b> ' + escH(c.title || c.filename || '—') + '</div>'
                     ).join('')
                     : '<div class="done-empty">暂无导出记录</div>';
 
