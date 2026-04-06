@@ -3,7 +3,7 @@ MdOut! Markdown 导出服务层, 负责从 B 站 API 获取信息并生成 Markd
 
 :file: mybiout/pages/mdout/mdout.py
 :author: WaterRun
-:time: 2026-03-31
+:time: 2026-04-06
 """
 
 import re
@@ -119,7 +119,7 @@ def _client() -> httpx.Client:
     创建带认证的 HTTP 客户端
     :return: httpx.Client: HTTP 客户端
     """
-    sessdata: str = utils.get_setting("mdout", "sessdata").strip()
+    sessdata: str = utils.get_sessdata().strip()
     cookies: dict[str, str] = {"SESSDATA": sessdata} if sessdata else {}
     return httpx.Client(headers=_BILI_HEADERS, cookies=cookies, timeout=20.0, follow_redirects=True)
 

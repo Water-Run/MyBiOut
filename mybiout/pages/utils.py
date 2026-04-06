@@ -24,6 +24,7 @@ def get_default_bilibili_pc_cache_path() -> str:
 DEFAULTS: dict[str, dict[str, str]] = {
     "export": {
         "path": r"C:\MyBiOut!",
+        "sessdata": "",
     },
     "api": {
         "key": "",
@@ -177,3 +178,18 @@ def get_api_timeout_seconds() -> float | None:
         "1000s": 1000.0,
     }
     return timeout_map.get(mode, None)
+
+def get_sessdata() -> str:
+    r"""
+    获取统一的 SESSDATA (优先共享设置, 兼容旧分区)
+    :return: str: SESSDATA 值
+    """
+    shared: str = get_setting("export", "sessdata").strip()
+    if shared:
+        return shared
+    # 兼容旧配置
+    for sec in ("bbdown", "mdout"):
+        old: str = get_setting(sec, "sessdata" if sec == "mdout" else "cookie").strip()
+        if old:
+            return old
+    return ""

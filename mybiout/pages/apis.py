@@ -641,3 +641,46 @@ async def man_chat(request: Request) -> dict[str, Any]:
     from mybiout.pages.man.man import chat
 
     return chat(prompt, force_bs=force_bs)
+
+@app.post("/api/open-explorer")
+async def api_open_explorer(request: Request) -> dict[str, bool | str]:
+    r"""
+    在资源管理器中定位文件
+    """
+    body: dict[str, Any] = await _read_json_dict(request)
+    path: str = _as_str(body.get("path", ""))
+
+    from mybiout.pages.bbdown.bbdown import open_in_explorer
+    return open_in_explorer(path)
+
+
+@app.post("/api/auto-sessdata")
+async def api_auto_sessdata() -> dict[str, bool | str]:
+    r"""
+    尝试从浏览器自动获取 SESSDATA
+    """
+    from mybiout.pages.ohmyconfig.ohmyconfig import auto_get_sessdata
+    result: str | None = auto_get_sessdata()
+    if result:
+        return {"ok": True, "sessdata": result}
+    return {"ok": False, "error": "无法自动获取, 请手动填写"}
+
+
+@app.post("/api/man/chat-stream")
+async def man_chat_stream(request: Request):
+    r"""
+    Man 页面 AI 流式对话接口 (SSE)
+    """
+    from fastapi.responses import StreamingResponse
+
+    body: dict[str, Any] = await _read_json_dict(request)
+    prompt: str = _as_str(body.get("prompt", ""))
+
+    from mybiout.pages.man.man import chat_stream_sse
+
+    return StreamingResponse(
+        chat_stream_sse(prompt),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+    

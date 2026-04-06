@@ -3,9 +3,12 @@ MyBiOut! 设置页服务层, 负责设置的校验、浏览与业务逻辑
 
 :file: mybiout/pages/ohmyconfig/ohmyconfig.py
 :author: WaterRun
-:time: 2026-04-02
+:time: 2026-04-06
 """
 
+import json
+import os
+import sys
 from pathlib import Path
 
 from mybiout.pages import utils
@@ -51,13 +54,6 @@ def validate_and_save(section: str, key: str, value: str) -> SettingResult:
 
         case ("localout", "bilibili_pc_cache_path"):
             utils.set_setting(section, key, value.strip())
-            return _ok()
-
-        case ("localout", "scan_interval"):
-            v: str = value.strip()
-            if v not in _ALLOWED_SCAN_INTERVAL:
-                return _err("扫描间隔只能是 1s / 8s / 45s")
-            utils.set_setting(section, key, v)
             return _ok()
 
         case ("localout", "ffmpeg_concurrent"):
@@ -229,3 +225,133 @@ def _err(msg: str) -> SettingResult:
     :return: SettingResult: 失败结果字典
     """
     return {"ok": False, "error": msg}
+
+def auto_get_sessdata() -> str | None:
+    r"""
+    尝试从 Chrome/Edge 浏览器自动读取 SESSDATA
+    :return: str | None: SESSDATA 或 None
+    """
+    if sys.platform != "win32":
+        return None
+
+    import base64
+    import ctypes
+    import ctypes.wintypes
+    import os
+    import shutil
+    import sqlite3
+    import tempfile
+
+    class DATA_BLOB(ctypes.Structure):
+        _fields_ = [("cbData", ctypes.wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+    def dpapi_decrypt(encrypted: bytes) -> bytes | None:
+        blob_in = DATA_BLOB(len(encrypted), ctypes.create_string_buffer(encrypted, len(encrypted)))
+        blob_out = DATA_BLOB()
+        if ctypes.windll.crypt32.CryptUnprotectData(ctypes.byref(blob_in), None, None, None, None, 0, ctypes.byref(blob_out)):
+            result = ctypes.string_at(blob_out.pbData, blob_out.cbData)
+            ctypes.windll.kernel32.LocalFree(blob_out.pbData)
+            return result
+        return None
+
+    def aes_gcm_decrypt(key: bytes, nonce: bytes, ciphertext_and_tag: bytes) -> bytes | None:
+        r"""使用 Windows BCrypt AES-GCM 解密"""
+        bcrypt = ctypes.windll.bcrypt
+        hAlg = ctypes.c_void_p()
+        if bcrypt.BCryptOpenAlgorithmProvider(ctypes.byref(hAlg), "AES", None, 0) != 0:
+            return None
+        try:
+            mode = "ChainingModeGCM".encode("utf-16-le")
+            bcrypt.BCryptSetProperty(hAlg, "ChainingMode", mode, len(mode), 0)
+            hKey = ctypes.c_void_p()
+            if bcrypt.BCryptGenerateSymmetricKey(hAlg, ctypes.byref(hKey), None, 0, key, len(key), 0) != 0:
+                return None
+            try:
+                ciphertext = ciphertext_and_tag[:-16]
+                tag = ciphertext_and_tag[-16:]
+
+                class AUTH_INFO(ctypes.Structure):
+                    _fields_ = [
+                        ("cbSize", ctypes.c_ulong), ("dwInfoVersion", ctypes.c_ulong),
+                        ("pbNonce", ctypes.c_char_p), ("cbNonce", ctypes.c_ulong),
+                        ("pbAuthData", ctypes.c_char_p), ("cbAuthData", ctypes.c_ulong),
+                        ("pbTag", ctypes.c_char_p), ("cbTag", ctypes.c_ulong),
+                        ("pbMacContext", ctypes.c_char_p), ("cbMacContext", ctypes.c_ulong),
+                        ("cbAAD", ctypes.c_ulong), ("cbData", ctypes.c_ulonglong), ("dwFlags", ctypes.c_ulong),
+                    ]
+
+                auth = AUTH_INFO()
+                auth.cbSize = ctypes.sizeof(auth)
+                auth.dwInfoVersion = 1
+                auth.pbNonce = nonce
+                auth.cbNonce = len(nonce)
+                auth.pbTag = tag
+                auth.cbTag = len(tag)
+                out = ctypes.create_string_buffer(len(ciphertext))
+                cb = ctypes.c_ulong()
+                if bcrypt.BCryptDecrypt(hKey, ciphertext, len(ciphertext), ctypes.byref(auth), None, 0, out, len(ciphertext), ctypes.byref(cb), 0) == 0:
+                    return out.raw[:cb.value]
+                return None
+            finally:
+                bcrypt.BCryptDestroyKey(hKey)
+        finally:
+            bcrypt.BCryptCloseAlgorithmProvider(hAlg, 0)
+
+    browsers = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Edge" / "User Data",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data",
+    ]
+    for user_data_dir in browsers:
+        if not user_data_dir.exists():
+            continue
+        local_state_path = user_data_dir / "Local State"
+        if not local_state_path.exists():
+            continue
+        try:
+            local_state = json.loads(local_state_path.read_text(encoding="utf-8"))
+            enc_key_b64 = local_state.get("os_crypt", {}).get("encrypted_key", "")
+            if not enc_key_b64:
+                continue
+            enc_key = base64.b64decode(enc_key_b64)
+            if enc_key[:5] != b"DPAPI":
+                continue
+            key = dpapi_decrypt(enc_key[5:])
+            if not key:
+                continue
+
+            for profile in ["Default", "Profile 1", "Profile 2", "Profile 3", "Profile 4"]:
+                for sub in ["Network/Cookies", "Cookies"]:
+                    db_path = user_data_dir / profile / sub.replace("/", os.sep)
+                    if not db_path.exists():
+                        continue
+                    tmp = tempfile.mktemp(suffix=".db")
+                    try:
+                        shutil.copy2(str(db_path), tmp)
+                        conn = sqlite3.connect(tmp)
+                        cur = conn.execute(
+                            "SELECT encrypted_value, value FROM cookies "
+                            "WHERE host_key LIKE '%bilibili.com' AND name='SESSDATA' "
+                            "ORDER BY last_access_utc DESC LIMIT 1"
+                        )
+                        row = cur.fetchone()
+                        conn.close()
+                        if row:
+                            enc_val, plain_val = row
+                            if plain_val:
+                                return plain_val
+                            if enc_val and len(enc_val) > 15 and enc_val[:3] in (b"v10", b"v11"):
+                                nonce = enc_val[3:15]
+                                payload = enc_val[15:]
+                                decrypted = aes_gcm_decrypt(key, nonce, payload)
+                                if decrypted:
+                                    return decrypted.decode("utf-8", errors="replace")
+                    except Exception:
+                        pass
+                    finally:
+                        try:
+                            os.remove(tmp)
+                        except Exception:
+                            pass
+        except Exception:
+            continue
+    return None

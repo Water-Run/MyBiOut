@@ -714,139 +714,199 @@
 
     <div class="toast" id="toast"></div>
 
-    <script>
-        (function () {
-            const $ = id => document.getElementById(id);
-            function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+<script>
+    (function () {
+        const $ = id => document.getElementById(id);
+        function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-            let _tt = null;
-            function toast(msg, err) {
-                const el = $('toast'); if (_tt) clearTimeout(_tt);
-                el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
-                _tt = setTimeout(() => el.className = 'toast', 2200);
-            }
+        let _tt = null;
+        function toast(msg, err) {
+            const el = $('toast'); if (_tt) clearTimeout(_tt);
+            el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
+            _tt = setTimeout(() => el.className = 'toast', 2200);
+        }
 
-            let sending = false;
+        let sending = false;
+        let currentBotDiv = null;
 
-            function addUserMsg(text) {
-                const welcome = $('chat-msgs').querySelector('.chat-welcome');
-                if (welcome) welcome.remove();
+        function addUserMsg(text) {
+            const welcome = $('chat-msgs').querySelector('.chat-welcome');
+            if (welcome) welcome.remove();
+            const div = document.createElement('div');
+            div.className = 'msg msg-user';
+            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble">${escH(text)}</div></div>`;
+            $('chat-msgs').appendChild(div);
+            $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+        }
 
-                const div = document.createElement('div');
-                div.className = 'msg msg-user';
-                div.innerHTML = `<div class="msg-inner"><div class="msg-bubble">${escH(text)}</div></div>`;
-                $('chat-msgs').appendChild(div);
-                $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
-            }
+        function addLoadingMsg() {
+            const welcome = $('chat-msgs').querySelector('.chat-welcome');
+            if (welcome) welcome.remove();
+            const div = document.createElement('div');
+            div.className = 'msg msg-bot';
+            div.id = 'msg-loading';
+            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble"><div class="msg-loading"><span></span><span></span><span></span></div></div></div>`;
+            $('chat-msgs').appendChild(div);
+            $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+        }
 
-            function addLoading() {
-                const welcome = $('chat-msgs').querySelector('.chat-welcome');
-                if (welcome) welcome.remove();
-            }
+        function removeLoading() {
+            const el = $('msg-loading');
+            if (el) el.remove();
+        }
 
-            function removeLoading() {
-                const el = $('msg-loading');
-                if (el) el.remove();
-            }
+        function createBotMsgContainer() {
+            removeLoading();
+            const div = document.createElement('div');
+            div.className = 'msg msg-bot';
+            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble" id="stream-bubble"></div></div>`;
+            $('chat-msgs').appendChild(div);
+            return div.querySelector('#stream-bubble');
+        }
 
-            function addBotMsg(reply, source, note) {
-                removeLoading();
+        function renderMarkdown(text) {
+            try { return marked.parse(text); }
+            catch (e) { return escH(text).replace(/\n/g, '<br>'); }
+        }
 
-                let contentHtml;
-                if (source === 'llm') {
-                    try { contentHtml = marked.parse(reply); }
-                    catch (e) { contentHtml = escH(reply).replace(/\n/g, '<br>'); }
-                } else {
-                    contentHtml = escH(reply).replace(/\n/g, '<br>');
-                }
+        window.sendChat = async function (forceBs) {
+            if (sending) return;
+            const input = $('chat-input');
+            const text = input.value.trim();
+            if (!text) { toast('请输入问题', true); return; }
 
-                const div = document.createElement('div');
-                div.className = 'msg msg-bot';
-                div.innerHTML = `
-                    <div class="msg-inner">
-                        <div class="msg-bubble">${contentHtml}</div>
-                    </div>`;
-                $('chat-msgs').appendChild(div);
-                $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
-            }
+            sending = true;
+            $('btn-send').disabled = true;
+            $('btn-bs').disabled = true;
+            input.value = '';
+            addUserMsg(text);
 
-            window.sendChat = async function (forceBs) {
-                if (sending) return;
-                const input = $('chat-input');
-                const text = input.value.trim();
-                if (!text) { toast('请输入问题', true); return; }
-
-                sending = true;
-                $('btn-send').disabled = true;
-                $('btn-bs').disabled = true;
-                input.value = '';
-
-                addUserMsg(text);
-                addLoading();
-
+            if (forceBs) {
+                // 非流式: 直接说模式
+                addLoadingMsg();
                 try {
                     const r = await fetch('/api/man/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: text, force_bs: !!forceBs })
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: text, force_bs: true })
                     });
                     const data = await r.json();
-
+                    removeLoading();
                     if (data.ok) {
-                        addBotMsg(data.reply, data.source, data.note || '');
+                        const bubble = createBotMsgContainer();
+                        bubble.innerHTML = escH(data.reply).replace(/\n/g, '<br>');
+                        if (data.note) {
+                            bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + escH(data.note) + '</em>';
+                        }
                     } else {
-                        removeLoading();
                         toast(data.error || '请求失败', true);
                     }
                 } catch (e) {
                     removeLoading();
                     toast('网络错误: ' + e.message, true);
-                } finally {
-                    sending = false;
-                    $('btn-send').disabled = false;
-                    $('btn-bs').disabled = false;
-                    input.focus();
                 }
-            };
-
-            /* ===== BG STARS ===== */
-            function initBg() {
-                const cv = $('bg-cv'), cx = cv.getContext('2d');
-                const O = '#F5A623', P = '#E85B8A';
-                let stars = [];
-                function resize() { cv.width = innerWidth; cv.height = innerHeight; }
-                resize(); window.addEventListener('resize', resize);
-                for (let i = 0; i < 28; i++) stars.push({
-                    x: Math.random() * innerWidth, y: Math.random() * innerHeight,
-                    sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2,
-                    rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2,
-                    c: Math.random() > .5 ? O : P, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2
-                });
-                function dS(x, y, r, sz, col, al) {
-                    if (al < .01) return;
-                    cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r); cx.beginPath();
-                    for (let i = 0; i < 5; i++) {
-                        const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5;
-                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
-                        cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
-                    }
-                    cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore();
-                }
-                (function loop() {
-                    cx.clearRect(0, 0, cv.width, cv.height);
-                    stars.forEach(s => {
-                        s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
-                        if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; }
-                        if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20;
-                        dS(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
+            } else {
+                // 流式传输
+                addLoadingMsg();
+                try {
+                    const response = await fetch('/api/man/chat-stream', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: text })
                     });
-                    requestAnimationFrame(loop);
-                })();
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    let fullReply = '';
+                    let source = 'llm';
+                    let bubble = null;
+                    let note = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+                            const dataStr = line.slice(6).trim();
+                            if (!dataStr) continue;
+                            try {
+                                const chunk = JSON.parse(dataStr);
+
+                                if (chunk.error) {
+                                    removeLoading();
+                                    toast(chunk.error, true);
+                                    break;
+                                }
+
+                                if (chunk.source) source = chunk.source;
+                                if (chunk.note) note = chunk.note;
+
+                                if (chunk.content) {
+                                    if (!bubble) {
+                                        bubble = createBotMsgContainer();
+                                    }
+                                    fullReply += chunk.content;
+                                    if (source === 'llm') {
+                                        bubble.innerHTML = renderMarkdown(fullReply);
+                                    } else {
+                                        bubble.innerHTML = escH(fullReply).replace(/\n/g, '<br>');
+                                    }
+                                    $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+                                }
+
+                                if (chunk.done) {
+                                    if (!bubble && fullReply) {
+                                        bubble = createBotMsgContainer();
+                                        if (source === 'llm') {
+                                            bubble.innerHTML = renderMarkdown(fullReply);
+                                        } else {
+                                            bubble.innerHTML = escH(fullReply).replace(/\n/g, '<br>');
+                                        }
+                                    }
+                                    if (bubble && note) {
+                                        bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + escH(note) + '</em>';
+                                    }
+                                }
+                            } catch (e) { }
+                        }
+                    }
+
+                    if (!bubble) {
+                        removeLoading();
+                        if (!fullReply) toast('未收到回复', true);
+                    }
+
+                } catch (e) {
+                    removeLoading();
+                    toast('网络错误: ' + e.message, true);
+                }
             }
 
-            initBg();
-        })();
-    </script>
+            sending = false;
+            $('btn-send').disabled = false;
+            $('btn-bs').disabled = false;
+            input.focus();
+            $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+        };
+
+        /* BG STARS */
+        function initBg() {
+            const cv = $('bg-cv'), cx = cv.getContext('2d');
+            const O = '#F5A623', P = '#E85B8A';
+            let stars = [];
+            function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+            resize(); window.addEventListener('resize', resize);
+            for (let i = 0; i < 28; i++) stars.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2, rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2, c: Math.random() > .5 ? O : P, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2 });
+            function dS(x, y, r, sz, col, al) { if (al < .01) return; cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r); cx.beginPath(); for (let i = 0; i < 5; i++) { const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5; i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz); cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4); } cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore(); }
+            (function loop() { cx.clearRect(0, 0, cv.width, cv.height); stars.forEach(s => { s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012; if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; } if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20; dS(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase))); }); requestAnimationFrame(loop); })();
+        }
+        initBg();
+    })();
+</script>
 </body>
 
 </html>

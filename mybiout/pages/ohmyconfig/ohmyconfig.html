@@ -512,6 +512,17 @@
             </div>
 
             <div class="setting-row">
+                <div class="setting-label">B站认证 Cookie (SESSDATA)</div>
+                <div class="setting-hint">统一的 B 站登录凭证, 用于 BBDown 下载高画质视频和 MdOut 获取收藏夹等</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-sessdata" style="width:420px" placeholder="留空则不使用认证">
+                    <button class="btn btn-orange" onclick="confirmSessdataShared()">保存</button>
+                    <button class="btn btn-pink" onclick="autoGetSessdata()">一键从浏览器获取</button>
+                    <button class="btn btn-danger" onclick="clearSessdataShared()">清空</button>
+                </div>
+            </div>
+
+            <div class="setting-row">
                 <div class="setting-label">大模型 API (OpenAI兼容)</div>
                 <div class="setting-hint">可选项，不配置时仅无法使用依赖该能力的功能</div>
                 <div class="setting-controls" style="flex-direction:column;align-items:flex-start;gap:7px">
@@ -952,6 +963,7 @@
             const s = await apiGet('/api/settings');
 
             document.getElementById('s-export-path').value = s.export?.path ?? '';
+            document.getElementById('s-sessdata').value = s.export?.sessdata ?? '';
             document.getElementById('s-api-key').value = s.api?.key ?? '';
             document.getElementById('s-api-model').value = s.api?.model ?? '';
             document.getElementById('s-api-base-url').value = s.api?.base_url ?? 'https://api.openai.com/v1';
@@ -1095,8 +1107,9 @@
         }
         async function doSaveSessdata() {
             closeSessdataModal();
-            const v = document.getElementById('s-mdout-sessdata').value.trim();
-            await saveSetting('mdout', 'sessdata', v);
+            // 统一保存到 export.sessdata
+            const v = (document.getElementById('s-sessdata') || document.getElementById('s-mdout-sessdata')).value.trim();
+            await saveSetting('export', 'sessdata', v);
         }
         function closeSessdataModal() { document.getElementById('sessdata-modal').classList.remove('show'); }
         async function clearSessdata() {
@@ -1127,6 +1140,39 @@
             const defs = { localout: 'localout!', bbdown: 'bbdown!', mdout: 'mdout!' };
             document.getElementById('s-' + sec + '-folder').value = defs[sec];
             saveFolder(sec, defs[sec]);
+        }
+
+        /* 统一 SESSDATA */
+        function confirmSessdataShared() {
+            const v = document.getElementById('s-sessdata').value.trim();
+            if (!v) { showToast('SESSDATA 为空', true); return; }
+            document.getElementById('sessdata-modal').classList.add('show');
+        }
+        async function doSaveSessdataShared() {
+            closeSessdataModal();
+            const v = document.getElementById('s-sessdata').value.trim();
+            await saveSetting('export', 'sessdata', v);
+        }
+        async function clearSessdataShared() {
+            document.getElementById('s-sessdata').value = '';
+            await saveSetting('export', 'sessdata', '');
+            showToast('SESSDATA 已清空');
+        }
+        async function autoGetSessdata() {
+            showToast('正在从浏览器读取 Cookie...');
+            try {
+                const r = await fetch('/api/auto-sessdata', { method: 'POST' });
+                const d = await r.json();
+                if (d.ok && d.sessdata) {
+                    document.getElementById('s-sessdata').value = d.sessdata;
+                    await saveSetting('export', 'sessdata', d.sessdata);
+                    showToast('已自动获取 SESSDATA 并保存');
+                } else {
+                    showToast(d.error || '自动获取失败, 请手动填写', true);
+                }
+            } catch (e) {
+                showToast('自动获取失败: ' + e.message, true);
+            }
         }
 
         loadSettings();
