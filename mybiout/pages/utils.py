@@ -39,6 +39,7 @@ DEFAULTS: dict[str, dict[str, str]] = {
         "name_parts": "title",
         "incomplete_title_action": "partial_or_folder",
         "ffmpeg_concurrent": "3",
+        "crawler_fallback": "disabled",
     },
     "bbdown": {
         "folder": "bbdown!",
@@ -193,6 +194,15 @@ def get_sessdata() -> str:
         if old:
             return old
     return ""
+
+
+def get_crawler_fallback_timeout() -> float | None:
+    r"""
+    获取本地缓存元数据无法解析时, 通过爬虫补全的超时时间
+    :return: float | None: None 表示禁用, 否则为秒数
+    """
+    mode: str = (get_setting("localout", "crawler_fallback") or "disabled").strip().lower()
+    return {"1s": 1.0, "2s": 2.0, "5s": 5.0}.get(mode)
 
 def reset_all_settings() -> None:
     r"""

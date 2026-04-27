@@ -645,6 +645,20 @@
             </div>
 
             <div class="setting-row">
+                <div class="setting-label">元数据爬虫降级</div>
+                <div class="setting-hint">本地缓存无法解析标题/UP主等元数据时, 尝试通过 B 站 API 爬取补全</div>
+                <div class="setting-controls">
+                    <select id="s-crawler-fallback"
+                        onchange="saveSelect('localout','crawler_fallback',this.value)">
+                        <option value="disabled">不启用(默认)</option>
+                        <option value="1s">超时 1 秒</option>
+                        <option value="2s">超时 2 秒</option>
+                        <option value="5s">超时 5 秒</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-row">
                 <div class="setting-label">FFmpeg 并发数</div>
                 <div class="setting-hint">并发越高速度通常越快，但资源占用会增加</div>
                 <div class="setting-controls">
@@ -968,6 +982,8 @@
             document.getElementById('s-ffmpeg').value = s.localout?.ffmpeg_concurrent ?? '3';
             document.getElementById('s-incomplete-title-action').value =
                 s.localout?.incomplete_title_action ?? 'partial_or_folder';
+            document.getElementById('s-crawler-fallback').value =
+                s.localout?.crawler_fallback ?? 'disabled';
 
             const rawParts = s.localout?.name_parts ?? 'title';
             const selectedParts = new Set(rawParts.split(',').map(x => x.trim()).filter(Boolean));

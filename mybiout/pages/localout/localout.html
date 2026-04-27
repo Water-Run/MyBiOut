@@ -41,7 +41,6 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* ===== Canvas BG ===== */
         #bg-cv {
             position: fixed;
             inset: 0;
@@ -49,7 +48,6 @@
             pointer-events: none;
         }
 
-        /* ===== PAGE ===== */
         .page {
             position: relative;
             z-index: 1;
@@ -143,7 +141,6 @@
             transform: rotate(-0.3deg);
         }
 
-        /* Column Header */
         .col-hd {
             padding: 12px 14px 8px;
             border-bottom: 3px dashed #F5A623;
@@ -166,7 +163,6 @@
             font-size: 11px;
             font-weight: 700;
             padding: 2px 8px;
-            border-radius: 0;
             border: 2px solid #d48b0e;
             min-width: 24px;
             text-align: center;
@@ -179,7 +175,6 @@
             align-items: center;
         }
 
-        /* Scan indicator */
         @keyframes spin {
             from {
                 transform: rotate(0deg);
@@ -200,7 +195,6 @@
             display: none;
         }
 
-        /* Search */
         .col-search {
             padding: 8px 12px;
             flex-shrink: 0;
@@ -221,14 +215,13 @@
             border-color: #E85B8A;
         }
 
-        /* Card list */
         .card-list {
             flex: 1;
             overflow-y: auto;
             padding: 6px 12px;
         }
 
-        /* Card */
+        /* ===== CARD ===== */
         .card {
             background: #fff;
             border: 2px solid #eee;
@@ -274,6 +267,10 @@
             border-left-color: #27ae60;
         }
 
+        .card-adb {
+            border-left-color: #e67e22;
+        }
+
         .card-title {
             font-size: 14px;
             font-weight: 700;
@@ -282,6 +279,7 @@
             text-overflow: ellipsis;
             white-space: nowrap;
             margin-bottom: 3px;
+            padding-right: 22px;
         }
 
         .card-meta {
@@ -338,6 +336,81 @@
             color: #fff;
         }
 
+        .card-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .card-cover {
+            width: 84px;
+            height: 56px;
+            flex-shrink: 0;
+            object-fit: cover;
+            border: 1px solid #eee;
+            background: #fafafa;
+        }
+
+        .card-cover-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ccc;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .card-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-path {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: "Cascadia Code", "Consolas", monospace;
+        }
+
+        .card-removed {
+            opacity: 0.55;
+            text-decoration: line-through;
+            background: repeating-linear-gradient(45deg,
+                    transparent,
+                    transparent 8px,
+                    rgba(231, 76, 60, .06) 8px,
+                    rgba(231, 76, 60, .06) 16px);
+        }
+
+        .card-removed .card-title,
+        .card-removed .card-meta,
+        .card-removed .card-path {
+            text-decoration: line-through;
+        }
+
+        /* ===== DELETE BUTTON ===== */
+        .btn-del {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            background: none;
+            border: none;
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1;
+            padding: 1px 4px;
+            cursor: pointer;
+            z-index: 2;
+            transition: color .15s;
+        }
+
+        .btn-del:hover {
+            color: #e74c3c;
+        }
+
         @keyframes shimmer {
             0% {
                 background-position: 0% center;
@@ -348,7 +421,7 @@
             }
         }
 
-        /* Column Footer */
+        /* ===== FOOTER ===== */
         .col-ft {
             padding: 8px 12px;
             border-top: 2px solid rgba(245, 166, 35, .2);
@@ -359,7 +432,7 @@
             align-items: center;
         }
 
-        /* Buttons */
+        /* ===== BUTTONS ===== */
         .btn {
             padding: 5px 12px;
             font-size: 12px;
@@ -415,7 +488,7 @@
             box-shadow: 3px 3px 0 #888;
         }
 
-        /* ===== DROPDOWN (fixed overlay, rendered outside column to avoid overflow clipping) ===== */
+        /* ===== DROPDOWN ===== */
         .dd-backdrop {
             display: none;
             position: fixed;
@@ -434,9 +507,9 @@
             background: #fff;
             border: 2px solid #F5A623;
             box-shadow: 4px 4px 0 #E85B8A;
-            min-width: 300px;
-            max-width: 420px;
-            max-height: 380px;
+            min-width: 320px;
+            max-width: 460px;
+            max-height: 400px;
             overflow-y: auto;
         }
 
@@ -490,6 +563,23 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        .dd-tag {
+            display: inline-block;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 5px;
+            margin-top: 3px;
+            color: #fff;
+        }
+
+        .dd-tag-adb {
+            background: #e67e22;
+        }
+
+        .dd-tag-drive {
+            background: #27ae60;
         }
 
         /* ===== LOG BAR ===== */
@@ -633,7 +723,6 @@
             box-shadow: 4px 4px 0 #F5A623;
         }
 
-        /* ===== EMPTY ===== */
         .empty-hint {
             text-align: center;
             padding: 40px 10px;
@@ -692,7 +781,7 @@
                     <h2>📋 任务</h2>
                     <div class="badge" id="badge-task">0</div>
                     <div class="col-hd-right">
-                        <button class="btn btn-dn btn-sm" id="btn-cancel-exp" onclick="cancelExport()"
+                        <button class="btn btn-dn" id="btn-cancel-exp" onclick="cancelExport()"
                             style="display:none">取消导出</button>
                     </div>
                 </div>
@@ -734,16 +823,20 @@
         </div>
     </div>
 
-    <!-- Dropdown rendered at body level to escape column overflow:hidden -->
     <div class="dd-backdrop" id="dd-backdrop" onclick="closeDD()"></div>
     <div class="dd-menu" id="dd-menu"></div>
     <div class="toast" id="toast"></div>
 
     <script>
         (function () {
-            /* ===== GLOBALS ===== */
+            /* ===== STATE ===== */
             const selSrc = new Set(), selTask = new Set();
-            let prevLogLen = 0, ddOpen = false, polling = null, _lastState = null;
+            let prevLogLen = 0, ddOpen = false, _lastState = null;
+            let _scannedIds = new Set();   // 已自动触发过扫描的源 id
+            let _prevDeviceIds = new Set();// 上一次检测到的 drive/adb id 集合
+            let _pendingScans = [];        // 等待扫描的源队列
+            const _removedIds = new Set(); // 已消失设备对应的卡片 id
+            let _prevAvailableKeys = new Set();
 
             /* ===== TOAST ===== */
             let _tt = null;
@@ -758,9 +851,9 @@
             /* ===== HELPERS ===== */
             const $ = id => document.getElementById(id);
             function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-            function escAttr(s) { return escH(s || '').replace(/'/g, '&#39;'); }
+            function escAttr(s) { return escH(s || '').replace(/'/g, '&#39;').replace(/\\/g, '\\\\'); }
 
-            /* ===== DROPDOWN (fixed overlay) ===== */
+            /* ===== DROPDOWN ===== */
             async function toggleDD() {
                 if (ddOpen) { closeDD(); return; }
                 const btn = $('btn-add-src');
@@ -772,6 +865,7 @@
                 menu.classList.add('open');
                 $('dd-backdrop').classList.add('open');
                 ddOpen = true;
+
                 try {
                     const r = await fetch('/api/localout/available-sources');
                     const srcs = await r.json();
@@ -779,17 +873,23 @@
                         const icon = escH(s.icon || '📁');
                         if (s.type === 'browse') {
                             return `<div class="dd-item" onclick="doBrowse()">
-                                <span class="dd-icon">${icon}</span>
-                                <div class="dd-body"><div class="dd-name">${escH(s.label)}</div></div>
-                            </div>`;
+                        <span class="dd-icon">${icon}</span>
+                        <div class="dd-body"><div class="dd-name">${escH(s.label)}</div></div>
+                    </div>`;
                         }
-                        return `<div class="dd-item" onclick="doAddSource('${escAttr(s.type)}','${escAttr(s.path)}','${escAttr(s.label)}','${escAttr(s.serial)}','${escAttr(s.package)}')">
-                            <span class="dd-icon">${icon}</span>
-                            <div class="dd-body">
-                                <div class="dd-name">${escH(s.label)}</div>
-                                ${s.path ? '<div class="dd-path">' + escH(s.path) + '</div>' : ''}
-                            </div>
-                        </div>`;
+                        // 来源类型标签
+                        let tagHtml = '';
+                        if (s.type === 'adb') tagHtml = '<span class="dd-tag dd-tag-adb">ADB</span>';
+                        if (s.type === 'drive') tagHtml = '<span class="dd-tag dd-tag-drive">MTP</span>';
+
+                        return `<div class="dd-item" onclick="doAddSource('${escAttr(s.type)}','${escAttr(s.path || '')}','${escAttr(s.label)}','${escAttr(s.serial || '')}','${escAttr(s.package || '')}')">
+                    <span class="dd-icon">${icon}</span>
+                    <div class="dd-body">
+                        <div class="dd-name">${escH(s.label)}</div>
+                        ${s.path ? '<div class="dd-path">' + escH(s.path) + '</div>' : ''}
+                        ${tagHtml}
+                    </div>
+                </div>`;
                     }).join('');
                 } catch (e) {
                     menu.innerHTML = '<div class="dd-item"><span class="dd-icon">❌</span><div class="dd-body"><div class="dd-name" style="color:#e74c3c">加载失败</div></div></div>';
@@ -829,17 +929,18 @@
             window.resumeScan = () => fetch('/api/localout/resume-scan', { method: 'POST' });
             window.cancelScan = () => fetch('/api/localout/cancel-scan', { method: 'POST' });
 
-            /* ===== AUTO-DETECT DRIVES ===== */
-            let _scannedIds = new Set();
-            let _prevDriveIds = new Set();
-            let _pendingScans = [];
-
-            async function autoDetectDrives() {
+            /* ===== AUTO-DETECT DEVICES (drive + ADB) =====
+             * 参考 biliandout MainWindow._auto_refresh_devices / autoDetectDrives：
+             * - 每 1 秒调用一次 available-sources
+             * - 新出现的 drive/adb 源自动入队扫描
+             * - 断开的设备从已扫描集合中移除，再次接入时重新扫描
+             */
+            async function autoDetectDevices() {
                 try {
                     const srcs = await (await fetch('/api/localout/available-sources')).json();
                     const nowIds = new Set();
                     for (const s of srcs) {
-                        if (s.type === 'drive') {
+                        if (s.type === 'drive' || s.type === 'adb') {
                             nowIds.add(s.id);
                             if (!_scannedIds.has(s.id)) {
                                 _scannedIds.add(s.id);
@@ -847,11 +948,11 @@
                             }
                         }
                     }
-                    /* drive disconnected → allow re-scan on reconnect */
-                    for (const id of _prevDriveIds) {
+                    // 已断开的设备从已扫描集合中清除，下次接入可重新自动扫描
+                    for (const id of _prevDeviceIds) {
                         if (!nowIds.has(id)) _scannedIds.delete(id);
                     }
-                    _prevDriveIds = nowIds;
+                    _prevDeviceIds = nowIds;
                     tryNextPendingScan();
                 } catch (e) { }
             }
@@ -860,8 +961,9 @@
                 if (_pendingScans.length === 0) return;
                 if (_lastState && _lastState.scan_status !== 'idle') return;
                 const s = _pendingScans.shift();
-                toast(`发现新设备，正在扫描: ${s.label}`);
-                doAddSource(s.type, s.path, s.label, '', '');
+                const typeLabel = s.type === 'adb' ? '(ADB)' : '(MTP)';
+                toast(`发现新设备 ${typeLabel}，正在扫描: ${s.label}`);
+                doAddSource(s.type, s.path || '', s.label, s.serial || '', s.package || '');
             }
 
             /* ===== CARD RENDERING ===== */
@@ -869,6 +971,9 @@
                 const selSet = col === 'src' ? selSrc : col === 'task' ? selTask : null;
                 const isSel = selSet ? selSet.has(c.id) : false;
                 const typeClass = 'card-' + (c.source_type || 'local');
+                const removed = ((col === 'src' || col === 'task') && _removedIds.has(c.id))
+                    || (c.alive === false);
+
                 let statusHtml = '';
                 if (col === 'task' && c.status) {
                     const labels = { queued: '排队中', exporting: '导出中...', failed: '失败' };
@@ -876,17 +981,51 @@
                         statusHtml = `<div class="card-status ${c.status}">${labels[c.status]}${c.status === 'failed' && c.error ? ': ' + escH(c.error) : ''}</div>`;
                     }
                 }
-                if (col === 'done') {
-                    statusHtml = '<div class="card-status success">✓ 完成</div>';
-                }
-                return `<div class="card ${typeClass} ${isSel ? 'sel' : ''}" data-id="${c.id}" onclick="toggleCard('${col}','${c.id}')">
-                <div class="card-title">${escH(c.title || c.folder_name || '未知视频')}</div>
-                <div class="card-meta"><b>${escH(c.up_name || '—')}</b> · ${escH(c.quality || '—')} · ${c.size_mb || 0}MB</div>
-                <div class="card-meta">${escH(c.bvid || (c.avid ? 'av' + c.avid : ''))}${c.part > 1 ? ' · P' + c.part : ''}${c.resolution ? ' · ' + escH(c.resolution) : ''}${c.publish_time ? ' · ' + escH(c.publish_time) : ''}</div>
-                ${c.source_label && col !== 'src' ? '<div class="card-src-tag">' + escH(c.source_label) + '</div>' : ''}
-                ${statusHtml}
-            </div>`;
+                if (col === 'done') statusHtml = '<div class="card-status success">✓ 点击在资源管理器中打开</div>';
+
+                // 源/任务栏显示单卡片删除按钮
+                const delBtn = (col === 'src' || col === 'task')
+                    ? `<button class="btn-del" onclick="event.stopPropagation();deleteCard('${col}','${c.id}')" title="删除">✕</button>`
+                    : '';
+
+                const coverHtml = c.cover_url
+                    ? `<img class="card-cover" src="${escAttr(c.cover_url)}" loading="lazy" onerror="this.style.display='none'">`
+                    : `<div class="card-cover card-cover-empty">—</div>`;
+
+                const partInfo = (c.part && c.part > 1) ? `P${c.part}` : '';
+                const pathLine = c.path_display
+                    ? `<div class="card-path" title="${escAttr(c.path_display)}">${escH(c.path_display)}</div>`
+                    : '';
+
+                const clickTarget = escAttr(c.output_path || c.path_display || '');
+                const onClick = col === 'done'
+                    ? `openInExplorer('${clickTarget}')`
+                    : `toggleCard('${col}','${c.id}')`;
+
+                return `<div class="card ${typeClass} ${isSel ? 'sel' : ''} ${removed ? 'card-removed' : ''}" data-id="${c.id}" onclick="${onClick}">
+            ${delBtn}
+            <div class="card-row">
+                ${coverHtml}
+                <div class="card-body">
+                    <div class="card-title">${escH(c.title || c.folder_name || '未知视频')}</div>
+                    <div class="card-meta"><b>${escH(c.up_name || '—')}</b>${partInfo ? ' · ' + partInfo : ''} · ${escH(c.quality || '—')} · ${c.size_mb || 0}MB</div>
+                    <div class="card-meta">${escH(c.bvid || (c.avid ? 'av' + c.avid : ''))}${c.resolution ? ' · ' + escH(c.resolution) : ''}${c.publish_time ? ' · ' + escH(c.publish_time) : ''}</div>
+                    ${pathLine}
+                </div>
+            </div>
+            ${c.source_label && col !== 'src' ? '<div class="card-src-tag">' + escH(c.source_label) + '</div>' : ''}
+            ${statusHtml}
+        </div>`;
             }
+
+            window.openInExplorer = async function (path) {
+                if (!path) { toast('路径为空', true); return; }
+                const r = await (await fetch('/api/open-explorer', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path })
+                })).json();
+                if (!r.ok) toast(r.error || '无法打开', true);
+            };
 
             function renderCol(col, cards) {
                 const container = $(col + '-cards');
@@ -898,9 +1037,15 @@
                     (c.folder_name || '').toLowerCase().includes(q)
                 ) : cards;
 
+                const emptyIcons = { src: '📂', task: '📋', done: '🎉' };
+                const emptyTexts = {
+                    src: '点击上方「添加源」开始',
+                    task: '从源栏添加视频到这里',
+                    done: '导出完成的视频将出现在这里',
+                };
                 const html = filtered.length
                     ? filtered.map(c => cardHtml(c, col)).join('')
-                    : `<div class="empty-hint"><span class="em-icon">${col === 'src' ? '📂' : col === 'task' ? '📋' : '🎉'}</span>${col === 'src' ? '点击上方「添加源」开始' : col === 'task' ? '从源栏添加视频到这里' : '导出完成的视频将出现在这里'}</div>`;
+                    : `<div class="empty-hint"><span class="em-icon">${emptyIcons[col]}</span>${emptyTexts[col]}</div>`;
 
                 if (container._lh !== html) {
                     const st = container.scrollTop;
@@ -917,17 +1062,33 @@
                 poll();
             };
 
+            /* ===== DELETE SINGLE CARD ===== */
+            window.deleteCard = async function (col, id) {
+                if (col === 'src') {
+                    await fetch('/api/localout/remove-source', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ card_ids: [id] })
+                    });
+                    selSrc.delete(id);
+                } else if (col === 'task') {
+                    await fetch('/api/localout/remove-tasks', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ card_ids: [id] })
+                    });
+                    selTask.delete(id);
+                }
+                poll();
+            };
+
             /* ===== SELECTION ===== */
             window.selAll = function (col) {
                 const s = col === 'src' ? selSrc : selTask;
                 const cards = col === 'src' ? _lastState?.source_cards : _lastState?.task_cards;
-                if (!cards) return;
-                cards.forEach(c => s.add(c.id));
+                if (cards) cards.forEach(c => s.add(c.id));
                 poll();
             };
             window.selNone = function (col) {
-                const s = col === 'src' ? selSrc : selTask;
-                s.clear();
+                (col === 'src' ? selSrc : selTask).clear();
                 poll();
             };
 
@@ -968,18 +1129,17 @@
                 await fetch('/api/localout/clear-completed', { method: 'POST' });
             };
 
-            /* ===== LOG RENDERING ===== */
+            /* ===== LOG ===== */
             function renderLogs(logs) {
                 if (logs.length === prevLogLen) return;
                 const el = $('log-msgs');
-                const newLogs = logs.slice(prevLogLen);
-                prevLogLen = logs.length;
-                newLogs.forEach(l => {
+                logs.slice(prevLogLen).forEach(l => {
                     const d = document.createElement('div');
                     d.className = 'lm';
                     d.innerHTML = `<span class="lm-time">[${escH(l.time)}]</span> <span class="lm-${l.level}">${escH(l.msg)}</span>`;
                     el.appendChild(d);
                 });
+                prevLogLen = logs.length;
                 el.scrollTop = el.scrollHeight;
             }
 
@@ -998,8 +1158,7 @@
                 $('prog-text').textContent = Math.round(pct) + '%';
                 $('prog-label').textContent = label;
 
-                const spinning = s.scan_status === 'scanning';
-                $('scan-spin').classList.toggle('hidden', !spinning);
+                $('scan-spin').classList.toggle('hidden', s.scan_status !== 'scanning');
                 $('btn-add-src').disabled = s.scan_status !== 'idle';
                 $('btn-export').disabled = s.export_status === 'exporting';
                 $('btn-cancel-exp').style.display = s.export_status === 'exporting' ? '' : 'none';
@@ -1011,6 +1170,20 @@
                     const r = await fetch('/api/localout/state');
                     const s = await r.json();
                     _lastState = s;
+
+                    const nowAvailable = new Set(s.available_keys || []);
+                    const markByAvailability = (cards) => {
+                        for (const c of cards || []) {
+                            const isDevice = c.source_type === 'drive' || c.source_type === 'adb';
+                            if (!isDevice) continue;
+                            const k = `${c.source_type || ''}|${c.source_label || ''}`;
+                            if (nowAvailable.has(k)) _removedIds.delete(c.id);
+                            else if (_prevAvailableKeys.has(k)) _removedIds.add(c.id);
+                        }
+                    };
+                    markByAvailability(s.source_cards);
+                    markByAvailability(s.task_cards);
+                    _prevAvailableKeys = nowAvailable;
 
                     renderCol('src', s.source_cards);
                     renderCol('task', s.task_cards);
@@ -1025,26 +1198,24 @@
                     $('st-task').textContent = s.task_cards.length;
                     $('st-done').textContent = s.completed_cards.length;
 
-                    /* Purge stale selections */
+                    // 清理失效选择
                     const srcIds = new Set(s.source_cards.map(c => c.id));
-                    for (const id of selSrc) { if (!srcIds.has(id)) selSrc.delete(id); }
                     const taskIds = new Set(s.task_cards.map(c => c.id));
+                    for (const id of selSrc) { if (!srcIds.has(id)) selSrc.delete(id); }
                     for (const id of selTask) { if (!taskIds.has(id)) selTask.delete(id); }
 
-                    /* Drive scan queue: start next when idle */
+                    // 有空闲时继续排队扫描
                     tryNextPendingScan();
                 } catch (e) { }
             }
 
             /* ===== BG STARS ===== */
             function initBgStars() {
-                const cv = $('bg-cv');
-                const cx = cv.getContext('2d');
+                const cv = $('bg-cv'), cx = cv.getContext('2d');
                 const O = '#F5A623', P = '#E85B8A';
                 let stars = [];
                 function resize() { cv.width = innerWidth; cv.height = innerHeight; }
                 resize(); window.addEventListener('resize', resize);
-
                 for (let i = 0; i < 28; i++) {
                     stars.push({
                         x: Math.random() * innerWidth, y: Math.random() * innerHeight,
@@ -1057,18 +1228,17 @@
                 }
                 function drawStar(x, y, r, sz, col, al) {
                     if (al < .01) return;
-                    cx.save(); cx.globalAlpha = al;
-                    cx.translate(x, y); cx.rotate(r);
+                    cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r);
                     cx.beginPath();
                     for (let i = 0; i < 5; i++) {
-                        const ao = i * 2 * Math.PI / 5 - Math.PI / 2;
-                        const ai = ao + Math.PI / 5;
-                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
+                        const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5;
+                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz)
+                            : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
                         cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
                     }
                     cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore();
                 }
-                function loop() {
+                (function loop() {
                     cx.clearRect(0, 0, cv.width, cv.height);
                     stars.forEach(s => {
                         s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
@@ -1078,28 +1248,27 @@
                         drawStar(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
                     });
                     requestAnimationFrame(loop);
-                }
-                loop();
+                })();
             }
 
             /* ===== SEARCH DEBOUNCE ===== */
             ['src-search', 'task-search', 'done-search'].forEach(id => {
                 $(id).addEventListener('input', () => {
-                    if (_lastState) {
-                        const col = id.split('-')[0];
-                        const map = { src: 'source_cards', task: 'task_cards', done: 'completed_cards' };
-                        const el = $(col + '-cards'); el._lh = null;
-                        renderCol(col, _lastState[map[col]]);
-                    }
+                    if (!_lastState) return;
+                    const col = id.split('-')[0];
+                    const map = { src: 'source_cards', task: 'task_cards', done: 'completed_cards' };
+                    const el = $(col + '-cards'); el._lh = null;
+                    renderCol(col, _lastState[map[col]]);
                 });
             });
 
             /* ===== INIT ===== */
             initBgStars();
             poll();
-            polling = setInterval(poll, 500);
-            autoDetectDrives();
-            setInterval(autoDetectDrives, 3000);
+            setInterval(poll, 500);
+            // 每 1 秒检测新接入的 drive/ADB 设备
+            autoDetectDevices();
+            setInterval(autoDetectDevices, 1000);
         })();
     </script>
 </body>

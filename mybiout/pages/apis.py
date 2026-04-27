@@ -371,6 +371,19 @@ async def localout_start_export(request: Request) -> dict[str, Any]:
     return start_export(card_ids)
 
 
+@app.get("/api/localout/cover/{card_id}")
+async def localout_cover(card_id: str) -> Response:
+    r"""
+    返回指定卡片的封面图片
+    """
+    from mybiout.pages.localout.localout import get_cover_bytes
+
+    if result := get_cover_bytes(card_id):
+        data, ct = result
+        return Response(content=data, media_type=ct, headers={"Cache-Control": "max-age=300"})
+    return Response(status_code=404)
+
+
 @app.post("/api/localout/cancel-export")
 async def localout_cancel_export() -> dict[str, bool]:
     r"""
