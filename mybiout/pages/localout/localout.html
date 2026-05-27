@@ -105,6 +105,17 @@
             color: #F5A623;
         }
 
+        /* ===== ENV STATUS BAR ===== */
+        #env-bar {
+            flex-shrink: 0;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        #env-bar-icon {
+            margin-right: 6px;
+        }
+
         /* ===== COLUMNS ===== */
         .cols {
             flex: 1;
@@ -753,6 +764,12 @@
             </div>
         </div>
 
+        <!-- ENV STATUS BAR -->
+        <div id="env-bar" style="display:none;background:#fff3cd;border:2px solid #ffc107;padding:8px 14px;margin-bottom:10px;font-size:12px;color:#856404;box-shadow:3px 3px 0 #E85B8A;">
+            <span id="env-bar-icon">⚠️</span>
+            <span id="env-bar-text"></span>
+        </div>
+
         <!-- COLUMNS -->
         <div class="cols">
             <!-- SOURCE -->
@@ -868,8 +885,24 @@
 
                 try {
                     const r = await fetch('/api/localout/available-sources');
-                    const srcs = await r.json();
-                    menu.innerHTML = srcs.map(s => {
+                    const data = await r.json();
+                    const srcs = data.sources || [];
+                    const warnings = data.warnings || [];
+
+                    let html = '';
+
+                    // 显示警告信息
+                    if (warnings.length > 0) {
+                        html += warnings.map(w =>
+                            `<div class="dd-item" style="background:#fff3cd;cursor:default">
+                                <span class="dd-icon">⚠️</span>
+                                <div class="dd-body"><div class="dd-name" style="color:#856404;font-size:12px">${escH(w)}</div></div>
+                            </div>`
+                        ).join('');
+                    }
+
+                    // 显示源列表
+                    html += srcs.map(s => {
                         const icon = escH(s.icon || '📁');
                         if (s.type === 'browse') {
                             return `<div class="dd-item" onclick="doBrowse()">
@@ -891,8 +924,19 @@
                     </div>
                 </div>`;
                     }).join('');
+
+                    // 如果没有设备源，显示提示
+                    const deviceSrcs = srcs.filter(s => s.type === 'drive' || s.type === 'adb');
+                    if (deviceSrcs.length === 0 && warnings.length === 0) {
+                        html += `<div class="dd-item" style="cursor:default">
+                            <span class="dd-icon">💡</span>
+                            <div class="dd-body"><div class="dd-name" style="color:#888;font-size:12px">未检测到 Android 设备，请检查连接</div></div>
+                        </div>`;
+                    }
+
+                    menu.innerHTML = html;
                 } catch (e) {
-                    menu.innerHTML = '<div class="dd-item"><span class="dd-icon">❌</span><div class="dd-body"><div class="dd-name" style="color:#e74c3c">加载失败</div></div></div>';
+                    menu.innerHTML = '<div class="dd-item"><span class="dd-icon">❌</span><div class="dd-body"><div class="dd-name" style="color:#e74c3c">加载失败: ' + escH(e.message || '网络错误') + '</div></div></div>';
                 }
             }
             function closeDD() {
@@ -937,7 +981,29 @@
              */
             async function autoDetectDevices() {
                 try {
-                    const srcs = await (await fetch('/api/localout/available-sources')).json();
+                    const data = await (await fetch('/api/localout/available-sources')).json();
+                    const srcs = data.sources || [];
+                    const warnings = data.warnings || [];
+
+                    // 更新环境状态栏
+                    const envBar = $('env-bar');
+                    const envBarText = $('env-bar-text');
+                    if (warnings.length > 0) {
+                        envBarText.textContent = warnings.join(' | ') + ' — 部分功能可能不可用';
+                        envBar.style.display = 'block';
+                    } else {
+                        envBar.style.display = 'none';
+                    }
+
+                    // 显示环境警告（仅在首次或变化时）
+                    if (warnings.length > 0) {
+                        const warningKey = warnings.join('|');
+                        if (window._lastWarningKey !== warningKey) {
+                            window._lastWarningKey = warningKey;
+                            warnings.forEach(w => toast(w, true));
+                        }
+                    }
+
                     const nowIds = new Set();
                     for (const s of srcs) {
                         if (s.type === 'drive' || s.type === 'adb') {
@@ -1262,8 +1328,40 @@
                 });
             });
 
+            /* ===== ENV STATUS CHECK ===== */
+            async function checkEnvStatus() {
+                try {
+                    const r = await fetch('/api/localout/env-status');
+                    const env = await r.json();
+                    const issues = [];
+
+                    if (!env.adb.available) {
+                        issues.push('ADB 未找到');
+                    }
+                    if (!env.biliffm4s.available) {
+                        issues.push('biliffm4s 未安装');
+                    }
+
+                    // 更新环境状态栏
+                    const envBar = $('env-bar');
+                    const envBarText = $('env-bar-text');
+                    if (issues.length > 0) {
+                        envBarText.textContent = issues.join(' | ') + ' — 部分功能可能不可用';
+                        envBar.style.display = 'block';
+                    } else {
+                        envBar.style.display = 'none';
+                    }
+
+                    // 存储环境状态供后续使用
+                    window._envStatus = env;
+                } catch (e) {
+                    console.warn('[LocalOut] 环境检查失败:', e);
+                }
+            }
+
             /* ===== INIT ===== */
             initBgStars();
+            checkEnvStatus();
             poll();
             setInterval(poll, 500);
             // 每 1 秒检测新接入的 drive/ADB 设备

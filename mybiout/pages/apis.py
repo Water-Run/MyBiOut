@@ -194,11 +194,22 @@ async def localout_state() -> dict[str, Any]:
     return get_state()
 
 
-@app.get("/api/localout/available-sources")
-async def localout_available_sources() -> list[dict[str, Any]]:
+@app.get("/api/localout/env-status")
+async def localout_env_status() -> dict[str, Any]:
     r"""
-    获取可用的扫描源列表
-    :return: list[dict[str, Any]]: 可用源
+    获取环境状态信息（ADB、biliffm4s 等）
+    :return: dict[str, Any]: 环境状态
+    """
+    from mybiout.pages.localout.localout import get_env_status
+
+    return get_env_status()
+
+
+@app.get("/api/localout/available-sources")
+async def localout_available_sources() -> dict[str, Any]:
+    r"""
+    获取可用的扫描源列表和环境警告
+    :return: dict[str, Any]: 包含 sources 和 warnings
     """
     from mybiout.pages.localout.localout import get_available_sources
 

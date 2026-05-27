@@ -1148,17 +1148,52 @@ def get_state() -> dict:
     return S.snapshot()
 
 
-def get_available_sources() -> list[dict]:
+def get_env_status() -> dict:
+    r"""
+    获取环境状态信息，用于前端显示诊断
+    :return: dict: 环境状态
+    """
+    adb_path: str | None = _find_adb()
+    has_ffm4s: bool = _HAS_FFM4S
+    has_httpx: bool = _HAS_HTTPX
+
+    return {
+        "adb": {
+            "available": adb_path is not None,
+            "path": adb_path or "",
+            "hint": "请安装 ADB 并添加到 PATH，或放入 mybiout/bin/ 目录" if not adb_path else "",
+        },
+        "biliffm4s": {
+            "available": has_ffm4s,
+            "hint": "请运行: pip install biliffm4s" if not has_ffm4s else "",
+        },
+        "httpx": {
+            "available": has_httpx,
+            "hint": "爬虫补全功能不可用（可选依赖）" if not has_httpx else "",
+        },
+    }
+
+
+def get_available_sources() -> dict:
     r"""
     获取可用的扫描源列表
     包括：浏览按钮 / PC 缓存 / 挂载驱动器 Android 设备 / ADB Android 设备
     参考 biliandout DeviceScanner.get_connected_devices
-    :return: list[dict]
+    :return: dict: 包含 sources 列表和 warnings 列表
     """
+    warnings: list[str] = []
     sources: list[dict] = [
         {"id": "browse", "label": "浏览本地路径...", "icon": "📂",
          "type": "browse", "path": "", "serial": "", "package": ""},
     ]
+
+    # 环境检查
+    if not _HAS_FFM4S:
+        warnings.append("biliffm4s 未安装，导出功能将不可用")
+
+    adb_path: str | None = _find_adb()
+    if not adb_path:
+        warnings.append("ADB 未找到，无法扫描 Android 设备（USB调试模式）")
 
     # PC 桌面端缓存
     pc_path: str = utils.get_setting("localout", "bilibili_pc_cache_path").strip()
@@ -1179,6 +1214,7 @@ def get_available_sources() -> list[dict]:
 
     # 挂载为本地驱动器的 Android 设备（MTP / USB 大容量存储）
     # 参考 biliandout DeviceScanner.get_drive_devices
+    drive_count: int = 0
     for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
         drive: Path = Path(f"{letter}:/")
         if not drive.exists():
@@ -1202,11 +1238,16 @@ def get_available_sources() -> list[dict]:
                         "serial": "",
                         "package": pkg,
                     })
+                    drive_count += 1
                     break
 
     # ADB 连接的 Android 设备（USB 调试模式）
     # 参考 biliandout DeviceScanner.get_adb_devices
-    for serial, display_name in _get_adb_devices():
+    adb_devices: list[tuple[str, str]] = _get_adb_devices() if adb_path else []
+    if adb_path and not adb_devices:
+        warnings.append("ADB 已安装但未检测到设备，请确认设备已启用 USB 调试并已授权")
+
+    for serial, display_name in adb_devices:
         for pkg, name in _BILI_PACKAGES:
             sources.append({
                 "id": f"adb_{serial}_{pkg}",
@@ -1228,7 +1269,7 @@ def get_available_sources() -> list[dict]:
                 if s.get("type") in ("drive", "adb")
             }
 
-    return sources
+    return {"sources": sources, "warnings": warnings}
 
 
 def browse_local() -> str | None:
