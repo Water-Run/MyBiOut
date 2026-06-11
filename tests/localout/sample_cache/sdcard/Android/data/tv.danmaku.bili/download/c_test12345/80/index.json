@@ -1,0 +1,19 @@
+{
+  "video": [
+    {
+      "id": 80,
+      "base_url": "https://example.com/80.m4s",
+      "backup_url": null,
+      "width": 1920,
+      "height": 1080,
+      "frame_rate": "30.000",
+      "bandwidth": 2000000
+    }
+  ],
+  "audio": [
+    {
+      "id": 30280,
+      "base_url": "https://example.com/30280.m4s"
+    }
+  ]
+}

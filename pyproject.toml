@@ -65,3 +65,8 @@ ignore = ["E501", "B008", "SIM108"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mybiout"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"

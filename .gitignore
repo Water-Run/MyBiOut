@@ -46,3 +46,10 @@ Desktop.ini
 .idea/
 *.swp
 *.swo
+
+# MyBiOut! 项目本地配置（可能含 SESSDATA 等敏感信息）
+mybiout/config.ini
+
+# 内置二进制工具与无关子项目（PyPI wheel 不应包含）
+mybiout/bin/*.exe
+mybiout/bin/BullshitGenerator/

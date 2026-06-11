@@ -7,6 +7,7 @@ LocalOut! 本地缓存导出服务层, 负责扫描、解析和导出本地视�
 """
 
 import ctypes
+import hashlib
 import json
 import os
 import re
@@ -64,6 +65,9 @@ _POPEN_EXTRA: dict = {}
 if sys.platform == "win32":
     _POPEN_EXTRA["creationflags"] = 0x08000000
 
+_COVER_CACHE_DIR: Path = Path(tempfile.gettempdir()) / "mybiout_covers"
+_COVER_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
 
 # ===== ADB 工具 =====
 
@@ -72,8 +76,9 @@ def _find_adb() -> str | None:
     查找 adb 可执行文件路径（参考 biliandout DeviceScanner.find_adb）
     :return: str | None: 路径, 未找到返回 None
     """
-    if shutil.which("adb"):
-        return "adb"
+    bin_name: str = "adb.exe" if sys.platform == "win32" else "adb"
+    if shutil.which(bin_name) or shutil.which("adb"):
+        return bin_name
     if sys.platform == "win32":
         for candidate in (
             Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
@@ -90,15 +95,19 @@ def _find_adb() -> str | None:
 
 def _adb_run(adb: str, serial: str, *args: str, timeout: float = 10) -> subprocess.CompletedProcess:
     r"""
-    执行 adb -s serial <args> 命令
+    执行 adb [-s serial] <args> 命令
     :param: adb: adb 可执行文件路径
-    :param: serial: 设备序列号
+    :param: serial: 设备序列号（为空时省略 -s 参数）
     :param: args: 后续命令参数
     :param: timeout: 超时秒数
     :return: subprocess.CompletedProcess
     """
+    cmd: list[str] = [adb]
+    if serial:
+        cmd += ["-s", serial]
+    cmd += list(args)
     return subprocess.run(
-        [adb, "-s", serial, *args],
+        cmd,
         capture_output=True, text=True, timeout=timeout,
         **_POPEN_EXTRA,
     )
@@ -114,11 +123,7 @@ def _get_adb_devices() -> list[tuple[str, str]]:
     if not adb:
         return devices
     try:
-        result: subprocess.CompletedProcess = subprocess.run(
-            [adb, "devices", "-l"],
-            capture_output=True, text=True, timeout=8,
-            **_POPEN_EXTRA,
-        )
+        result: subprocess.CompletedProcess = _adb_run(adb, "", "devices", "-l", timeout=8)
         if result.returncode != 0:
             return devices
         for line in result.stdout.strip().splitlines()[1:]:
@@ -389,6 +394,27 @@ def _find_m4s_recursive(root: Path, source_label: str, source_type: str) -> list
         except PermissionError:
             pass
     return cards
+
+
+def _parse_ls_output(stdout: str) -> list[str]:
+    r"""
+    解析 adb shell ls 输出，过滤空行、错误前缀、控制字符（处理彩色输出）
+    参考 biliandout ScanWorker 经验：某些 Android ROM 默认 ls 输出带 ANSI 颜色
+    :param: stdout: adb shell ls 原始输出
+    :return: list[str]: 清理后的条目名列表
+    """
+    out: list[str] = []
+    ansi_re: re.Pattern[str] = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+    for line in stdout.splitlines():
+        cleaned: str = ansi_re.sub("", line).strip()
+        if not cleaned:
+            continue
+        if cleaned.startswith("ls:"):
+            continue
+        if cleaned in (".", ".."):
+            continue
+        out.append(cleaned)
+    return out
 
 
 def _find_pc_m4s(cache_dir: Path) -> tuple[str, str]:
@@ -735,14 +761,11 @@ def _scan_adb_folder(
         return cards
     try:
         res: subprocess.CompletedProcess = _adb_run(
-            adb, serial, "shell", f"ls '{remote_path}'", timeout=10,
+            adb, serial, "shell", f"ls -1a '{remote_path}'", timeout=10,
         )
         if res.returncode != 0:
             return cards
-        entries: list[str] = [
-            line.strip() for line in res.stdout.splitlines()
-            if line.strip() and not line.strip().startswith("ls:")
-        ]
+        entries: list[str] = _parse_ls_output(res.stdout)
         if "video.m4s" in entries and "audio.m4s" in entries:
             if card := _make_adb_card(adb, serial, remote_path, root_folder, source_label):
                 cards.append(card)
@@ -758,11 +781,46 @@ def _scan_adb_folder(
     return cards
 
 
+def _pull_cover_adb(adb: str, serial: str, remote_dir: str, identifier: str) -> str:
+    r"""
+    从 ADB 设备拉取 cover.jpg 到本地缓存目录，命中缓存直接返回
+    参考 biliandout ScanWorker._pull_cover_adb
+    :param: adb: adb 路径
+    :param: serial: 设备序列号
+    :param: remote_dir: 远端目录（向上搜索起点）
+    :param: identifier: 唯一标识（用于哈希命名）
+    :return: str: 本地缓存路径, 失败返回空串
+    """
+    safe_id: str = hashlib.md5(f"{remote_dir}_{identifier}".encode("utf-8")).hexdigest()
+    for ext in ("jpg", "jpeg", "png"):
+        cached: Path = _COVER_CACHE_DIR / f"{safe_id}.{ext}"
+        if cached.exists() and cached.stat().st_size > 0:
+            return str(cached)
+
+    cur: str = remote_dir
+    for _ in range(4):
+        for ext in ("jpg", "jpeg", "png"):
+            target: Path = _COVER_CACHE_DIR / f"{safe_id}.{ext}"
+            try:
+                res: subprocess.CompletedProcess = _adb_run(
+                    adb, serial, "pull", f"{cur}/cover.{ext}", str(target), timeout=15,
+                )
+                if res.returncode == 0 and target.exists() and target.stat().st_size > 0:
+                    return str(target)
+            except Exception:
+                pass
+            target.unlink(missing_ok=True)
+        if "/" not in cur:
+            break
+        cur = cur.rsplit("/", 1)[0]
+    return ""
+
+
 def _make_adb_card(
     adb: str, serial: str, remote_path: str, root_folder: str, source_label: str,
 ) -> VideoCard | None:
     r"""
-    解析 ADB 设备上某 m4s 目录，尝试拉取 entry.json 获取元数据后生成 VideoCard
+    解析 ADB 设备上某 m4s 目录，尝试拉取 entry.json / index.json 获取元数据后生成 VideoCard
     参考 biliandout ScanWorker._parse_video_adb
     :param: adb: adb 路径
     :param: serial: 设备序列号
@@ -774,7 +832,11 @@ def _make_adb_card(
     title: str = root_folder
     quality: str = ""
     resolution: str = ""
+    frame_rate: str = ""
     size_bytes: int = 0
+    bvid: str = ""
+    avid: str = ""
+    up_name: str = ""
 
     # 尝试从父目录拉取 entry.json
     parent_remote: str = remote_path.rsplit("/", 1)[0] if "/" in remote_path else remote_path
@@ -788,6 +850,9 @@ def _make_adb_card(
         if pull_res.returncode == 0 and Path(tmp_path).exists():
             data: dict = json.loads(Path(tmp_path).read_text(encoding="utf-8"))
             title = data.get("title", root_folder) or root_folder
+            bvid = data.get("bvid", "") or ""
+            avid = str(data.get("avid", ""))
+            up_name = data.get("owner_name", "")
             quality = data.get("quality_pithy_description", "")
             pd: dict = data.get("page_data", {})
             w, h = pd.get("width", 0), pd.get("height", 0)
@@ -800,12 +865,38 @@ def _make_adb_card(
         if tmp_path:
             Path(tmp_path).unlink(missing_ok=True)
 
+    # 尝试拉取 index.json 解析分辨率/帧率（与 m4s 同目录）
+    if not resolution or not frame_rate:
+        idx_tmp: str = ""
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+                idx_tmp = tmp.name
+            idx_res: subprocess.CompletedProcess = _adb_run(
+                adb, serial, "pull", f"{remote_path}/index.json", idx_tmp, timeout=10,
+            )
+            if idx_res.returncode == 0 and Path(idx_tmp).exists():
+                res_r, fr_r, _ = _parse_index_json(Path(idx_tmp))
+                if not resolution and res_r:
+                    resolution = res_r
+                if fr_r:
+                    frame_rate = fr_r
+        except Exception:
+            pass
+        finally:
+            if idx_tmp:
+                Path(idx_tmp).unlink(missing_ok=True)
+
     # 从目录名推断画质
     if not quality:
         try:
             quality = _QN_MAP.get(int(remote_path.rsplit("/", 1)[-1]), "")
         except (ValueError, IndexError):
             pass
+    if frame_rate:
+        quality = f"{quality} {frame_rate}".strip()
+
+    # 拉取封面（向上 4 层查找）
+    cover_path: str = _pull_cover_adb(adb, serial, parent_remote, root_folder)
 
     # 若 entry.json 未提供大小，通过 stat 获取
     if not size_bytes:
@@ -825,12 +916,14 @@ def _make_adb_card(
             pass
 
     return VideoCard(
-        title=title, quality=quality, resolution=resolution,
+        title=title, bvid=bvid, avid=avid, up_name=up_name,
+        quality=quality, resolution=resolution,
         size_bytes=size_bytes, folder_name=root_folder,
         source_label=source_label, source_type="adb",
         device_serial=serial,
         video_path=f"{remote_path}/video.m4s",
         audio_path=f"{remote_path}/audio.m4s",
+        cover_path=cover_path,
     )
 
 
@@ -852,14 +945,11 @@ def _scan_adb_device(serial: str, source_label: str) -> list[VideoCard]:
         remote_base: str = f"/sdcard/Android/data/{pkg}/download"
         try:
             res: subprocess.CompletedProcess = _adb_run(
-                adb, serial, "shell", f"ls '{remote_base}'", timeout=15,
+                adb, serial, "shell", f"ls -1a '{remote_base}'", timeout=15,
             )
             if res.returncode != 0:
                 continue
-            folders: list[str] = [
-                line.strip() for line in res.stdout.splitlines()
-                if line.strip() and not line.strip().startswith("ls:")
-            ]
+            folders: list[str] = _parse_ls_output(res.stdout)
             total: int = len(folders)
             for i, folder_name in enumerate(folders):
                 if S._scan_cancel.is_set():

@@ -1,0 +1,14 @@
+{
+  "title": "测试视频标题",
+  "bvid": "BV1test12345",
+  "avid": 1700000000,
+  "owner_name": "测试UP主",
+  "type_tag": "80",
+  "quality_pithy_description": "1080P 高清",
+  "total_bytes": 1048576,
+  "page_data": {
+    "page": 1,
+    "width": 1920,
+    "height": 1080
+  }
+}
