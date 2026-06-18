@@ -907,6 +907,19 @@
         </div>
     </div>
 
+    <!-- 获取 SESSDATA 选项模态框 -->
+    <div class="modal-backdrop" id="get-sessdata-modal">
+        <div class="modal" style="transform:rotate(-0.5deg)">
+            <h3>获取登录凭证</h3>
+            <p id="get-sessdata-text">未能在当前进程直接提取到有效的浏览器登录凭证。<br>您希望如何操作？</p>
+            <div class="modal-btns" style="display:flex; gap:10px; justify-content:center;">
+                <button class="btn btn-orange" id="btn-uac" onclick="triggerUacElevation()">管理员提权提取 (免扫码)</button>
+                <button class="btn btn-pink" id="btn-login-qr" onclick="triggerPlaywrightLogin()">扫码登录 (Playwright)</button>
+                <button class="btn btn-ghost" onclick="closeGetSessdataModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
@@ -1122,19 +1135,76 @@
             showToast('SESSDATA 已清空');
         }
         async function autoGetSessdata() {
-            showToast('正在从浏览器读取 Cookie...');
+            showToast('正在检测浏览器登录凭证...');
             try {
-                const r = await fetch('/api/auto-sessdata', { method: 'POST' });
+                const r = await fetch('/api/auto-sessdata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'check_direct' })
+                });
                 const d = await r.json();
-                if (d.ok && d.sessdata) {
+                if (d.status === 'success' && d.sessdata) {
                     document.getElementById('s-sessdata').value = d.sessdata;
                     await saveSetting('export', 'sessdata', d.sessdata);
-                    showToast('已自动获取 SESSDATA 并保存');
+                    showToast('已直接从浏览器获取 SESSDATA 并保存！');
                 } else {
-                    showToast(d.error || '自动获取失败, 请手动填写', true);
+                    document.getElementById('get-sessdata-modal').classList.add('show');
                 }
             } catch (e) {
-                showToast('自动获取失败: ' + e.message, true);
+                showToast('直接获取失败: ' + e.message, true);
+            }
+        }
+
+        function closeGetSessdataModal() {
+            document.getElementById('get-sessdata-modal').classList.remove('show');
+        }
+
+        async function triggerUacElevation() {
+            closeGetSessdataModal();
+            showToast('请在 Windows 弹出的 UAC 窗口中选择“是”进行提权...');
+            try {
+                const r = await fetch('/api/auto-sessdata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'check_elevated' })
+                });
+                const d = await r.json();
+                if (d.status === 'success' && d.sessdata) {
+                    document.getElementById('s-sessdata').value = d.sessdata;
+                    await saveSetting('export', 'sessdata', d.sessdata);
+                    showToast('提权提取 SESSDATA 成功！');
+                } else if (d.status === 'denied') {
+                    showToast('管理员提权申请被拒绝，即将为您拉起扫码登录...', true);
+                    setTimeout(triggerPlaywrightLogin, 1800);
+                } else {
+                    showToast('直接提取失败（由于应用绑定加密限制），即将为您拉起扫码登录...', true);
+                    setTimeout(triggerPlaywrightLogin, 1800);
+                }
+            } catch (e) {
+                showToast('提权提取异常，即将为您拉起扫码登录...', true);
+                setTimeout(triggerPlaywrightLogin, 1800);
+            }
+        }
+
+        async function triggerPlaywrightLogin() {
+            closeGetSessdataModal();
+            showToast('正在启动扫码登录窗口...');
+            try {
+                const r = await fetch('/api/auto-sessdata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'launch_login' })
+                });
+                const d = await r.json();
+                if (d.status === 'success' && d.sessdata) {
+                    document.getElementById('s-sessdata').value = d.sessdata;
+                    await saveSetting('export', 'sessdata', d.sessdata);
+                    showToast('扫码登录成功，已保存 SESSDATA！');
+                } else {
+                    showToast(d.error || '扫码登录失败', true);
+                }
+            } catch (e) {
+                showToast('扫码登录异常: ' + e.message, true);
             }
         }
 

@@ -53,3 +53,6 @@ mybiout/config.ini
 # 内置二进制工具与无关子项目（PyPI wheel 不应包含）
 mybiout/bin/*.exe
 mybiout/bin/BullshitGenerator/
+
+# 浏览器配置文件缓存
+auth_profile/

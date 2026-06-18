@@ -15,7 +15,6 @@ import pytest
 from mybiout.pages.localout import localout as lm
 from tests.localout import fake_adb
 
-
 SAMPLE_ROOT: Path = Path(__file__).resolve().parent / "sample_cache"
 
 

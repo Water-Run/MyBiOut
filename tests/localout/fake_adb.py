@@ -21,7 +21,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 SERIAL: str = "emulator-5554"
 MODEL: str = "MockPixel"
 

@@ -679,15 +679,43 @@ async def api_open_explorer(request: Request) -> dict[str, bool | str]:
 
 
 @app.post("/api/auto-sessdata")
-async def api_auto_sessdata() -> dict[str, bool | str]:
+async def api_auto_sessdata(request: Request) -> dict[str, Any]:
     r"""
-    尝试从浏览器自动获取 SESSDATA
+    分步尝试自动获取 SESSDATA:
+    action: "check_direct" | "check_elevated" | "launch_login"
     """
-    from mybiout.pages.ohmyconfig.ohmyconfig import auto_get_sessdata
-    result: str | None = auto_get_sessdata()
-    if result:
-        return {"ok": True, "sessdata": result}
-    return {"ok": False, "error": "无法自动获取, 请手动填写"}
+    body: dict[str, Any] = await _read_json_dict(request)
+    action: str = _as_str(body.get("action", "check_direct"))
+    user_agent = request.headers.get("user-agent", "")
+    
+    from mybiout.pages.ohmyconfig.ohmyconfig import (
+        _auto_get_sessdata_from_browsers,
+        _auto_get_sessdata_via_elevation,
+        _auto_get_sessdata_via_login
+    )
+    
+    if action == "check_direct":
+        result = _auto_get_sessdata_from_browsers(user_agent)
+        if result:
+            return {"status": "success", "sessdata": result}
+        return {"status": "need_elevation_or_login"}
+        
+    elif action == "check_elevated":
+        result, error_code = _auto_get_sessdata_via_elevation(user_agent)
+        if result:
+            return {"status": "success", "sessdata": result}
+        elif error_code == "denied":
+            return {"status": "denied", "error": "管理员提权申请被拒绝"}
+        else:
+            return {"status": "failed", "error": "提取失败（可能由于浏览器最新的 v20 应用绑定加密限制）"}
+            
+    elif action == "launch_login":
+        result = _auto_get_sessdata_via_login(user_agent, timeout_sec=180)
+        if result:
+            return {"status": "success", "sessdata": result}
+        return {"status": "failed", "error": "扫码登录超时或窗口被关闭"}
+        
+    return {"status": "failed", "error": f"未知操作: {action}"}
 
 
 @app.post("/api/reset-all-settings")
@@ -704,8 +732,8 @@ async def mdout_open_folder() -> dict[str, bool | str]:
     r"""
     打开 MdOut 导出目录
     """
-    from mybiout.pages.mdout.mdout import get_export_folder_path
     from mybiout.pages.bbdown.bbdown import open_in_explorer
+    from mybiout.pages.mdout.mdout import get_export_folder_path
     return open_in_explorer(get_export_folder_path())
 
 
@@ -726,4 +754,4 @@ async def man_chat_stream(request: Request):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-    
+

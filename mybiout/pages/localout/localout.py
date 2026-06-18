@@ -840,6 +840,24 @@ def _make_adb_card(
 
     # 尝试从父目录拉取 entry.json
     parent_remote: str = remote_path.rsplit("/", 1)[0] if "/" in remote_path else remote_path
+    # 针对新版 B 站 Android 缓存进行路径智能上移
+    _parts: list[str] = remote_path.split("/")
+    if "download" in _parts:
+        idx = _parts.index("download")
+        depth = len(_parts) - 1 - idx
+        if depth == 3:
+            parent_remote = "/".join(_parts[:-2])
+        elif depth == 2:
+            parent_remote = "/".join(_parts[:-1])
+    # 针对新版 B 站 Android 缓存进行路径智能上移
+    _parts: list[str] = remote_path.split("/")
+    if "download" in _parts:
+        idx = _parts.index("download")
+        depth = len(_parts) - 1 - idx
+        if depth == 3:
+            parent_remote = "/".join(_parts[:-2])
+        elif depth == 2:
+            parent_remote = "/".join(_parts[:-1])
     tmp_path: str = ""
     try:
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:

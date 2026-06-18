@@ -50,10 +50,16 @@ Repository = "https://github.com/Water-Run/MyBiOut.git"
 Issues = "https://github.com/Water-Run/MyBiOut/issues"
 
 [tool.hatch.build.targets.sdist]
-include = ["/mybiout"]
+include = ["/mybiout", "/hatch_build.py"]
+[tool.hatch.build.targets.sdist.hooks.custom]
+path = "hatch_build.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mybiout"]
+pure-python = false
+pure_python = false
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
 
 [tool.ruff]
 target-version = "py314"
@@ -61,7 +67,7 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM", "PTH", "RUF"]
-ignore = ["E501", "B008", "SIM108"]
+ignore = ["E501", "B008", "SIM108", "RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mybiout"]

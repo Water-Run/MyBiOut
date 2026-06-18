@@ -6,7 +6,6 @@ BBDown! 可视化封装服务层, 管理 BBDown 下载任务队列
 :time: 2026-04-06
 """
 
-import os
 import re
 import shutil
 import subprocess
@@ -515,4 +514,3 @@ def open_in_explorer(file_path: str) -> dict[str, bool | str]:
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
-    

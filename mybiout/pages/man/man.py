@@ -205,7 +205,7 @@ def _call_llm(prompt: str, context: str) -> str:
     return data.get("text", str(data))
 
 
-def _stream_llm(prompt: str, context: str) -> Generator[str, None, None]:
+def _stream_llm(prompt: str, context: str) -> Generator[str]:
     r"""
     流式调用 LLM, 逐块 yield 内容文本
     """
@@ -223,30 +223,29 @@ def _stream_llm(prompt: str, context: str) -> Generator[str, None, None]:
     chat_url: str = _build_chat_url(base_url)
     timeout_seconds: float | None = utils.get_api_timeout_seconds()
 
-    with httpx.Client(timeout=timeout_seconds) as client:
-        with client.stream(
-            "POST", chat_url,
-            headers=headers,
-            json={"model": model, "messages": messages, "stream": True},
-        ) as response:
-            response.raise_for_status()
-            for line in response.iter_lines():
-                if not line or not line.startswith("data: "):
-                    continue
-                data_str: str = line[6:].strip()
-                if data_str == "[DONE]":
-                    break
-                try:
-                    chunk: dict = json.loads(data_str)
-                    delta: dict = chunk.get("choices", [{}])[0].get("delta", {})
-                    content: str = delta.get("content", "")
-                    if content:
-                        yield content
-                except (json.JSONDecodeError, IndexError, KeyError):
-                    continue
+    with httpx.Client(timeout=timeout_seconds) as client, client.stream(
+        "POST", chat_url,
+        headers=headers,
+        json={"model": model, "messages": messages, "stream": True},
+    ) as response:
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if not line or not line.startswith("data: "):
+                continue
+            data_str: str = line[6:].strip()
+            if data_str == "[DONE]":
+                break
+            try:
+                chunk: dict = json.loads(data_str)
+                delta: dict = chunk.get("choices", [{}])[0].get("delta", {})
+                content: str = delta.get("content", "")
+                if content:
+                    yield content
+            except (json.JSONDecodeError, IndexError, KeyError):
+                continue
 
 
-def chat_stream_sse(prompt: str) -> Generator[str, None, None]:
+def chat_stream_sse(prompt: str) -> Generator[str]:
     r"""
     SSE 格式的流式对话, 供 FastAPI StreamingResponse 使用
     """

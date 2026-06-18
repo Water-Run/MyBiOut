@@ -70,7 +70,7 @@ def load_config() -> configparser.ConfigParser:
     读取配置文件, 不存在则使用默认值
     :return: configparser.ConfigParser: 加载后的配置解析器
     """
-    cfg: configparser.ConfigParser = configparser.ConfigParser()
+    cfg: configparser.ConfigParser = configparser.ConfigParser(interpolation=None)
     for section, kvs in DEFAULTS.items():
         cfg[section] = dict(kvs)
     if _CONFIG_PATH.exists():
@@ -208,7 +208,7 @@ def reset_all_settings() -> None:
     r"""
     将全部设置恢复为默认值
     """
-    cfg: configparser.ConfigParser = configparser.ConfigParser()
+    cfg: configparser.ConfigParser = configparser.ConfigParser(interpolation=None)
     for section, kvs in DEFAULTS.items():
         cfg[section] = dict(kvs)
     save_config(cfg)
