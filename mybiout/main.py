@@ -130,6 +130,16 @@ def _print_env_detail(checks: list[_EnvItem]) -> None:
     print()
 
 
+def _get_startup_blockers(_checks: list[_EnvItem]) -> list[_EnvItem]:
+    r"""
+    返回会阻止 Web 服务启动的环境问题。
+
+    BBDown、ffmpeg、biliffm4s 都只影响具体功能页，不能阻断配置页、
+    Markdown 导出页或环境诊断接口的访问。
+    """
+    return []
+
+
 # ===== 服务启动状态 =====
 
 
@@ -769,7 +779,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         case "split":
             top: list[int] = list(range(1, height // 2 + 1))
             bottom: list[int] = list(range(height, height // 2, -1))
-            row_order = [r for pair in zip(top, bottom) for r in pair]
+            row_order = [r for pair in zip(top, bottom, strict=False) for r in pair]
             row_order += top[len(bottom) :] or bottom[len(top) :]
         case _:
             ...
@@ -953,7 +963,7 @@ def main() -> None:
 
     # ===== 环境检查 =====
     env_checks: list[_EnvItem] = _check_environment()
-    env_missing: list[_EnvItem] = [c for c in env_checks if not c.available]
+    env_missing: list[_EnvItem] = _get_startup_blockers(env_checks)
 
     if env_missing:
         # 环境缺失 → 创建预失败状态 → 动画将坠机

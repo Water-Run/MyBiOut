@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -450,10 +451,8 @@ def cancel_current() -> None:
     S._cancel.set()
     with S.lock:
         if S._process:
-            try:
+            with suppress(Exception):
                 S._process.kill()
-            except Exception:
-                ...
     S.log("info", "正在取消当前下载...")
 
 

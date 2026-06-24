@@ -607,9 +607,8 @@ def _do_fetch_user(card: MdCard) -> None:
             if S._cancel.is_set():
                 break
             _delay()
-            if fav_id := fav.get("id", 0):
-                if fc := _fetch_favorite_content(fav_id, pn=1, ps=20):
-                    fav_contents[fav_id] = fc
+            if (fav_id := fav.get("id", 0)) and (fc := _fetch_favorite_content(fav_id, pn=1, ps=20)):
+                fav_contents[fav_id] = fc
             S.log("info", f"获取收藏夹 ({i + 1}/{min(len(favorites), max_fav)}): {fav.get('title', '')}")
     card.markdown = _md_user(card_data, upstat, favorites, fav_contents, cfg)
 

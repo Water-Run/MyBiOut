@@ -20,6 +20,15 @@ app: FastAPI = FastAPI(title="MyBiOut!", version="0.1.0")
 app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets")
 
 
+class _InvalidJsonBody(ValueError):
+    pass
+
+
+@app.exception_handler(_InvalidJsonBody)
+async def _invalid_json_handler(_request: Request, _exc: _InvalidJsonBody) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"ok": False, "error": "请求体不是合法 JSON"})
+
+
 def _read_html(relative_path: str) -> HTMLResponse:
     r"""
     读取 HTML 文件并返回 HTMLResponse
@@ -37,7 +46,10 @@ async def _read_json_dict(request: Request) -> dict[str, Any]:
     :param: request: FastAPI 请求对象
     :return: dict[str, Any]: JSON 字典, 若非对象则返回空字典
     """
-    payload: Any = await request.json()
+    try:
+        payload: Any = await request.json()
+    except Exception as e:
+        raise _InvalidJsonBody from e
     return payload if isinstance(payload, dict) else {}
 
 
@@ -687,19 +699,19 @@ async def api_auto_sessdata(request: Request) -> dict[str, Any]:
     body: dict[str, Any] = await _read_json_dict(request)
     action: str = _as_str(body.get("action", "check_direct"))
     user_agent = request.headers.get("user-agent", "")
-    
+
     from mybiout.pages.ohmyconfig.ohmyconfig import (
         _auto_get_sessdata_from_browsers,
         _auto_get_sessdata_via_elevation,
-        _auto_get_sessdata_via_login
+        _auto_get_sessdata_via_login,
     )
-    
+
     if action == "check_direct":
         result = _auto_get_sessdata_from_browsers(user_agent)
         if result:
             return {"status": "success", "sessdata": result}
         return {"status": "need_elevation_or_login"}
-        
+
     elif action == "check_elevated":
         result, error_code = _auto_get_sessdata_via_elevation(user_agent)
         if result:
@@ -708,13 +720,13 @@ async def api_auto_sessdata(request: Request) -> dict[str, Any]:
             return {"status": "denied", "error": "管理员提权申请被拒绝"}
         else:
             return {"status": "failed", "error": "提取失败（可能由于浏览器最新的 v20 应用绑定加密限制）"}
-            
+
     elif action == "launch_login":
         result = _auto_get_sessdata_via_login(user_agent, timeout_sec=180)
         if result:
             return {"status": "success", "sessdata": result}
         return {"status": "failed", "error": "扫码登录超时或窗口被关闭"}
-        
+
     return {"status": "failed", "error": f"未知操作: {action}"}
 
 

@@ -9,6 +9,7 @@ MyBiOut! 设置页服务层, 负责设置的校验、浏览与业务逻辑
 import json
 import os
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 from mybiout.pages import utils
@@ -117,7 +118,7 @@ def validate_and_save(section: str, key: str, value: str) -> SettingResult:
                 return _err("请求间隔只能是 0.3 / 0.5 / 1.0 / 2.0")
             utils.set_setting(section, key, v)
             return _ok()
-        
+
         case ("api", "key" | "model"):
             utils.set_setting(section, key, value.strip())
             return _ok()
@@ -262,8 +263,8 @@ def _fast_copy_file(src: Path, dst: Path) -> bool:
     如果文件被进程独占锁定，且拥有管理员权限，则尝试使用 shadowcopy 影子拷贝复制，避免挂起。
     """
     try:
-        import win32file
         import win32con
+        import win32file
         handle = win32file.CreateFile(
             str(src),
             win32con.GENERIC_READ,
@@ -273,9 +274,9 @@ def _fast_copy_file(src: Path, dst: Path) -> bool:
             win32con.FILE_ATTRIBUTE_NORMAL,
             None
         )
-        with open(dst, "wb") as f_out:
+        with dst.open("wb") as f_out:
             while True:
-                err, data = win32file.ReadFile(handle, 64 * 1024)
+                _err, data = win32file.ReadFile(handle, 64 * 1024)
                 if not data:
                     break
                 f_out.write(data)
@@ -301,8 +302,6 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
     从本地浏览器数据库快速尝试获取 SESSDATA（不卡顿，不使用 shadowcopy）。
     如果遇到数据库被独占锁定，或检测到 v20 (App-Bound Encryption)，则立即跳过。
     """
-    import os
-    import json
     import base64
     import sqlite3
     import tempfile
@@ -334,9 +333,8 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
             current_browser = "firefox"
         elif "brave" in ua:
             current_browser = "brave"
-        elif "chrome" in ua:
-            if not any(x in ua for x in ["edg/", "edge", "opr/", "opera", "vivaldi", "brave"]):
-                current_browser = "chrome"
+        elif "chrome" in ua and not any(x in ua for x in ["edg/", "edge", "opr/", "opera", "vivaldi", "brave"]):
+            current_browser = "chrome"
 
     browser_order = []
     if current_browser and current_browser in browser_dirs:
@@ -363,7 +361,7 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
         try:
             if not _fast_copy_file(local_state_path, tmp_path):
                 continue
-            with open(tmp_path, "r", encoding="utf-8") as f:
+            with tmp_path.open(encoding="utf-8") as f:
                 local_state = json.loads(f.read())
             encrypted_key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])[5:]
             import win32crypt
@@ -372,7 +370,7 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
             continue
         finally:
             if tmp_path.exists():
-                os.remove(tmp_path)
+                tmp_path.unlink()
 
         # 扫描所有可能的 Cookies 数据库位置
         profiles = list(user_data_dir.glob("Default/Network/Cookies")) + \
@@ -413,7 +411,7 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
                 pass
             finally:
                 if tmp_db_path.exists():
-                    os.remove(tmp_db_path)
+                    tmp_db_path.unlink()
 
     # 3. 尝试从 Firefox 读取 (Firefox cookies 无加密)
     app_data = os.environ.get("APPDATA")
@@ -445,7 +443,7 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
                         pass
                     finally:
                         if tmp_db_path.exists():
-                            os.remove(tmp_db_path)
+                            tmp_db_path.unlink()
 
     return None
 
@@ -457,6 +455,7 @@ def _auto_get_sessdata_via_login(user_agent: str | None = None, timeout_sec: int
     """
     try:
         import time
+
         from playwright.sync_api import sync_playwright  # type: ignore
     except Exception:
         return None
@@ -485,15 +484,13 @@ def _auto_get_sessdata_via_login(user_agent: str | None = None, timeout_sec: int
         with sync_playwright() as p:
             context = None
             if browser_type == "firefox":
-                try:
+                with suppress(Exception):
                     context = p.firefox.launch_persistent_context(
                         user_data_dir=ud,
                         headless=False,
                         viewport={"width": 1280, "height": 800},
                     )
-                except Exception:
-                    pass
-            
+
             if context is None:
                 try:
                     context = p.chromium.launch_persistent_context(
@@ -511,8 +508,8 @@ def _auto_get_sessdata_via_login(user_agent: str | None = None, timeout_sec: int
 
             page = context.new_page()
             page.goto("https://www.bilibili.com", wait_until="domcontentloaded")
-            
-            try:
+
+            with suppress(Exception):
                 page.evaluate(
                     """() => {
                         const d=document.createElement('div');
@@ -521,8 +518,6 @@ def _auto_get_sessdata_via_login(user_agent: str | None = None, timeout_sec: int
                         document.body.appendChild(d);
                     }"""
                 )
-            except Exception:
-                pass
 
             deadline = time.time() + max(30, timeout_sec)
             while time.time() < deadline:
@@ -540,184 +535,16 @@ def _auto_get_sessdata_via_login(user_agent: str | None = None, timeout_sec: int
     return None
 
 
-def _auto_get_sessdata_via_cdp_restart(user_agent: str | None = None) -> str | None:
-    r"""
-    通过临时启动带扩展的 headless 浏览器进行 Cookie 抓取，不需要管理员权限。
-    """
-    import os
-    import time
-    import json
-    import subprocess
-    import tempfile
-    import threading
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-    # 1. 识别目标浏览器
-    browser_name = "edge"
-    if user_agent:
-        ua = user_agent.lower()
-        if "chrome" in ua and not any(x in ua for x in ["edg/", "edge", "opr/", "opera", "vivaldi", "brave"]):
-            browser_name = "chrome"
-
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if not local_app_data:
-        return None
-
-    if browser_name == "edge":
-        exe_paths = [
-            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        ]
-        user_data_path = Path(local_app_data) / "Microsoft" / "Edge" / "User Data"
-        proc_name = "msedge.exe"
-    else:
-        exe_paths = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        ]
-        user_data_path = Path(local_app_data) / "Google" / "Chrome" / "User Data"
-        proc_name = "chrome.exe"
-
-    exe_path = None
-    for p in exe_paths:
-        if os.path.exists(p):
-            exe_path = p
-            break
-    if not exe_path:
-        return None
-
-    # 2. 启动本地 HTTP 接收服务器
-    extracted_cookie = [None]
-    server_received = threading.Event()
-
-    class CookieReceiver(BaseHTTPRequestHandler):
-        def log_message(self, format, *args):
-            return
-        def do_OPTIONS(self):
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-            self.end_headers()
-        def do_POST(self):
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            try:
-                data = json.loads(post_data.decode('utf-8'))
-                if val := data.get("sessdata"):
-                    extracted_cookie[0] = val
-                    server_received.set()
-            except Exception:
-                pass
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(b'{"status":"ok"}')
-
-    server = HTTPServer(('127.0.0.1', 54321), CookieReceiver)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    # 3. 创建临时扩展程序并执行拷贝
-    with tempfile.TemporaryDirectory(prefix="mybiout_ext_") as temp_dir:
-        ext_path = Path(temp_dir)
-        manifest = {
-            "manifest_version": 3,
-            "name": "Extractor",
-            "version": "1.0",
-            "permissions": ["cookies"],
-            "host_permissions": ["*://*.bilibili.com/*"],
-            "background": {
-                "service_worker": "background.js"
-            }
-        }
-        background_js = """
-        function extract() {
-          chrome.cookies.get({
-            url: "https://www.bilibili.com",
-            name: "SESSDATA"
-          }, (c) => {
-            if (c && c.value) {
-              fetch("http://127.0.0.1:54321/cookie", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sessdata: c.value })
-              }).catch(() => {});
-            }
-          });
-        }
-        chrome.runtime.onInstalled.addListener(extract);
-        chrome.runtime.onStartup.addListener(extract);
-        extract();
-        """
-        (ext_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-        (ext_path / "background.js").write_text(background_js, encoding="utf-8")
-
-        # 4. 关闭浏览器并清理 lock 文件
-        os.system(f"taskkill /F /IM {proc_name} >nul 2>&1")
-        if browser_name == "edge":
-            os.system("taskkill /F /IM msedgewebview2.exe >nul 2>&1")
-        time.sleep(2.0)
-
-        lock_files = [user_data_path / "LOCK", user_data_path / "Default" / "LOCK"]
-        for lock in lock_files:
-            if lock.exists():
-                try:
-                    lock.unlink()
-                except Exception:
-                    pass
-
-        # 5. 启动无界面浏览器，加载扩展
-        cmd = [
-            exe_path,
-            "--headless",
-            f"--user-data-dir={user_data_path}",
-            f"--load-extension={ext_path}",
-            "https://www.bilibili.com"
-        ]
-        try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except Exception:
-            server.shutdown()
-            return None
-
-        # 6. 等待接收
-        received = server_received.wait(timeout=10.0)
-
-        # 7. 终止无界面浏览器
-        proc.terminate()
-        try:
-            proc.wait(timeout=3.0)
-        except Exception:
-            proc.kill()
-
-    server.shutdown()
-
-    # 8. 重新启动浏览器以恢复会话
-    try:
-        subprocess.Popen([exe_path])
-    except Exception:
-        pass
-
-    return extracted_cookie[0]
-
-
 def _auto_get_sessdata_via_elevation(user_agent: str | None = None) -> tuple[str | None, str | None]:
     r"""
     通过 UAC 提权启动 cookie_helper.py 进行抓取。
     返回值: (sessdata, error_code)
     error_code: None / "denied" (提权被拒绝) / "failed" (读取失败)
     """
-    # 首先尝试不需要 UAC 管理员提权的浏览器静默重启 CDP-Extension 方法
-    try:
-        if s := _auto_get_sessdata_via_cdp_restart(user_agent):
-            return s, None
-    except Exception:
-        pass
+    if s := _auto_get_sessdata_from_browsers(user_agent):
+        return s, None
 
     import ctypes
-    import sys
     import tempfile
     import time
 
@@ -735,7 +562,7 @@ def _auto_get_sessdata_via_elevation(user_agent: str | None = None) -> tuple[str
     temp_dir = tempfile.gettempdir()
     temp_out = Path(temp_dir) / f"mybiout_cookie_{int(time.time())}.txt"
     helper_path = Path(__file__).resolve().parent / "cookie_helper.py"
-    
+
     args = f'"{helper_path}" --out "{temp_out}"'
     if user_agent:
         # 过滤特殊字符防止参数注入
@@ -749,7 +576,7 @@ def _auto_get_sessdata_via_elevation(user_agent: str | None = None) -> tuple[str
         )
         if int(ret) <= 32:
             return None, "failed"
-            
+
         # 轮询等待临时文件被写入（最长等待 8 秒）
         start_time = time.time()
         while time.time() - start_time < 8.0:
@@ -762,7 +589,7 @@ def _auto_get_sessdata_via_elevation(user_agent: str | None = None) -> tuple[str
                 except Exception:
                     pass
             time.sleep(0.25)
-            
+
         return None, "failed"
     except Exception as e:
         # 捕捉提权取消/拒绝错误 (ERROR_CANCELLED = 1223)
@@ -771,10 +598,8 @@ def _auto_get_sessdata_via_elevation(user_agent: str | None = None) -> tuple[str
         return None, "failed"
     finally:
         if temp_out.exists():
-            try:
+            with suppress(Exception):
                 temp_out.unlink()
-            except Exception:
-                pass
 
 
 def auto_get_sessdata(user_agent: str | None = None) -> str | None:

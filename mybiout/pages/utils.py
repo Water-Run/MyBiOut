@@ -7,10 +7,15 @@ MyBiOut! 基础工具模块, 负责配置文件的读写与通用方法
 """
 
 import configparser
+import os
+import tempfile
+import threading
+from contextlib import suppress
 from pathlib import Path
 
 _CONFIG_PATH: Path = Path(__file__).resolve().parent.parent / "config.ini"
 _DEFAULT_PORT: int = 23333
+_CONFIG_LOCK: threading.RLock = threading.RLock()
 
 
 def get_default_bilibili_pc_cache_path() -> str:
@@ -83,9 +88,23 @@ def save_config(cfg: configparser.ConfigParser) -> None:
     将配置写回文件
     :param: cfg: 配置解析器实例
     """
-    with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
-        f.write("# MyBiOut! 配置文件\n\n")
-        cfg.write(f)
+    _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{_CONFIG_PATH.name}.",
+        suffix=".tmp",
+        dir=str(_CONFIG_PATH.parent),
+        text=True,
+    )
+    tmp_path: Path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("# MyBiOut! 配置文件\n\n")
+            cfg.write(f)
+        tmp_path.replace(_CONFIG_PATH)
+    except Exception:
+        with suppress(OSError):
+            tmp_path.unlink()
+        raise
 
 
 def get_all_settings() -> dict[str, dict[str, str]]:
@@ -116,11 +135,12 @@ def set_setting(section: str, key: str, value: str) -> None:
     :param: key: 配置键名
     :param: value: 配置值
     """
-    cfg: configparser.ConfigParser = load_config()
-    if section not in cfg:
-        cfg[section] = {}
-    cfg[section][key] = value
-    save_config(cfg)
+    with _CONFIG_LOCK:
+        cfg: configparser.ConfigParser = load_config()
+        if section not in cfg:
+            cfg[section] = {}
+        cfg[section][key] = value
+        save_config(cfg)
 
 
 def get_export_path() -> Path:
@@ -178,7 +198,7 @@ def get_api_timeout_seconds() -> float | None:
         "100s": 100.0,
         "1000s": 1000.0,
     }
-    return timeout_map.get(mode, None)
+    return timeout_map.get(mode)
 
 def get_sessdata() -> str:
     r"""
@@ -208,8 +228,8 @@ def reset_all_settings() -> None:
     r"""
     将全部设置恢复为默认值
     """
-    cfg: configparser.ConfigParser = configparser.ConfigParser(interpolation=None)
-    for section, kvs in DEFAULTS.items():
-        cfg[section] = dict(kvs)
-    save_config(cfg)
-    
+    with _CONFIG_LOCK:
+        cfg: configparser.ConfigParser = configparser.ConfigParser(interpolation=None)
+        for section, kvs in DEFAULTS.items():
+            cfg[section] = dict(kvs)
+        save_config(cfg)

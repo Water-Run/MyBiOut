@@ -19,6 +19,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
@@ -238,7 +239,7 @@ class VideoCard:
             "status": self.status, "error": self.error,
         }
 
-    def clone(self) -> "VideoCard":
+    def clone(self) -> VideoCard:
         return replace(self, id=_uid(), status="queued", error="", output_path="")
 
 
@@ -459,10 +460,8 @@ def _parse_video_info_json(path: Path, source_label: str) -> VideoCard | None:
     pubdate: int = data.get("pubdate", 0)
     publish_time: str = ""
     if pubdate:
-        try:
+        with suppress(Exception):
             publish_time = datetime.fromtimestamp(pubdate).strftime("%Y-%m-%d %H:%M")
-        except Exception:
-            pass
 
     cache_dir: Path = path.parent
     video_path, audio_path = _find_pc_m4s(cache_dir)
@@ -542,10 +541,8 @@ def _make_card_from_m4s_dir(m4s_dir: Path, source_label: str, source_type: str) 
         return None
 
     size: int = 0
-    try:
+    with suppress(OSError):
         size = vp.stat().st_size + ap.stat().st_size
-    except OSError:
-        pass
 
     resolution: str = ""
     frame_rate: str = ""
@@ -553,10 +550,8 @@ def _make_card_from_m4s_dir(m4s_dir: Path, source_label: str, source_type: str) 
         resolution, frame_rate, _ = _parse_index_json(idx)
 
     quality: str = ""
-    try:
+    with suppress(ValueError):
         quality = _QN_MAP.get(int(m4s_dir.name), "")
-    except ValueError:
-        pass
     if frame_rate:
         quality = f"{quality} {frame_rate}".strip()
 
@@ -604,10 +599,8 @@ def _crawler_enrich(card: VideoCard) -> None:
         if not card.up_name:
             card.up_name = info.get("owner", {}).get("name", "")
         if not card.publish_time and (pubdate := info.get("pubdate")):
-            try:
+            with suppress(Exception):
                 card.publish_time = datetime.fromtimestamp(pubdate).strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                pass
     except Exception:
         pass
 
@@ -791,7 +784,7 @@ def _pull_cover_adb(adb: str, serial: str, remote_dir: str, identifier: str) -> 
     :param: identifier: 唯一标识（用于哈希命名）
     :return: str: 本地缓存路径, 失败返回空串
     """
-    safe_id: str = hashlib.md5(f"{remote_dir}_{identifier}".encode("utf-8")).hexdigest()
+    safe_id: str = hashlib.md5(f"{remote_dir}_{identifier}".encode()).hexdigest()
     for ext in ("jpg", "jpeg", "png"):
         cached: Path = _COVER_CACHE_DIR / f"{safe_id}.{ext}"
         if cached.exists() and cached.stat().st_size > 0:
@@ -906,10 +899,8 @@ def _make_adb_card(
 
     # 从目录名推断画质
     if not quality:
-        try:
+        with suppress(ValueError, IndexError):
             quality = _QN_MAP.get(int(remote_path.rsplit("/", 1)[-1]), "")
-        except (ValueError, IndexError):
-            pass
     if frame_rate:
         quality = f"{quality} {frame_rate}".strip()
 
@@ -1233,7 +1224,7 @@ def _export_thread_fn(card_ids: list[str]) -> None:
 
     with ThreadPoolExecutor(max_workers=concurrent) as pool:
         futs: dict = {pool.submit(_do_one, c): c for c in targets}
-        for f in as_completed(futs):
+        for _f in as_completed(futs):
             if S._export_cancel.is_set():
                 break
 
