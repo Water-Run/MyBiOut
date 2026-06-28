@@ -47,6 +47,8 @@ Desktop.ini
 *.swp
 *.swo
 TmpEdit*.txt
+.worktrees/
+worktrees/
 
 # MyBiOut! 项目本地配置（可能含 SESSDATA 等敏感信息）
 mybiout/config.ini
