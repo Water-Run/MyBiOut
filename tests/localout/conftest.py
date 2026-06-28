@@ -27,6 +27,16 @@ def _build_sample_tree(tmp_path_factory: pytest.TempPathFactory) -> Path:
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
+    download_root: Path = dst / "Android" / "data" / "tv.danmaku.bili" / "download"
+    for relative_dir in (
+        Path("c_test12345") / "80",
+        Path("c_noentry") / "32",
+        Path("c_exp") / "80",
+    ):
+        media_dir: Path = download_root / relative_dir
+        media_dir.mkdir(parents=True, exist_ok=True)
+        (media_dir / "video.m4s").write_bytes(b"fake video stream")
+        (media_dir / "audio.m4s").write_bytes(b"fake audio stream")
     return dst
 
 
