@@ -62,7 +62,11 @@ def test_scan_adb_folder_basic(fake_adb_env) -> None:
     adb: str = lm._find_adb()
     assert adb is not None
     cards: list[lm.VideoCard] = lm._scan_adb_folder(
-        adb, "emulator-5554", remote, "c_test12345", "Mock设备",
+        adb,
+        "emulator-5554",
+        remote,
+        "c_test12345",
+        "Mock设备",
     )
     assert len(cards) == 1
     c = cards[0]
@@ -91,6 +95,47 @@ def test_scan_adb_device_full(fake_adb_env) -> None:
     assert "无 entry.json 视频" in titles
 
 
+def test_add_source_rejects_missing_non_adb_path(tmp_path: Path) -> None:
+    r"""
+    非 ADB 扫描源必须有实际目录，避免空路径或坏路径误扫当前工作目录。
+    """
+    missing_path: Path = tmp_path / "missing-cache"
+
+    res: dict = lm.add_source(
+        source_type="pc",
+        path=str(missing_path),
+        label="不存在的 PC 缓存",
+    )
+
+    assert res["ok"] is False
+    assert "路径不存在" in str(res["error"])
+    assert lm.S.scan_status == "idle"
+
+
+def test_add_source_respects_requested_adb_package(fake_adb_env) -> None:
+    r"""
+    指定 ADB 包名时只扫描该包；fake 样例只包含 tv.danmaku.bili，
+    因此扫描国际版包应找不到视频。
+    """
+    res: dict = lm.add_source(
+        source_type="adb",
+        path="",
+        label="Mock设备 · 国际版",
+        serial="emulator-5554",
+        package="com.bilibili.app.in",
+    )
+
+    assert res["ok"] is True
+    deadline: float = time.time() + 10.0
+    while time.time() < deadline:
+        if lm.S.scan_status == "idle" and lm.S.scan_progress >= 1.0:
+            break
+        time.sleep(0.05)
+
+    assert lm.S.scan_status == "idle"
+    assert lm.S.source_cards == []
+
+
 def test_make_adb_card_cover_pulled(fake_adb_env) -> None:
     r"""
     验证封面被拉取并写入本地缓存
@@ -98,9 +143,11 @@ def test_make_adb_card_cover_pulled(fake_adb_env) -> None:
     adb: str = lm._find_adb()
     assert adb is not None
     card: lm.VideoCard | None = lm._make_adb_card(
-        adb, "emulator-5554",
+        adb,
+        "emulator-5554",
         "/sdcard/Android/data/tv.danmaku.bili/download/c_test12345/80",
-        "c_test12345", "Mock设备",
+        "c_test12345",
+        "Mock设备",
     )
     assert card is not None
     assert card.cover_path != ""
@@ -116,9 +163,11 @@ def test_make_adb_card_index_json_used(fake_adb_env) -> None:
     adb: str = lm._find_adb()
     assert adb is not None
     card: lm.VideoCard | None = lm._make_adb_card(
-        adb, "emulator-5554",
+        adb,
+        "emulator-5554",
         "/sdcard/Android/data/tv.danmaku.bili/download/c_test12345/80",
-        "c_test12345", "Mock设备",
+        "c_test12345",
+        "Mock设备",
     )
     assert card is not None
     assert card.resolution == "1920×1080"

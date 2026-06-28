@@ -176,6 +176,7 @@ def get_port() -> int:
     """
     return _DEFAULT_PORT
 
+
 def get_api_base_url() -> str:
     r"""
     获取 API 基地址
@@ -200,6 +201,7 @@ def get_api_timeout_seconds() -> float | None:
     }
     return timeout_map.get(mode)
 
+
 def get_sessdata() -> str:
     r"""
     获取统一的 SESSDATA (优先共享设置, 兼容旧分区)
@@ -223,6 +225,7 @@ def get_crawler_fallback_timeout() -> float | None:
     """
     mode: str = (get_setting("localout", "crawler_fallback") or "disabled").strip().lower()
     return {"1s": 1.0, "2s": 2.0, "5s": 5.0}.get(mode)
+
 
 def reset_all_settings() -> None:
     r"""

@@ -89,7 +89,8 @@ def test_pull_cover_adb_missing_returns_empty(fake_adb_env) -> None:
     adb: str = lm._find_adb()
     assert adb is not None
     result: str = lm._pull_cover_adb(
-        adb, "emulator-5554",
+        adb,
+        "emulator-5554",
         "/sdcard/Android/data/com.bilibili.app.in/download/ghost",
         "ghost",
     )

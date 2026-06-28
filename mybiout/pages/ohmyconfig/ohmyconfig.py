@@ -51,7 +51,7 @@ def validate_and_save(section: str, key: str, value: str) -> SettingResult:
             return _validate_folder(section, value)
 
         case ("localout", "bilibili_pc_cache_optional_when_installed"):
-                    return _save_bool(section, key, value)
+            return _save_bool(section, key, value)
 
         case ("localout", "bilibili_pc_cache_path"):
             utils.set_setting(section, key, value.strip())
@@ -197,6 +197,7 @@ def browse_folder() -> str | None:
     """
     try:
         from tkinter import Tk, filedialog
+
         root: Tk = Tk()
         root.withdraw()
         root.attributes("-topmost", True)
@@ -239,6 +240,7 @@ def _err(msg: str) -> SettingResult:
     """
     return {"ok": False, "error": msg}
 
+
 def reset_all() -> dict[str, bool]:
     r"""
     恢复全部默认设置
@@ -246,6 +248,7 @@ def reset_all() -> dict[str, bool]:
     """
     utils.reset_all_settings()
     return {"ok": True}
+
 
 def _sess_from_cookiejar(jar) -> str | None:
     try:
@@ -265,6 +268,7 @@ def _fast_copy_file(src: Path, dst: Path) -> bool:
     try:
         import win32con
         import win32file
+
         handle = win32file.CreateFile(
             str(src),
             win32con.GENERIC_READ,
@@ -272,7 +276,7 @@ def _fast_copy_file(src: Path, dst: Path) -> bool:
             None,
             win32con.OPEN_EXISTING,
             win32con.FILE_ATTRIBUTE_NORMAL,
-            None
+            None,
         )
         with dst.open("wb") as f_out:
             while True:
@@ -286,11 +290,13 @@ def _fast_copy_file(src: Path, dst: Path) -> bool:
         # 如果共享读取失败（如 Chrome 独占锁定），尝试使用 shadowcopy（需要管理员权限）
         try:
             import shadowcopy.shadow as sha
+
             sha.shadow_copy(str(src), str(dst))
             return True
         except Exception:
             try:
                 import shutil
+
                 shutil.copy2(src, dst)
                 return True
             except Exception:
@@ -365,6 +371,7 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
                 local_state = json.loads(f.read())
             encrypted_key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])[5:]
             import win32crypt
+
             decrypted_key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
         except Exception:
             continue
@@ -373,12 +380,14 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
                 tmp_path.unlink()
 
         # 扫描所有可能的 Cookies 数据库位置
-        profiles = list(user_data_dir.glob("Default/Network/Cookies")) + \
-                   list(user_data_dir.glob("Profile */Network/Cookies")) + \
-                   list(user_data_dir.glob("Default/Cookies")) + \
-                   list(user_data_dir.glob("Profile */Cookies")) + \
-                   list(user_data_dir.glob("Network/Cookies")) + \
-                   list(user_data_dir.glob("Cookies"))
+        profiles = (
+            list(user_data_dir.glob("Default/Network/Cookies"))
+            + list(user_data_dir.glob("Profile */Network/Cookies"))
+            + list(user_data_dir.glob("Default/Cookies"))
+            + list(user_data_dir.glob("Profile */Cookies"))
+            + list(user_data_dir.glob("Network/Cookies"))
+            + list(user_data_dir.glob("Cookies"))
+        )
 
         for db_path in profiles:
             if not db_path.exists():
@@ -398,6 +407,7 @@ def _auto_get_sessdata_from_browsers(user_agent: str | None = None) -> str | Non
                         # 只尝试解密 v10/v11，v20 则直接放弃（交给引导登录）
                         if enc_val.startswith(b"v10") or enc_val.startswith(b"v11"):
                             from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
                             iv = enc_val[3:15]
                             ciphertext = enc_val[15:]
                             aesgcm = AESGCM(decrypted_key)
@@ -571,9 +581,7 @@ def _auto_get_sessdata_via_elevation(user_agent: str | None = None) -> tuple[str
 
     try:
         # 触发 UAC 弹窗运行提权助手
-        ret = ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", sys.executable, args, None, 0
-        )
+        ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, args, None, 0)
         if int(ret) <= 32:
             return None, "failed"
 

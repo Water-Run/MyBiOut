@@ -296,20 +296,30 @@ def _md_video(info: dict, tags: list, cfg: dict) -> str:
     if cfg.get("include_cover") == "true" and pic:
         lines.append(f"![封面]({pic})\n")
 
-    lines.extend([
-        "## 基本信息\n", "| 项目 | 内容 |", "|------|------|",
-        f"| UP主 | [{owner.get('name', '—')}](https://space.bilibili.com/{owner.get('mid', '')}) |",
-        f"| 发布时间 | {_fmt_ts(info.get('pubdate', 0))} |",
-        f"| 分区 | {info.get('tname', '')} |",
-        f"| 时长 | {_fmt_dur(info.get('duration', 0))} |",
-        f"| 链接 | https://www.bilibili.com/video/{bvid} |", "",
-    ])
+    lines.extend(
+        [
+            "## 基本信息\n",
+            "| 项目 | 内容 |",
+            "|------|------|",
+            f"| UP主 | [{owner.get('name', '—')}](https://space.bilibili.com/{owner.get('mid', '')}) |",
+            f"| 发布时间 | {_fmt_ts(info.get('pubdate', 0))} |",
+            f"| 分区 | {info.get('tname', '')} |",
+            f"| 时长 | {_fmt_dur(info.get('duration', 0))} |",
+            f"| 链接 | https://www.bilibili.com/video/{bvid} |",
+            "",
+        ]
+    )
 
     if cfg.get("include_stats") == "true":
         lines.extend(["## 数据统计\n", "| 指标 | 数值 |", "|------|------|"])
         for k, label in [
-            ("view", "播放"), ("danmaku", "弹幕"), ("reply", "评论"),
-            ("like", "点赞"), ("coin", "投币"), ("favorite", "收藏"), ("share", "转发"),
+            ("view", "播放"),
+            ("danmaku", "弹幕"),
+            ("reply", "评论"),
+            ("like", "点赞"),
+            ("coin", "投币"),
+            ("favorite", "收藏"),
+            ("share", "转发"),
         ]:
             lines.append(f"| {label} | {_fmt_num(stat.get(k, 0))} |")
         lines.append("")
@@ -377,10 +387,13 @@ def _md_user(card_data: dict, upstat: dict, favorites: list, fav_contents: dict,
 
     if cfg.get("include_stats") == "true":
         lines.extend(["## 数据统计\n", "| 指标 | 数值 |", "|------|------|"])
-        lines.extend([
-            f"| 粉丝 | {_fmt_num(fans)} |", f"| 关注 | {_fmt_num(friend)} |",
-            f"| 投稿视频 | {archive_count} |",
-        ])
+        lines.extend(
+            [
+                f"| 粉丝 | {_fmt_num(fans)} |",
+                f"| 关注 | {_fmt_num(friend)} |",
+                f"| 投稿视频 | {archive_count} |",
+            ]
+        )
         if like_num:
             lines.append(f"| 获赞 | {_fmt_num(like_num)} |")
         if upstat:
@@ -447,8 +460,12 @@ def _md_article(info: dict, cfg: dict) -> str:
     if cfg.get("include_stats") == "true" and stats:
         lines.extend(["## 数据统计\n", "| 指标 | 数值 |", "|------|------|"])
         for k, label in [
-            ("view", "阅读"), ("like", "点赞"), ("reply", "评论"),
-            ("favorite", "收藏"), ("coin", "投币"), ("share", "转发"),
+            ("view", "阅读"),
+            ("like", "点赞"),
+            ("reply", "评论"),
+            ("favorite", "收藏"),
+            ("coin", "投币"),
+            ("share", "转发"),
         ]:
             lines.append(f"| {label} | {_fmt_num(stats.get(k, 0))} |")
         lines.append("")
@@ -462,6 +479,7 @@ class MdCard:
     r"""
     Markdown 导出卡片数据模型
     """
+
     id: str = field(default_factory=_uid)
     input_text: str = ""
     item_type: str = "unknown"
@@ -481,10 +499,16 @@ class MdCard:
         :return: dict: 卡片字典
         """
         return {
-            "id": self.id, "input_text": self.input_text, "item_type": self.item_type,
-            "id_value": self.id_value, "title": self.title, "subtitle": self.subtitle,
-            "has_markdown": bool(self.markdown), "status": self.status,
-            "error": self.error, "filename": self.filename,
+            "id": self.id,
+            "input_text": self.input_text,
+            "item_type": self.item_type,
+            "id_value": self.id_value,
+            "title": self.title,
+            "subtitle": self.subtitle,
+            "has_markdown": bool(self.markdown),
+            "status": self.status,
+            "error": self.error,
+            "filename": self.filename,
             "output_path": self.output_path,
         }
 
@@ -704,10 +728,13 @@ def add_and_fetch(input_text: str) -> dict:
     if parsed["type"] == "unknown":
         return {"ok": False, "error": f"无法识别: {input_text}"}
     card: MdCard = MdCard(
-        input_text=input_text, item_type=parsed["type"],
-        id_type=parsed["id_type"], id_value=parsed["id_value"],
+        input_text=input_text,
+        item_type=parsed["type"],
+        id_type=parsed["id_type"],
+        id_value=parsed["id_value"],
         title=f"[{_TYPE_LABELS.get(parsed['type'], '?')}] {parsed['id_value']}",
-        subtitle="等待获取...", status="pending",
+        subtitle="等待获取...",
+        status="pending",
     )
     with S.lock:
         S.cards.append(card)
@@ -808,6 +835,7 @@ def clear_completed() -> None:
     with S.lock:
         S.completed.clear()
     S.log("info", "已清空完成列表")
+
 
 def get_export_folder_path() -> str:
     r"""

@@ -678,6 +678,7 @@ async def man_chat(request: Request) -> dict[str, Any]:
 
     return chat(prompt, force_bs=force_bs)
 
+
 @app.post("/api/open-explorer")
 async def api_open_explorer(request: Request) -> dict[str, bool | str]:
     r"""
@@ -687,6 +688,7 @@ async def api_open_explorer(request: Request) -> dict[str, bool | str]:
     path: str = _as_str(body.get("path", ""))
 
     from mybiout.pages.bbdown.bbdown import open_in_explorer
+
     return open_in_explorer(path)
 
 
@@ -736,6 +738,7 @@ async def api_reset_all_settings() -> dict[str, bool]:
     恢复全部默认设置
     """
     from mybiout.pages.ohmyconfig.ohmyconfig import reset_all
+
     return reset_all()
 
 
@@ -746,6 +749,7 @@ async def mdout_open_folder() -> dict[str, bool | str]:
     """
     from mybiout.pages.bbdown.bbdown import open_in_explorer
     from mybiout.pages.mdout.mdout import get_export_folder_path
+
     return open_in_explorer(get_export_folder_path())
 
 
@@ -766,4 +770,3 @@ async def man_chat_stream(request: Request):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-

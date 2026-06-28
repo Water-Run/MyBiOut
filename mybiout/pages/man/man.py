@@ -109,8 +109,12 @@ def _get_project_context() -> str:
     try:
         result: subprocess.CompletedProcess = subprocess.run(
             ["pmc", str(_PROJECT_ROOT)],
-            capture_output=True, text=True, timeout=60,
-            encoding="utf-8", errors="replace", **_POPEN_EXTRA,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            encoding="utf-8",
+            errors="replace",
+            **_POPEN_EXTRA,
         )
         if result.returncode == 0 and result.stdout.strip():
             ctx: str = result.stdout.strip()
@@ -140,14 +144,14 @@ def _build_messages(prompt: str, context: str) -> list[dict[str, str]]:
     system_content: str = (
         "你是 MyBiOut! 项目的 AI 助手, 拥有 Mamba Mentality 的灵魂。"
         "你的说话风格像一位传奇老大哥——必须大量、放纵地使用以下语气词和梗:\n"
-        "- \"孩子们\"(称呼提问者), \"Man!\"(感叹词, 高频使用)\n"
-        "- \"牢大\"(自称或表示厉害/靠谱)\n"
-        "- \"What can I say\"(开场白)\n"
-        "- \"Mamba Out\"(结束语)\n"
-        "- \"凌晨四点\"(比喻努力/深入研究)\n"
-        "- \"曼巴精神\"(表示不服输/死磕到底)\n"
-        "- \"What can I say\"(表示教导)\n"
-        "- \"肘击\"(表示突破困难)\n"
+        '- "孩子们"(称呼提问者), "Man!"(感叹词, 高频使用)\n'
+        '- "牢大"(自称或表示厉害/靠谱)\n'
+        '- "What can I say"(开场白)\n'
+        '- "Mamba Out"(结束语)\n'
+        '- "凌晨四点"(比喻努力/深入研究)\n'
+        '- "曼巴精神"(表示不服输/死磕到底)\n'
+        '- "What can I say"(表示教导)\n'
+        '- "肘击"(表示突破困难)\n'
         "每段回答都要自然融入这些梗, 越多越好, 语气要放纵、霸气、充满导师感。"
         "绝对不要提及任何真实人名。"
         "你的核心身份仍然是 MyBiOut! 技术助手, 技术内容必须准确。\n\n"
@@ -223,11 +227,15 @@ def _stream_llm(prompt: str, context: str) -> Generator[str]:
     chat_url: str = _build_chat_url(base_url)
     timeout_seconds: float | None = utils.get_api_timeout_seconds()
 
-    with httpx.Client(timeout=timeout_seconds) as client, client.stream(
-        "POST", chat_url,
-        headers=headers,
-        json={"model": model, "messages": messages, "stream": True},
-    ) as response:
+    with (
+        httpx.Client(timeout=timeout_seconds) as client,
+        client.stream(
+            "POST",
+            chat_url,
+            headers=headers,
+            json={"model": model, "messages": messages, "stream": True},
+        ) as response,
+    ):
         response.raise_for_status()
         for line in response.iter_lines():
             if not line or not line.startswith("data: "):
@@ -241,7 +249,7 @@ def _stream_llm(prompt: str, context: str) -> Generator[str]:
                 content: str = delta.get("content", "")
                 if content:
                     yield content
-            except (json.JSONDecodeError, IndexError, KeyError):
+            except json.JSONDecodeError, IndexError, KeyError:
                 continue
 
 
@@ -298,7 +306,12 @@ def chat(prompt: str, force_bs: bool = False) -> dict:
     if not api_key:
         _log("warn", "未配置 API Key, 降级为狗屁不通文章生成器")
         reply = bullshit_generate(prompt)
-        return {"ok": True, "reply": reply, "source": "bullshit", "note": "未配置 API Key, 已使用狗屁不通文章生成器代替"}
+        return {
+            "ok": True,
+            "reply": reply,
+            "source": "bullshit",
+            "note": "未配置 API Key, 已使用狗屁不通文章生成器代替",
+        }
 
     try:
         _log("info", "正在获取项目代码上下文...")
@@ -310,7 +323,12 @@ def chat(prompt: str, force_bs: bool = False) -> dict:
     except Exception as e:
         _log("error", f"大模型调用失败: {e}, 降级为狗屁不通文章生成器")
         reply = bullshit_generate(prompt)
-        return {"ok": True, "reply": reply, "source": "bullshit", "note": f"API 调用失败 ({e}), 已使用狗屁不通文章生成器代替"}
+        return {
+            "ok": True,
+            "reply": reply,
+            "source": "bullshit",
+            "note": f"API 调用失败 ({e}), 已使用狗屁不通文章生成器代替",
+        }
 
 
 def get_logs() -> list[dict[str, str]]:

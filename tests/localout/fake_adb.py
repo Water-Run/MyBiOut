@@ -25,8 +25,7 @@ SERIAL: str = "emulator-5554"
 MODEL: str = "MockPixel"
 
 DEVICES_OUTPUT: str = (
-    "List of devices attached\n"
-    f"{SERIAL}\tdevice product:mock_model model:{MODEL} device:mock_device\n"
+    f"List of devices attached\n{SERIAL}\tdevice product:mock_model model:{MODEL} device:mock_device\n"
 )
 
 
@@ -36,7 +35,7 @@ def _resolve_remote(remote: str, root: Path) -> Path:
     """
     rel: str = remote
     if rel.startswith("/sdcard/"):
-        rel = rel[len("/sdcard/"):]
+        rel = rel[len("/sdcard/") :]
     elif rel.startswith("/"):
         rel = rel[1:]
     return root / rel
@@ -128,7 +127,7 @@ def run(args: list[str], root: Path) -> subprocess.CompletedProcess:
     if "devices" in filtered:
         return subprocess.CompletedProcess(args, 0, DEVICES_OUTPUT, "")
     if "shell" in filtered:
-        shell_args: list[str] = list(filtered[filtered.index("shell") + 1:])
+        shell_args: list[str] = list(filtered[filtered.index("shell") + 1 :])
         expanded: list[str] = _split_shell_args(shell_args)
         joined: str = " ".join(expanded)
         if "ls" in expanded or "ls" in joined:
@@ -139,7 +138,7 @@ def run(args: list[str], root: Path) -> subprocess.CompletedProcess:
             return subprocess.CompletedProcess(args, rc, out, err)
         return subprocess.CompletedProcess(args, 1, "", f"unsupported shell cmd: {shell_args}")
     if "pull" in filtered:
-        rc, out, err = _cmd_pull(list(filtered[filtered.index("pull") + 1:]), root)
+        rc, out, err = _cmd_pull(list(filtered[filtered.index("pull") + 1 :]), root)
         return subprocess.CompletedProcess(args, rc, out, err)
     return subprocess.CompletedProcess(args, 1, "", f"unsupported cmd: {args}")
 

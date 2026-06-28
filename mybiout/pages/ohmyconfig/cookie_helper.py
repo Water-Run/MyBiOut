@@ -56,5 +56,6 @@ def main() -> None:
         except OSError:
             pass
 
+
 if __name__ == "__main__":
     main()

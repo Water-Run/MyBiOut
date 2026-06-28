@@ -27,6 +27,6 @@ class PlatformCheckHook(BuildHookInterface):
             )
 
         # 强制将 Wheel 标记为平台特定（非 pure python），并指定为 Windows 64位平台标签（win_amd64）
-        if self.target_name == 'wheel':
-            build_data['pure_python'] = False
-            build_data['tag'] = 'py3-none-win_amd64'
+        if self.target_name == "wheel":
+            build_data["pure_python"] = False
+            build_data["tag"] = "py3-none-win_amd64"

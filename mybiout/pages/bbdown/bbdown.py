@@ -83,6 +83,7 @@ class BBDownTask:
     r"""
     BBDown 下载任务数据模型
     """
+
     id: str = field(default_factory=_uid)
     url: str = ""
     title: str = ""
@@ -189,7 +190,9 @@ def _build_command(task: BBDownTask) -> list[str]:
         case "cover_only":
             cmd.append("--cover-only")
 
-    want_danmaku: bool = opts.get("download_danmaku", False) or utils.get_setting("bbdown", "download_danmaku") == "true"
+    want_danmaku: bool = (
+        opts.get("download_danmaku", False) or utils.get_setting("bbdown", "download_danmaku") == "true"
+    )
     if want_danmaku and content == "default":
         cmd.append("-dd")
 

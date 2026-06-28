@@ -30,12 +30,14 @@ def test_fast_copy_file_basic():
         if dst_path.exists():
             dst_path.unlink()
 
+
 def test_fast_copy_file_non_existent():
     # Test copying a non-existent file
     src_path = Path("this_file_does_not_exist.txt")
     dst_path = Path("destination.txt")
     success = _fast_copy_file(src_path, dst_path)
     assert success is False
+
 
 @patch("mybiout.pages.ohmyconfig.ohmyconfig._fast_copy_file")
 def test_auto_get_sessdata_from_browsers_fallback_or_empty(mock_copy):
