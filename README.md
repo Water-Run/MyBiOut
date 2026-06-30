@@ -2,7 +2,7 @@
 
 `MyBiOut`, 即`My-Bilibili-Output`, "导出我的哔哩哔哩", 一个综合性的, 一站式开箱即用哔哩哔哩导出工具集.  
 
-![Logo](./mybiout/assets/logo-fullres.png)
+![Logo](./mybiout/assets/logo.png)
 
 支持的功能包括:  
 

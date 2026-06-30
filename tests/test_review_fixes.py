@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import threading
 import time
 from pathlib import Path
@@ -10,7 +9,7 @@ from fastapi.testclient import TestClient
 from mybiout import main as app_main
 from mybiout.pages import utils
 from mybiout.pages.apis import app
-from mybiout.pages.ohmyconfig import cookie_helper, ohmyconfig
+from mybiout.pages.ohmyconfig import ohmyconfig
 
 
 def test_invalid_json_body_returns_400() -> None:
@@ -55,33 +54,26 @@ def test_concurrent_setting_writes_preserve_both_changes(tmp_path: Path, monkeyp
     assert settings["api"]["model"] == "m1"
 
 
-def test_cookie_helper_writes_output_without_machine_specific_debug_path(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    out = tmp_path / "sessdata.txt"
-    monkeypatch.setattr(sys, "argv", ["cookie_helper.py", "--out", str(out)])
-    monkeypatch.setattr(cookie_helper, "_auto_get_sessdata_from_browsers", lambda _ua: "SESS=ok")
+def test_auto_sessdata_launch_login_uses_qr_login(monkeypatch) -> None:
+    client = TestClient(app, raise_server_exceptions=False)
+    monkeypatch.setattr(ohmyconfig, "_auto_get_sessdata_via_login", lambda _ua, timeout_sec=180: "SESS=qr")
 
-    cookie_helper.main()
+    response = client.post("/api/auto-sessdata", json={"action": "launch_login"})
 
-    assert out.read_text(encoding="utf-8") == "SESS=ok"
+    assert response.status_code == 200
+    assert response.json() == {"status": "success", "sessdata": "SESS=qr"}
 
 
-def test_cookie_helper_has_no_machine_specific_debug_path() -> None:
-    source = Path(cookie_helper.__file__).read_text(encoding="utf-8")
+def test_auto_sessdata_rejects_legacy_browser_extraction_actions() -> None:
+    client = TestClient(app, raise_server_exceptions=False)
 
-    assert "C:/Users/linzh" not in source
-    assert "antigravity-cli" not in source
+    for action in ("check_direct", "check_elevated"):
+        response = client.post("/api/auto-sessdata", json={"action": action})
 
-
-def test_elevation_flow_does_not_silently_restart_browsers(monkeypatch) -> None:
-    monkeypatch.setattr(ohmyconfig, "_auto_get_sessdata_from_browsers", lambda _ua: "SESS=ok")
-
-    assert ohmyconfig._auto_get_sessdata_via_elevation("UA") == ("SESS=ok", None)
-
-    source = Path(ohmyconfig.__file__).read_text(encoding="utf-8")
-    assert "taskkill /F /IM" not in source
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "failed"
+        assert "sessdata" not in payload
 
 
 def test_gitignore_excludes_tmp_edit_files() -> None:

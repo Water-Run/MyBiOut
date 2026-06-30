@@ -695,41 +695,22 @@ async def api_open_explorer(request: Request) -> dict[str, bool | str]:
 @app.post("/api/auto-sessdata")
 async def api_auto_sessdata(request: Request) -> dict[str, Any]:
     r"""
-    分步尝试自动获取 SESSDATA:
-    action: "check_direct" | "check_elevated" | "launch_login"
+    通过扫码登录获取 SESSDATA:
+    action: "launch_login"
     """
     body: dict[str, Any] = await _read_json_dict(request)
-    action: str = _as_str(body.get("action", "check_direct"))
+    action: str = _as_str(body.get("action", "launch_login"))
     user_agent = request.headers.get("user-agent", "")
 
-    from mybiout.pages.ohmyconfig.ohmyconfig import (
-        _auto_get_sessdata_from_browsers,
-        _auto_get_sessdata_via_elevation,
-        _auto_get_sessdata_via_login,
-    )
+    from mybiout.pages.ohmyconfig.ohmyconfig import _auto_get_sessdata_via_login
 
-    if action == "check_direct":
-        result = _auto_get_sessdata_from_browsers(user_agent)
-        if result:
-            return {"status": "success", "sessdata": result}
-        return {"status": "need_elevation_or_login"}
-
-    elif action == "check_elevated":
-        result, error_code = _auto_get_sessdata_via_elevation(user_agent)
-        if result:
-            return {"status": "success", "sessdata": result}
-        elif error_code == "denied":
-            return {"status": "denied", "error": "管理员提权申请被拒绝"}
-        else:
-            return {"status": "failed", "error": "提取失败（可能由于浏览器最新的 v20 应用绑定加密限制）"}
-
-    elif action == "launch_login":
+    if action == "launch_login":
         result = _auto_get_sessdata_via_login(user_agent, timeout_sec=180)
         if result:
             return {"status": "success", "sessdata": result}
         return {"status": "failed", "error": "扫码登录超时或窗口被关闭"}
 
-    return {"status": "failed", "error": f"未知操作: {action}"}
+    return {"status": "failed", "error": "已移除浏览器 Cookie 自动提取能力，请使用扫码登录"}
 
 
 @app.post("/api/reset-all-settings")
