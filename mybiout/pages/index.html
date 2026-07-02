@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=1200">
     <title>MyBiOut!</title>
     <link rel="icon" href="./assets/logo.png" type="image/png">
+    <link rel="stylesheet" href="/assets/entry.css">
     <style>
         /* ========== RESET ========== */
         * {
@@ -85,18 +86,27 @@
         /* ========== SETTINGS LINK ========== */
         .settings-link {
             position: absolute;
-            top: 202px;
-            left: 32px;
-            font-size: 14px;
-            color: #E85B8A;
-            border-bottom: 2px dashed #E85B8A;
-            padding-bottom: 1px;
-            transition: color .2s, border-color .2s;
+            top: 196px;
+            left: 28px;
+            font-size: 16px;
+            font-weight: 900;
+            color: #7A1438;
+            background: #fff;
+            border: 3px solid #E85B8A;
+            border-radius: 6px;
+            padding: 9px 15px 8px;
+            box-shadow: 5px 5px 0 #F5A623, 0 0 0 2px rgba(122, 20, 56, .16);
+            text-shadow: 0 1px 0 rgba(255, 255, 255, .8);
+            transition: color .2s, border-color .2s, background .2s, transform .12s, box-shadow .12s;
+            z-index: 4;
         }
 
         .settings-link:hover {
-            color: #F5A623;
-            border-color: #F5A623;
+            color: #fff;
+            background: #E85B8A;
+            border-color: #7A1438;
+            box-shadow: 3px 3px 0 #7A1438, 0 0 20px rgba(232, 91, 138, .36);
+            transform: translate(2px, 2px) rotate(-1deg);
         }
 
         /* ========== GITHUB (右上) ========== */
@@ -362,267 +372,16 @@
             animation: glow-pulse-orange .9s ease-in-out infinite;
         }
 
-        /* ===== MyBiOut entrance animation ===== */
-        .mybiout-entry-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 12000;
-            display: grid;
-            place-items: center;
-            overflow: hidden;
-            background:
-                radial-gradient(circle at 50% 48%, rgba(255,255,255,.98) 0 18%, rgba(255,255,255,.93) 31%, rgba(245,166,35,.36) 48%, rgba(232,91,138,.42) 68%, rgba(255,255,255,.96) 100%);
-            pointer-events: none;
-            animation: mybiout-entry-vanish .55s ease-in 1.72s forwards;
-        }
-
-        .mybiout-entry-overlay::before,
-        .mybiout-entry-overlay::after {
-            content: "";
-            position: absolute;
-            inset: -18vmax;
-            background: conic-gradient(from 0deg, transparent 0 7deg, rgba(232,91,138,.9) 8deg 11deg, transparent 12deg 25deg, rgba(245,166,35,.92) 26deg 30deg, transparent 31deg 44deg);
-            opacity: .88;
-            animation: mybiout-entry-spin 1.35s cubic-bezier(.2,.75,.1,1) forwards;
-        }
-
-        .mybiout-entry-overlay::after {
-            filter: blur(9px);
-            opacity: .45;
-            animation-duration: 1.65s;
-            animation-direction: reverse;
-        }
-
-        .mybiout-entry-core {
-            position: relative;
-            z-index: 2;
-            width: 220px;
-            height: 220px;
-            display: grid;
-            place-items: center;
-            background: #fff;
-            border: 5px solid #F5A623;
-            box-shadow: 12px 12px 0 #E85B8A, 0 0 0 999px rgba(255,255,255,.02);
-            animation: mybiout-core-slam 1.24s cubic-bezier(.2,1.45,.25,1) forwards;
-        }
-
-        .mybiout-entry-core img {
-            width: 166px;
-            height: 166px;
-            object-fit: contain;
-            animation: mybiout-logo-pulse 1.18s cubic-bezier(.2,1.2,.2,1) forwards;
-        }
-
-        .mybiout-entry-title {
-            position: absolute;
-            z-index: 3;
-            left: 50%;
-            top: calc(50% + 150px);
-            transform: translateX(-50%);
-            color: #F5A623;
-            font-size: 32px;
-            font-weight: 900;
-            letter-spacing: 8px;
-            white-space: nowrap;
-            text-shadow: 4px 4px 0 #E85B8A;
-            animation: mybiout-title-pop 1.22s cubic-bezier(.22,1.35,.18,1) forwards;
-        }
-
-        .mybiout-entry-ring {
-            position: absolute;
-            z-index: 1;
-            width: 96px;
-            height: 96px;
-            border: 5px solid #E85B8A;
-            box-shadow: 0 0 0 3px #F5A623 inset;
-            opacity: 0;
-            animation: mybiout-ring-blast 1.45s ease-out forwards;
-        }
-
-        .mybiout-entry-ring.r2 {
-            border-color: #F5A623;
-            box-shadow: 0 0 0 3px #E85B8A inset;
-            animation-delay: .12s;
-        }
-
-        .mybiout-entry-chip {
-            position: absolute;
-            z-index: 2;
-            left: 50%;
-            top: 50%;
-            width: 13px;
-            height: 13px;
-            background: var(--chip-color, #E85B8A);
-            border: 2px solid #fff;
-            box-shadow: 2px 2px 0 rgba(0,0,0,.08);
-            opacity: 0;
-            transform: translate(-50%, -50%) rotate(var(--chip-rot, 0deg));
-            animation: mybiout-chip-burst 1.42s cubic-bezier(.2,.9,.2,1) forwards;
-        }
-
-        body:not(.mybiout-entry-ready) .page {
-            opacity: 0;
-            transform: translateY(28px) scale(.965);
-            filter: saturate(.75) blur(6px);
-        }
-
-        body.mybiout-entry-ready .page {
-            animation: mybiout-page-arrive .68s cubic-bezier(.18,1.15,.22,1) backwards;
-        }
-
-        body.mybiout-entry-ready .logo,
-        body.mybiout-entry-ready .header,
-        body.mybiout-entry-ready .hdr {
-            animation: mybiout-drop-in .72s cubic-bezier(.18,1.3,.22,1) backwards;
-        }
-
-        body.mybiout-entry-ready .github-link,
-        body.mybiout-entry-ready .settings-link,
-        body.mybiout-entry-ready .hdr-right,
-        body.mybiout-entry-ready .hdr-stats,
-        body.mybiout-entry-ready .hdr-sub {
-            animation: mybiout-swipe-in .72s cubic-bezier(.18,1.2,.22,1) .08s backwards;
-        }
-
-        body.mybiout-entry-ready .card,
-        body.mybiout-entry-ready .col,
-        body.mybiout-entry-ready .section,
-        body.mybiout-entry-ready .func-card,
-        body.mybiout-entry-ready .manual-panel,
-        body.mybiout-entry-ready .chat-panel,
-        body.mybiout-entry-ready .input-bar,
-        body.mybiout-entry-ready .panel-top,
-        body.mybiout-entry-ready .panel-input,
-        body.mybiout-entry-ready .panel-col,
-        body.mybiout-entry-ready .logbar {
-            animation: mybiout-tile-arrive .78s cubic-bezier(.18,1.28,.22,1) backwards;
-            animation-delay: var(--entry-delay, .16s);
-        }
-
-        body.mybiout-entry-ready .card:nth-child(2),
-        body.mybiout-entry-ready .col:nth-child(2),
-        body.mybiout-entry-ready .section:nth-of-type(2),
-        body.mybiout-entry-ready .func-card:nth-child(2),
-        body.mybiout-entry-ready .chat-panel {
-            --entry-delay: .24s;
-        }
-
-        body.mybiout-entry-ready .card:nth-child(3),
-        body.mybiout-entry-ready .col:nth-child(3),
-        body.mybiout-entry-ready .section:nth-of-type(3),
-        body.mybiout-entry-ready .func-card:nth-child(3),
-        body.mybiout-entry-ready .logbar {
-            --entry-delay: .32s;
-        }
-
-        @keyframes mybiout-entry-spin {
-            0% { transform: rotate(0deg) scale(.35); opacity: 0; }
-            18% { opacity: .95; }
-            100% { transform: rotate(430deg) scale(1.18); opacity: 0; }
-        }
-
-        @keyframes mybiout-core-slam {
-            0% { transform: translateY(-42vh) rotate(-18deg) scale(.25); opacity: 0; }
-            44% { transform: translateY(0) rotate(5deg) scale(1.16); opacity: 1; }
-            64% { transform: translateY(-12px) rotate(-3deg) scale(.96); }
-            84% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
-            100% { transform: translateY(38px) rotate(0deg) scale(.88); opacity: 0; }
-        }
-
-        @keyframes mybiout-logo-pulse {
-            0% { transform: scale(.3) rotate(-24deg); filter: blur(5px); }
-            45% { transform: scale(1.18) rotate(5deg); filter: blur(0); }
-            70% { transform: scale(.94) rotate(-2deg); }
-            100% { transform: scale(1.06) rotate(0); }
-        }
-
-        @keyframes mybiout-title-pop {
-            0%, 28% { opacity: 0; transform: translate(-50%, 38px) scale(.45); }
-            54% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
-            80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-            100% { opacity: 0; transform: translate(-50%, 22px) scale(.92); }
-        }
-
-        @keyframes mybiout-ring-blast {
-            0%, 18% { opacity: 0; transform: scale(.25) rotate(0deg); }
-            32% { opacity: .9; }
-            100% { opacity: 0; transform: scale(8.6) rotate(70deg); }
-        }
-
-        @keyframes mybiout-chip-burst {
-            0%, 18% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--chip-rot, 0deg)) scale(.5); }
-            32% { opacity: 1; }
-            100% { opacity: 0; transform: translate(calc(-50% + var(--chip-x)), calc(-50% + var(--chip-y))) rotate(calc(var(--chip-rot, 0deg) + 220deg)) scale(1.2); }
-        }
-
-        @keyframes mybiout-entry-vanish {
-            0% { opacity: 1; transform: scale(1); }
-            100% { opacity: 0; transform: scale(1.08); visibility: hidden; }
-        }
-
-        @keyframes mybiout-page-arrive {
-            0% { opacity: 0; transform: translateY(34px) scale(.965); filter: saturate(.75) blur(6px); }
-            62% { opacity: 1; transform: translateY(-5px) scale(1.01); filter: saturate(1.2) blur(0); }
-            100% { opacity: 1; transform: translateY(0) scale(1); filter: none; }
-        }
-
-        @keyframes mybiout-drop-in {
-            0% { opacity: 0; transform: translateY(-34px) rotate(-2deg) scale(.9); }
-            70% { opacity: 1; transform: translateY(5px) rotate(1deg) scale(1.03); }
-            100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
-        }
-
-        @keyframes mybiout-swipe-in {
-            0% { opacity: 0; transform: translateX(36px) skewX(-8deg); }
-            70% { opacity: 1; transform: translateX(-4px) skewX(2deg); }
-            100% { opacity: 1; transform: translateX(0) skewX(0); }
-        }
-
-        @keyframes mybiout-tile-arrive {
-            0% { opacity: 0; transform: translateY(48px) rotate(-2deg) scale(.9); filter: blur(5px); }
-            68% { opacity: 1; transform: translateY(-7px) rotate(1deg) scale(1.025); filter: blur(0); }
-            100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); filter: none; }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            .mybiout-entry-overlay { display: none; }
-            body:not(.mybiout-entry-ready) .page,
-            body.mybiout-entry-ready .page,
-            body.mybiout-entry-ready .logo,
-            body.mybiout-entry-ready .header,
-            body.mybiout-entry-ready .hdr,
-            body.mybiout-entry-ready .github-link,
-            body.mybiout-entry-ready .settings-link,
-            body.mybiout-entry-ready .hdr-right,
-            body.mybiout-entry-ready .hdr-stats,
-            body.mybiout-entry-ready .hdr-sub,
-            body.mybiout-entry-ready .card,
-            body.mybiout-entry-ready .col,
-            body.mybiout-entry-ready .section,
-            body.mybiout-entry-ready .func-card,
-            body.mybiout-entry-ready .manual-panel,
-            body.mybiout-entry-ready .chat-panel,
-            body.mybiout-entry-ready .input-bar,
-            body.mybiout-entry-ready .panel-top,
-            body.mybiout-entry-ready .panel-input,
-            body.mybiout-entry-ready .panel-col,
-            body.mybiout-entry-ready .logbar {
-                animation: none !important;
-                opacity: 1 !important;
-                filter: none !important;
-            }
-        }
-
     </style>
 </head>
 
 <body>
 
     <div class="mybiout-entry-overlay" aria-hidden="true">
-        <div class="mybiout-entry-ring r1"></div>
-        <div class="mybiout-entry-ring r2"></div>
-        <div class="mybiout-entry-core"><img src="/assets/logo.png" alt=""></div>
-        <div class="mybiout-entry-title">MyBiOut!</div>
+        <canvas class="mybiout-entry-canvas"></canvas>
+        <div class="mybiout-entry-stage">
+            <div class="mybiout-entry-core"></div>
+        </div>
     </div>
     <div class="page">
         <div class="logo">
@@ -1202,40 +961,7 @@
 
         })();
     </script>
-
-    <script>
-        (function () {
-            const overlay = document.querySelector('.mybiout-entry-overlay');
-            if (!overlay) {
-                document.body.classList.add('mybiout-entry-ready');
-                return;
-            }
-            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                overlay.remove();
-                document.body.classList.add('mybiout-entry-ready');
-                return;
-            }
-            for (let i = 0; i < 34; i++) {
-                const chip = document.createElement('i');
-                chip.className = 'mybiout-entry-chip';
-                const angle = (i / 34) * Math.PI * 2;
-                const distance = 180 + (i % 7) * 34;
-                chip.style.setProperty('--chip-x', Math.cos(angle) * distance + 'px');
-                chip.style.setProperty('--chip-y', Math.sin(angle) * distance + 'px');
-                chip.style.setProperty('--chip-rot', (angle * 180 / Math.PI) + 'deg');
-                chip.style.setProperty('--chip-color', i % 2 ? '#F5A623' : '#E85B8A');
-                chip.style.animationDelay = (0.08 + (i % 9) * 0.035) + 's';
-                overlay.appendChild(chip);
-            }
-            window.addEventListener('load', function () {
-                document.body.classList.add('mybiout-entry-ready');
-                window.setTimeout(function () { overlay.remove(); }, 2300);
-            });
-            window.setTimeout(function () {
-                document.body.classList.add('mybiout-entry-ready');
-            }, 800);
-        })();
-    </script>
+    <script src="/assets/entry.js"></script>
 </body>
 
 </html>

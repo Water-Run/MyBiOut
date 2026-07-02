@@ -90,3 +90,13 @@ def test_startup_does_not_block_when_feature_tools_are_missing() -> None:
     ]
 
     assert app_main._get_startup_blockers(checks) == []
+
+
+def test_terminal_helicopter_ascii_has_clear_airframe_parts() -> None:
+    rotor_art = "\n".join(app_main._ROTORS)
+    body_art = "\n".join(app_main._BODY)
+
+    assert "════╦════" in rotor_art
+    assert "╭" in body_art and "╯" in body_art
+    assert "═══>" in body_art
+    assert "╰─╯" in body_art

@@ -1,0 +1,285 @@
+.mybiout-entry-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 18% 16%, rgba(0, 174, 236, .2), transparent 28%),
+        radial-gradient(circle at 82% 76%, rgba(232, 91, 138, .22), transparent 30%),
+        linear-gradient(135deg, #fff 0%, #fff7fb 48%, #f5fbff 100%);
+    --entry-overlay-duration: .4s;
+    --entry-overlay-delay: 1.37s;
+    --entry-core-duration: .96s;
+    animation: entryOverlayLeave var(--entry-overlay-duration) cubic-bezier(.72, 0, .3, 1) var(--entry-overlay-delay) forwards;
+}
+
+.mybiout-entry-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: .22;
+    background-image:
+        radial-gradient(circle, rgba(232, 91, 138, .7) 0 2px, transparent 2.5px),
+        radial-gradient(circle, rgba(245, 166, 35, .65) 0 1.5px, transparent 2px);
+    background-size: 28px 28px, 36px 36px;
+    background-position: 0 0, 14px 18px;
+    transform: rotate(-1.5deg) scale(1.04);
+}
+
+.mybiout-entry-overlay::after {
+    content: "";
+    position: absolute;
+    inset: -18%;
+    opacity: .12;
+    background:
+        repeating-linear-gradient(135deg, #E85B8A 0 9px, transparent 9px 22px),
+        repeating-linear-gradient(45deg, #F5A623 0 8px, transparent 8px 24px);
+    mix-blend-mode: multiply;
+    animation: entryPaperDrift 1.7s cubic-bezier(.18, .8, .2, 1) forwards;
+}
+
+.mybiout-entry-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.mybiout-entry-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+}
+
+.mybiout-entry-core {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: clamp(88px, 18vmin, 176px);
+    height: clamp(88px, 18vmin, 176px);
+    border: 5px solid var(--entry-ink, #2B1822);
+    border-radius: var(--entry-radius, 8px);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, .86), rgba(255, 255, 255, .28)),
+        var(--entry-core-bg, #F5A623);
+    box-shadow:
+        10px 10px 0 var(--entry-shadow, #E85B8A),
+        0 0 0 5px rgba(255, 255, 255, .78) inset;
+    transform: translate(-50%, -50%) rotate(var(--entry-tilt, -4deg)) scale(.2);
+    animation: entryCoreStamp var(--entry-core-duration) cubic-bezier(.18, 1.25, .22, 1) forwards;
+}
+
+.mybiout-entry-core::before,
+.mybiout-entry-core::after {
+    content: "";
+    position: absolute;
+    inset: 18%;
+    border: 4px solid rgba(255, 255, 255, .78);
+    border-radius: inherit;
+    transform: rotate(12deg);
+}
+
+.mybiout-entry-core::after {
+    inset: 34%;
+    border-color: rgba(43, 24, 34, .45);
+    transform: rotate(-18deg);
+}
+
+.mybiout-entry-piece {
+    position: absolute;
+    z-index: 1;
+    display: block;
+    pointer-events: none;
+    border: 3px solid var(--piece-ink, #2B1822);
+    background: var(--piece-fill, #fff);
+    box-shadow: 5px 5px 0 var(--piece-shadow, rgba(43, 24, 34, .18));
+    transform-origin: center;
+}
+
+.mybiout-entry-piece.dot {
+    border-radius: 50%;
+}
+
+.mybiout-entry-piece.line {
+    height: 7px;
+    border-radius: 0;
+}
+
+.mybiout-entry-piece.card {
+    border-radius: 8px;
+}
+
+.mybiout-entry-piece.triangle {
+    border: 0;
+    box-shadow: none;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.mybiout-entry-piece.slice {
+    border-radius: 0;
+    clip-path: polygon(8% 0, 100% 12%, 86% 100%, 0 82%);
+}
+
+.entry-sticker-pop .mybiout-entry-core { --entry-core-bg: #fff; --entry-shadow: #F5A623; }
+.entry-card-slam .mybiout-entry-core { --entry-core-bg: #00AEEC; --entry-shadow: #E85B8A; --entry-radius: 0; }
+.entry-manga-burst .mybiout-entry-core { --entry-core-bg: #F5A623; --entry-shadow: #00AEEC; }
+.entry-confetti-cannon .mybiout-entry-core { --entry-core-bg: #E85B8A; --entry-shadow: #F5A623; }
+.entry-wave-ribbons .mybiout-entry-core { --entry-core-bg: #00AEEC; --entry-shadow: #F5A623; --entry-radius: 999px; }
+.entry-checker-wipe .mybiout-entry-core { --entry-core-bg: #fff; --entry-shadow: #00AEEC; --entry-radius: 0; }
+.entry-shutter-cards .mybiout-entry-core { --entry-core-bg: #F5A623; --entry-shadow: #2B1822; --entry-radius: 4px; }
+.entry-stamp-ripple .mybiout-entry-core { --entry-core-bg: #fff; --entry-shadow: #E85B8A; --entry-radius: 999px; }
+.entry-paper-fold .mybiout-entry-core { --entry-core-bg: #f5fbff; --entry-shadow: #F5A623; --entry-radius: 0; }
+.entry-scan-bars .mybiout-entry-core { --entry-core-bg: #fff7fb; --entry-shadow: #00AEEC; }
+.entry-dot-matrix .mybiout-entry-core { --entry-core-bg: #E85B8A; --entry-shadow: #00AEEC; --entry-radius: 999px; }
+.entry-carousel-slices .mybiout-entry-core { --entry-core-bg: #00AEEC; --entry-shadow: #F5A623; --entry-radius: 0; }
+.entry-ribbon-weave .mybiout-entry-core { --entry-core-bg: #F5A623; --entry-shadow: #E85B8A; --entry-radius: 999px; }
+.entry-flash-cards .mybiout-entry-core { --entry-core-bg: #fff; --entry-shadow: #2B1822; --entry-radius: 0; }
+.entry-bubble-splash .mybiout-entry-core { --entry-core-bg: #fff; --entry-shadow: #00AEEC; --entry-radius: 999px; }
+
+.mybiout-entry-overlay[data-entry-family="manga"] .mybiout-entry-core {
+    animation-name: entryCorePunch;
+}
+
+.mybiout-entry-overlay[data-entry-family="wipe"] .mybiout-entry-core {
+    animation-name: entryCoreSkid;
+}
+
+body:not(.mybiout-entry-ready) .page {
+    opacity: 0;
+    transform: translateY(28px) rotate(-.4deg) scale(.965);
+    filter: saturate(.82) blur(5px);
+}
+
+body.mybiout-entry-ready .page {
+    animation: entryPageArrive .68s cubic-bezier(.18, 1.15, .22, 1) backwards;
+}
+
+body.mybiout-entry-ready .logo,
+body.mybiout-entry-ready .header,
+body.mybiout-entry-ready .hdr {
+    animation: entryDropIn .72s cubic-bezier(.18, 1.3, .22, 1) backwards;
+}
+
+body.mybiout-entry-ready .github-link,
+body.mybiout-entry-ready .settings-link,
+body.mybiout-entry-ready .hdr-right,
+body.mybiout-entry-ready .hdr-stats,
+body.mybiout-entry-ready .hdr-sub {
+    animation: entrySwipeIn .72s cubic-bezier(.18, 1.2, .22, 1) .08s backwards;
+}
+
+body.mybiout-entry-ready .card,
+body.mybiout-entry-ready .col,
+body.mybiout-entry-ready .section,
+body.mybiout-entry-ready .func-card,
+body.mybiout-entry-ready .manual-panel,
+body.mybiout-entry-ready .chat-panel,
+body.mybiout-entry-ready .input-bar,
+body.mybiout-entry-ready .panel-top,
+body.mybiout-entry-ready .panel-input,
+body.mybiout-entry-ready .panel-col,
+body.mybiout-entry-ready .logbar {
+    animation: entryTileArrive .78s cubic-bezier(.18, 1.28, .22, 1) backwards;
+    animation-delay: var(--entry-delay, .16s);
+}
+
+body.mybiout-entry-ready .card:nth-child(2),
+body.mybiout-entry-ready .col:nth-child(2),
+body.mybiout-entry-ready .section:nth-of-type(2),
+body.mybiout-entry-ready .func-card:nth-child(2),
+body.mybiout-entry-ready .chat-panel {
+    --entry-delay: .24s;
+}
+
+body.mybiout-entry-ready .card:nth-child(3),
+body.mybiout-entry-ready .col:nth-child(3),
+body.mybiout-entry-ready .section:nth-of-type(3),
+body.mybiout-entry-ready .func-card:nth-child(3),
+body.mybiout-entry-ready .logbar {
+    --entry-delay: .32s;
+}
+
+@keyframes entryCoreStamp {
+    0% { opacity: 0; transform: translate(-50%, -62%) rotate(-18deg) scale(.24); }
+    44% { opacity: 1; transform: translate(-50%, -50%) rotate(5deg) scale(1.16); }
+    66% { transform: translate(-50%, -50%) rotate(-3deg) scale(.96); }
+    100% { opacity: .96; transform: translate(-50%, -50%) rotate(var(--entry-tilt, -4deg)) scale(1); }
+}
+
+@keyframes entryCorePunch {
+    0% { opacity: 0; transform: translate(-50%, -50%) rotate(-22deg) scale(.08); }
+    52% { opacity: 1; transform: translate(-50%, -50%) rotate(8deg) scale(1.28); }
+    100% { opacity: .98; transform: translate(-50%, -50%) rotate(-3deg) scale(1); }
+}
+
+@keyframes entryCoreSkid {
+    0% { opacity: 0; transform: translate(-135%, -50%) rotate(-14deg) scale(.7); }
+    58% { opacity: 1; transform: translate(-43%, -50%) rotate(5deg) scale(1.06); }
+    100% { opacity: .98; transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+}
+
+@keyframes entryOverlayLeave {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.035); visibility: hidden; }
+}
+
+@keyframes entryPaperDrift {
+    0% { transform: translate(-2%, -2%) rotate(-5deg) scale(1.08); }
+    100% { transform: translate(2%, 1%) rotate(2deg) scale(1.02); }
+}
+
+@keyframes entryPageArrive {
+    0% { opacity: 0; transform: translateY(34px) rotate(-.6deg) scale(.965); filter: saturate(.75) blur(6px); }
+    62% { opacity: 1; transform: translateY(-5px) rotate(.35deg) scale(1.01); filter: saturate(1.08) blur(0); }
+    100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); filter: none; }
+}
+
+@keyframes entryDropIn {
+    0% { opacity: 0; transform: translateY(-34px) rotate(-2deg) scale(.9); }
+    70% { opacity: 1; transform: translateY(5px) rotate(1deg) scale(1.03); }
+    100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+@keyframes entrySwipeIn {
+    0% { opacity: 0; transform: translateX(36px) skewX(-8deg); }
+    70% { opacity: 1; transform: translateX(-4px) skewX(2deg); }
+    100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+@keyframes entryTileArrive {
+    0% { opacity: 0; transform: translateY(48px) rotate(-2deg) scale(.9); filter: blur(5px); }
+    68% { opacity: 1; transform: translateY(-7px) rotate(1deg) scale(1.025); filter: blur(0); }
+    100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mybiout-entry-overlay { display: none; }
+
+    body:not(.mybiout-entry-ready) .page,
+    body.mybiout-entry-ready .page,
+    body.mybiout-entry-ready .logo,
+    body.mybiout-entry-ready .header,
+    body.mybiout-entry-ready .hdr,
+    body.mybiout-entry-ready .github-link,
+    body.mybiout-entry-ready .settings-link,
+    body.mybiout-entry-ready .hdr-right,
+    body.mybiout-entry-ready .hdr-stats,
+    body.mybiout-entry-ready .hdr-sub,
+    body.mybiout-entry-ready .card,
+    body.mybiout-entry-ready .col,
+    body.mybiout-entry-ready .section,
+    body.mybiout-entry-ready .func-card,
+    body.mybiout-entry-ready .manual-panel,
+    body.mybiout-entry-ready .chat-panel,
+    body.mybiout-entry-ready .input-bar,
+    body.mybiout-entry-ready .panel-top,
+    body.mybiout-entry-ready .panel-input,
+    body.mybiout-entry-ready .panel-col,
+    body.mybiout-entry-ready .logbar {
+        opacity: 1;
+        transform: none;
+        filter: none;
+        animation: none;
+    }
+}
