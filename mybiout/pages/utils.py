@@ -6,27 +6,27 @@ MyBiOut! 基础工具模块, 负责配置文件的读写与通用方法
 :time: 2026-04-06
 """
 
-import configparser
-import os
-import tempfile
-import threading
-from contextlib import suppress
-from pathlib import Path
+import configparser as 配置解析器
+import os as 系统
+import tempfile as 临时文件
+import threading as 线程
+from contextlib import suppress as 忽略异常
+from pathlib import Path as 路径
 
-_CONFIG_PATH: Path = Path(__file__).resolve().parent.parent / "config.ini"
-_DEFAULT_PORT: int = 23333
-_CONFIG_LOCK: threading.RLock = threading.RLock()
+_配置路径: 路径 = 路径(__file__).resolve().parent.parent / "config.ini"
+_默认端口: int = 23333
+_配置锁: 线程.RLock = 线程.RLock()
 
 
-def get_default_bilibili_pc_cache_path() -> str:
+def 取默认哔哩哔哩电脑缓存路径() -> str:
     r"""
     获取默认的哔哩哔哩电脑端缓存路径
     :return: str: 默认缓存路径
     """
-    return str(Path.home() / "Videos" / "bilibili")
+    return str(路径.home() / "Videos" / "bilibili")
 
 
-DEFAULTS: dict[str, dict[str, str]] = {
+默认设置: dict[str, dict[str, str]] = {
     "export": {
         "path": r"C:\MyBiOut!",
         "sessdata": "",
@@ -39,7 +39,7 @@ DEFAULTS: dict[str, dict[str, str]] = {
     },
     "localout": {
         "folder": "localout!",
-        "bilibili_pc_cache_path": get_default_bilibili_pc_cache_path(),
+        "bilibili_pc_cache_path": 取默认哔哩哔哩电脑缓存路径(),
         "bilibili_pc_cache_optional_when_installed": "true",
         "name_parts": "title",
         "incomplete_title_action": "partial_or_folder",
@@ -70,128 +70,144 @@ DEFAULTS: dict[str, dict[str, str]] = {
 }
 
 
-def load_config() -> configparser.ConfigParser:
+def _当前配置路径() -> 路径:
+    r"""
+    读取兼容别名后的配置路径, 让旧测试或外部 monkeypatch 仍然生效。
+    """
+    return globals().get("_CONFIG_PATH", _配置路径)
+
+
+def _当前保存配置函数():
+    r"""
+    读取兼容别名后的保存函数, 让旧测试或外部 monkeypatch 仍然生效。
+    """
+    return globals().get("save_config", 保存配置)
+
+
+def 载入配置() -> 配置解析器.ConfigParser:
     r"""
     读取配置文件, 不存在则使用默认值
     :return: configparser.ConfigParser: 加载后的配置解析器
     """
-    cfg: configparser.ConfigParser = configparser.ConfigParser(interpolation=None)
-    for section, kvs in DEFAULTS.items():
-        cfg[section] = dict(kvs)
-    if _CONFIG_PATH.exists():
-        cfg.read(_CONFIG_PATH, encoding="utf-8")
-    return cfg
+    配置: 配置解析器.ConfigParser = 配置解析器.ConfigParser(interpolation=None)
+    for 分区, 键值表 in 默认设置.items():
+        配置[分区] = dict(键值表)
+    配置路径: 路径 = _当前配置路径()
+    if 配置路径.exists():
+        配置.read(配置路径, encoding="utf-8")
+    return 配置
 
 
-def save_config(cfg: configparser.ConfigParser) -> None:
+def 保存配置(配置: 配置解析器.ConfigParser) -> None:
     r"""
     将配置写回文件
-    :param: cfg: 配置解析器实例
+    :param: 配置: 配置解析器实例
     """
-    _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=f".{_CONFIG_PATH.name}.",
+    配置路径: 路径 = _当前配置路径()
+    配置路径.parent.mkdir(parents=True, exist_ok=True)
+    文件描述符, 临时文件名 = 临时文件.mkstemp(
+        prefix=f".{配置路径.name}.",
         suffix=".tmp",
-        dir=str(_CONFIG_PATH.parent),
+        dir=str(配置路径.parent),
         text=True,
     )
-    tmp_path: Path = Path(tmp_name)
+    临时路径: 路径 = 路径(临时文件名)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write("# MyBiOut! 配置文件\n\n")
-            cfg.write(f)
-        tmp_path.replace(_CONFIG_PATH)
+        with 系统.fdopen(文件描述符, "w", encoding="utf-8") as 文件:
+            文件.write("# MyBiOut! 配置文件\n\n")
+            配置.write(文件)
+        临时路径.replace(配置路径)
     except Exception:
-        with suppress(OSError):
-            tmp_path.unlink()
+        with 忽略异常(OSError):
+            临时路径.unlink()
         raise
 
 
-def get_all_settings() -> dict[str, dict[str, str]]:
+def 取全部设置() -> dict[str, dict[str, str]]:
     r"""
-    获取全部设置, 按 section → key → value 组织
+    获取全部设置, 按 section -> key -> value 组织
     :return: dict[str, dict[str, str]]: 全部设置项
     """
-    cfg: configparser.ConfigParser = load_config()
-    return {sec: dict(cfg[sec]) for sec in cfg.sections()}
+    配置: 配置解析器.ConfigParser = 载入配置()
+    return {分区: dict(配置[分区]) for 分区 in 配置.sections()}
 
 
-def get_setting(section: str, key: str) -> str:
+def 取设置(分区: str, 键: str) -> str:
     r"""
     获取单项设置值
-    :param: section: 配置分区名
-    :param: key: 配置键名
+    :param: 分区: 配置分区名
+    :param: 键: 配置键名
     :return: str: 配置值, 不存在时返回默认值
     """
-    cfg: configparser.ConfigParser = load_config()
-    fallback: str = DEFAULTS.get(section, {}).get(key, "")
-    return cfg.get(section, key, fallback=fallback)
+    配置: 配置解析器.ConfigParser = 载入配置()
+    默认值: str = 默认设置.get(分区, {}).get(键, "")
+    return 配置.get(分区, 键, fallback=默认值)
 
 
-def set_setting(section: str, key: str, value: str) -> None:
+def 设设置(分区: str, 键: str, 值: str) -> None:
     r"""
     保存单项设置值
-    :param: section: 配置分区名
-    :param: key: 配置键名
-    :param: value: 配置值
+    :param: 分区: 配置分区名
+    :param: 键: 配置键名
+    :param: 值: 配置值
     """
-    with _CONFIG_LOCK:
-        cfg: configparser.ConfigParser = load_config()
-        if section not in cfg:
-            cfg[section] = {}
-        cfg[section][key] = value
-        save_config(cfg)
+    with _配置锁:
+        配置: 配置解析器.ConfigParser = 载入配置()
+        if 分区 not in 配置:
+            配置[分区] = {}
+        配置[分区][键] = 值
+        _当前保存配置函数()(配置)
 
 
-def get_export_path() -> Path:
+def 取导出路径() -> 路径:
     r"""
     获取导出根路径, 不存在则自动创建
     :return: Path: 导出根目录
     """
-    p: Path = Path(get_setting("export", "path"))
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    导出路径: 路径 = 路径(取设置("export", "path"))
+    导出路径.mkdir(parents=True, exist_ok=True)
+    return 导出路径
 
 
-def get_api_key() -> str:
+def 取接口密钥() -> str:
     r"""
     获取 API Key
     :return: str: API Key 值
     """
-    return get_setting("api", "key")
+    return 取设置("api", "key")
 
 
-def get_api_model() -> str:
+def 取接口模型() -> str:
     r"""
     获取 API 模型名称
     :return: str: 模型名称
     """
-    return get_setting("api", "model")
+    return 取设置("api", "model")
 
 
-def get_port() -> int:
+def 取端口() -> int:
     r"""
     获取默认服务端口号
     :return: int: 端口号
     """
-    return _DEFAULT_PORT
+    return _默认端口
 
 
-def get_api_base_url() -> str:
+def 取接口基地址() -> str:
     r"""
     获取 API 基地址
     :return: str: API 基地址
     """
-    return get_setting("api", "base_url") or "https://api.openai.com/v1"
+    return 取设置("api", "base_url") or "https://api.openai.com/v1"
 
 
-def get_api_timeout_seconds() -> float | None:
+def 取接口超时秒数() -> float | None:
     r"""
     获取 API 超时时间（秒）
     :return: float | None: None 表示无限超时
     """
-    mode: str = (get_setting("api", "timeout") or "infinite").strip().lower()
-    timeout_map: dict[str, float | None] = {
+    模式: str = (取设置("api", "timeout") or "infinite").strip().lower()
+    超时映射: dict[str, float | None] = {
         "infinite": None,
         "8s": 8.0,
         "20s": 20.0,
@@ -199,40 +215,62 @@ def get_api_timeout_seconds() -> float | None:
         "100s": 100.0,
         "1000s": 1000.0,
     }
-    return timeout_map.get(mode)
+    return 超时映射.get(模式)
 
 
-def get_sessdata() -> str:
+def 取会话数据() -> str:
     r"""
     获取统一的 SESSDATA (优先共享设置, 兼容旧分区)
     :return: str: SESSDATA 值
     """
-    shared: str = get_setting("export", "sessdata").strip()
-    if shared:
-        return shared
+    共享值: str = 取设置("export", "sessdata").strip()
+    if 共享值:
+        return 共享值
     # 兼容旧配置
-    for sec in ("bbdown", "mdout"):
-        old: str = get_setting(sec, "sessdata" if sec == "mdout" else "cookie").strip()
-        if old:
-            return old
+    for 分区 in ("bbdown", "mdout"):
+        旧值: str = 取设置(分区, "sessdata" if 分区 == "mdout" else "cookie").strip()
+        if 旧值:
+            return 旧值
     return ""
 
 
-def get_crawler_fallback_timeout() -> float | None:
+def 取爬虫兜底超时() -> float | None:
     r"""
     获取本地缓存元数据无法解析时, 通过爬虫补全的超时时间
     :return: float | None: None 表示禁用, 否则为秒数
     """
-    mode: str = (get_setting("localout", "crawler_fallback") or "disabled").strip().lower()
-    return {"1s": 1.0, "2s": 2.0, "5s": 5.0}.get(mode)
+    模式: str = (取设置("localout", "crawler_fallback") or "disabled").strip().lower()
+    return {"1s": 1.0, "2s": 2.0, "5s": 5.0}.get(模式)
 
 
-def reset_all_settings() -> None:
+def 重置全部设置() -> None:
     r"""
     将全部设置恢复为默认值
     """
-    with _CONFIG_LOCK:
-        cfg: configparser.ConfigParser = configparser.ConfigParser(interpolation=None)
-        for section, kvs in DEFAULTS.items():
-            cfg[section] = dict(kvs)
-        save_config(cfg)
+    with _配置锁:
+        配置: 配置解析器.ConfigParser = 配置解析器.ConfigParser(interpolation=None)
+        for 分区, 键值表 in 默认设置.items():
+            配置[分区] = dict(键值表)
+        _当前保存配置函数()(配置)
+
+
+_CONFIG_PATH = _配置路径
+_DEFAULT_PORT = _默认端口
+_CONFIG_LOCK = _配置锁
+DEFAULTS = 默认设置
+
+get_default_bilibili_pc_cache_path = 取默认哔哩哔哩电脑缓存路径
+load_config = 载入配置
+save_config = 保存配置
+get_all_settings = 取全部设置
+get_setting = 取设置
+set_setting = 设设置
+get_export_path = 取导出路径
+get_api_key = 取接口密钥
+get_api_model = 取接口模型
+get_port = 取端口
+get_api_base_url = 取接口基地址
+get_api_timeout_seconds = 取接口超时秒数
+get_sessdata = 取会话数据
+get_crawler_fallback_timeout = 取爬虫兜底超时
+reset_all_settings = 重置全部设置

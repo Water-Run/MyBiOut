@@ -6,21 +6,22 @@ MyBiOut! 主入口模块, 解析命令行参数并启动 FastAPI 服务
 :time: 2026-04-02
 """
 
-import argparse
-import math
-import random
-import shutil
-import socket
-import sys
-import threading
-import time
-import webbrowser
-from dataclasses import dataclass, field
-from pathlib import Path
+import argparse as 参数解析
+import math as 数学
+import random as 随机
+import shutil as 文件工具
+import socket as 套接字
+import sys as 系统
+import threading as 线程
+import time as 时间
+import webbrowser as 浏览器
+from dataclasses import dataclass as 数据类
+from dataclasses import field as 字段
+from pathlib import Path as 路径
 
-import uvicorn
+import uvicorn as 服务运行器
 
-from mybiout.pages.utils import get_port
+from mybiout.pages.utils import 取端口
 
 _CSI: str = "\033["
 _HIDE_CUR: str = f"{_CSI}?25l"
@@ -35,14 +36,14 @@ _BR_H: str = "⠿⡿⢿⣿⣾⣽⣻⣷⣯⣟⡷⡯⡟⠷⠯⠟⣶⣵⣳"
 _SPARK: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
 _MAX_PARTICLES: int = 280
 
-_BIN_DIR: Path = Path(__file__).resolve().parent / "bin"
+_BIN_DIR: 路径 = 路径(__file__).resolve().parent / "bin"
 
 
 # ===== 环境检查 =====
 
 
-@dataclass(frozen=True, slots=True)
-class _EnvItem:
+@数据类(frozen=True, slots=True)
+class _环境项:
     r"""
     单项环境检查结果
     """
@@ -52,15 +53,15 @@ class _EnvItem:
     hint: str
 
 
-def _check_environment() -> list[_EnvItem]:
+def _检查环境() -> list[_环境项]:
     r"""
     检查运行环境中各必需依赖项的可用性
     :return: list[_EnvItem]: 检查结果列表
     """
-    results: list[_EnvItem] = []
+    results: list[_环境项] = []
 
     # ffmpeg
-    ffmpeg_found: bool = shutil.which("ffmpeg") is not None
+    ffmpeg_found: bool = 文件工具.which("ffmpeg") is not None
     if not ffmpeg_found:
         for p in (
             _BIN_DIR / "BBDown" / "ffmpeg.exe",
@@ -72,7 +73,7 @@ def _check_environment() -> list[_EnvItem]:
                 ffmpeg_found = True
                 break
     results.append(
-        _EnvItem(
+        _环境项(
             "ffmpeg",
             ffmpeg_found,
             "下载: https://ffmpeg.org/download.html\n"
@@ -82,7 +83,7 @@ def _check_environment() -> list[_EnvItem]:
     )
 
     # BBDown
-    bbdown_found: bool = shutil.which("BBDown") is not None or shutil.which("bbdown") is not None
+    bbdown_found: bool = 文件工具.which("BBDown") is not None or 文件工具.which("bbdown") is not None
     if not bbdown_found:
         for p in (
             _BIN_DIR / "BBDown" / "BBDown.exe",
@@ -94,7 +95,7 @@ def _check_environment() -> list[_EnvItem]:
                 bbdown_found = True
                 break
     results.append(
-        _EnvItem(
+        _环境项(
             "BBDown",
             bbdown_found,
             "下载: https://github.com/nilaoda/BBDown/releases\n"
@@ -111,7 +112,7 @@ def _check_environment() -> list[_EnvItem]:
     except ImportError:
         ...
     results.append(
-        _EnvItem(
+        _环境项(
             "biliffm4s",
             biliffm4s_found,
             "安装: pip install biliffm4s\n      仓库: https://github.com/Water-Run/-m4s-Python-biliffm4s",
@@ -121,7 +122,7 @@ def _check_environment() -> list[_EnvItem]:
     return results
 
 
-def _print_env_detail(checks: list[_EnvItem]) -> None:
+def _打印环境详情(checks: list[_环境项]) -> None:
     r"""
     在终端打印环境检查详细报告
     :param checks: 检查结果列表
@@ -140,7 +141,7 @@ def _print_env_detail(checks: list[_EnvItem]) -> None:
     print()
 
 
-def _get_startup_blockers(_checks: list[_EnvItem]) -> list[_EnvItem]:
+def _取启动阻断项(_checks: list[_环境项]) -> list[_环境项]:
     r"""
     返回会阻止 Web 服务启动的环境问题。
 
@@ -153,18 +154,18 @@ def _get_startup_blockers(_checks: list[_EnvItem]) -> list[_EnvItem]:
 # ===== 服务启动状态 =====
 
 
-@dataclass(slots=True)
-class _ServerStartupState:
+@数据类(slots=True)
+class _服务启动状态:
     r"""
     Uvicorn 后台启动状态
     """
 
-    started: threading.Event = field(default_factory=threading.Event)
-    failed: threading.Event = field(default_factory=threading.Event)
+    started: 线程.Event = 字段(default_factory=线程.Event)
+    failed: 线程.Event = 字段(default_factory=线程.Event)
     reason: str = ""
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    server: uvicorn.Server | None = None
-    thread: threading.Thread | None = None
+    lock: 线程.Lock = 字段(default_factory=线程.Lock)
+    server: 服务运行器.Server | None = None
+    thread: 线程.Thread | None = None
 
     def mark_started(self) -> None:
         r"""
@@ -187,14 +188,14 @@ class _ServerStartupState:
             self.failed.set()
 
 
-def _probe_port_bind_error(port: int) -> str | None:
+def _探测端口绑定错误(port: int) -> str | None:
     r"""
     预探测端口是否可绑定
     :param port: 端口号
     :return: str | None: 可用返回 None，不可用返回错误原因
     """
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        with 套接字.套接字(套接字.AF_INET, 套接字.SOCK_STREAM) as sock:
             sock.bind(("127.0.0.1", port))
     except OSError as e:
         detail: str = e.strerror or str(e)
@@ -202,25 +203,25 @@ def _probe_port_bind_error(port: int) -> str | None:
     return None
 
 
-def _start_server_in_background(port: int) -> _ServerStartupState:
+def _后台启动服务(port: int) -> _服务启动状态:
     r"""
     后台启动 Uvicorn，并异步监控启动结果
     :param port: 服务端口号
     :return: _ServerStartupState: 启动状态对象
     """
-    state: _ServerStartupState = _ServerStartupState()
+    state: _服务启动状态 = _服务启动状态()
 
-    if err := _probe_port_bind_error(port):
+    if err := _探测端口绑定错误(port):
         state.mark_failed(err)
         return state
 
-    config: uvicorn.Config = uvicorn.Config(
+    config: 服务运行器.Config = 服务运行器.Config(
         "mybiout.pages.apis:app",
         host="127.0.0.1",
         port=port,
         log_level="warning",
     )
-    server: uvicorn.Server = uvicorn.Server(config)
+    server: 服务运行器.Server = 服务运行器.Server(config)
     state.server = server
 
     def _run() -> None:
@@ -232,7 +233,7 @@ def _start_server_in_background(port: int) -> _ServerStartupState:
         except Exception as e:
             state.mark_failed(f"Uvicorn 启动异常: {e}")
 
-    t: threading.Thread = threading.Thread(target=_run, daemon=True)
+    t: 线程.Thread = 线程.Thread(target=_run, daemon=True)
     state.thread = t
     t.start()
 
@@ -240,8 +241,8 @@ def _start_server_in_background(port: int) -> _ServerStartupState:
         r"""
         监控 server.started 与线程生命周期，判定启动成功/失败
         """
-        deadline: float = time.monotonic() + 20.0
-        while time.monotonic() < deadline:
+        deadline: float = 时间.monotonic() + 20.0
+        while 时间.monotonic() < deadline:
             if state.failed.is_set():
                 return
             if server.started:
@@ -250,7 +251,7 @@ def _start_server_in_background(port: int) -> _ServerStartupState:
             if not t.is_alive():
                 state.mark_failed("服务线程提前退出（可能端口占用或应用初始化失败）")
                 return
-            time.sleep(0.03)
+            时间.sleep(0.03)
 
         if server.started:
             state.mark_started()
@@ -259,31 +260,31 @@ def _start_server_in_background(port: int) -> _ServerStartupState:
         state.mark_failed("服务启动超时")
         server.should_exit = True
 
-    threading.Thread(target=_watch_startup, daemon=True).start()
+    线程.Thread(target=_watch_startup, daemon=True).start()
     return state
 
 
-def _wait_server_startup(state: _ServerStartupState, timeout: float = 25.0) -> bool:
+def _等待服务启动(state: _服务启动状态, timeout: float = 25.0) -> bool:
     r"""
     等待服务启动成功或失败
     :param state: 启动状态对象
     :param timeout: 最大等待秒数
     :return: bool: True=成功, False=失败或超时
     """
-    deadline: float = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+    deadline: float = 时间.monotonic() + timeout
+    while 时间.monotonic() < deadline:
         if state.started.is_set():
             return True
         if state.failed.is_set():
             return False
-        time.sleep(0.05)
+        时间.sleep(0.05)
     return state.started.is_set()
 
 
 # ===== 终端动画工具 =====
 
 
-def _at(row: int, col: int) -> str:
+def _定位(row: int, col: int) -> str:
     r"""
     生成终端光标定位控制序列
     :param row: 行号, 1-based
@@ -293,7 +294,7 @@ def _at(row: int, col: int) -> str:
     return f"{_CSI}{row};{col}H"
 
 
-def _fg(r: int, g: int, b: int) -> str:
+def _前景色(r: int, g: int, b: int) -> str:
     r"""
     生成 24-bit 真彩前景色 ANSI 控制序列
     :param r: 红色分量
@@ -304,7 +305,7 @@ def _fg(r: int, g: int, b: int) -> str:
     return f"{_CSI}38;2;{r};{g};{b}m"
 
 
-def _lerp(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+def _线性插值(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
     r"""
     对 RGB 颜色做线性插值
     :param a: 起始颜色
@@ -320,7 +321,7 @@ def _lerp(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[i
     )
 
 
-def _fade(c: tuple[int, int, int], alpha: float) -> tuple[int, int, int]:
+def _淡化(c: tuple[int, int, int], alpha: float) -> tuple[int, int, int]:
     r"""
     将颜色按比例淡化到黑色
     :param c: 原始颜色
@@ -331,7 +332,7 @@ def _fade(c: tuple[int, int, int], alpha: float) -> tuple[int, int, int]:
     return int(c[0] * a), int(c[1] * a), int(c[2] * a)
 
 
-def _cjk_len(text: str) -> int:
+def _中日韩宽度(text: str) -> int:
     r"""
     估算字符串在终端中的显示宽度, CJK 字符按 2 列计
     :param text: 输入文本
@@ -350,8 +351,8 @@ def _cjk_len(text: str) -> int:
     )
 
 
-@dataclass(frozen=True, slots=True)
-class _Theme:
+@数据类(frozen=True, slots=True)
+class _主题:
     r"""
     动画配色主题
     """
@@ -363,57 +364,57 @@ class _Theme:
     stars: tuple[tuple[int, int, int], ...]
 
 
-_THEMES: tuple[_Theme, ...] = (
-    _Theme(
+_THEMES: tuple[_主题, ...] = (
+    _主题(
         (0, 255, 255),
         (255, 0, 255),
         ((255, 255, 0), (0, 255, 200), (255, 100, 255)),
         (0, 255, 220),
         ((60, 60, 100), (80, 50, 120), (50, 70, 110)),
     ),
-    _Theme(
+    _主题(
         (255, 220, 50),
         (255, 30, 0),
         ((255, 255, 120), (255, 180, 50), (255, 100, 20)),
         (255, 210, 70),
         ((100, 60, 30), (120, 80, 20), (80, 50, 25)),
     ),
-    _Theme(
+    _主题(
         (0, 255, 128),
         (100, 0, 255),
         ((200, 255, 200), (160, 220, 255), (180, 100, 255)),
         (0, 255, 190),
         ((30, 80, 60), (40, 60, 100), (50, 50, 90)),
     ),
-    _Theme(
+    _主题(
         (251, 114, 153),
         (0, 174, 236),
         ((255, 200, 220), (120, 215, 255), (255, 160, 190)),
         (251, 114, 153),
         ((80, 40, 55), (30, 60, 90), (60, 45, 70)),
     ),
-    _Theme(
+    _主题(
         (0, 210, 120),
         (255, 215, 0),
         ((200, 255, 160), (255, 240, 120), (80, 255, 180)),
         (0, 230, 130),
         ((30, 80, 40), (60, 70, 20), (40, 90, 50)),
     ),
-    _Theme(
+    _主题(
         (0, 80, 255),
         (0, 255, 200),
         ((100, 200, 255), (0, 255, 190), (80, 140, 255)),
         (0, 180, 255),
         ((15, 30, 70), (20, 40, 80), (10, 25, 60)),
     ),
-    _Theme(
+    _主题(
         (255, 183, 197),
         (255, 105, 180),
         ((255, 228, 225), (255, 182, 193), (255, 240, 245)),
         (255, 150, 170),
         ((90, 50, 60), (80, 40, 55), (100, 60, 70)),
     ),
-    _Theme(
+    _主题(
         (255, 215, 0),
         (180, 130, 50),
         ((255, 240, 150), (220, 190, 80), (255, 200, 60)),
@@ -422,21 +423,21 @@ _THEMES: tuple[_Theme, ...] = (
     ),
 )
 
-_ROTORS: tuple[str, ...] = (
+_旋翼帧: tuple[str, ...] = (
     "        ════╦════        ",
     "      ══════╬══════      ",
     "    ════════╬════════    ",
     "      ══════╬══════      ",
 )
-_BODY: tuple[str, ...] = (
+_机身帧: tuple[str, ...] = (
     "            ║            ",
     "       ╭────╨────╮       ",
     "═══════╡  ◉   ◉  ╞═══>   ",
     "       ╰──┬───┬──╯       ",
     "          ╰─╯ ╰─╯        ",
 )
-_HELI_W: int = max(*(len(s) for s in _ROTORS), *(len(s) for s in _BODY))
-_HELI_H: int = 1 + len(_BODY)
+_HELI_W: int = max(*(len(s) for s in _旋翼帧), *(len(s) for s in _机身帧))
+_HELI_H: int = 1 + len(_机身帧)
 
 _TITLE: tuple[str, ...] = (
     r"  __  __       ____  _  ___        _   _ ",
@@ -449,8 +450,8 @@ _TITLE: tuple[str, ...] = (
 _TITLE_W: int = max(len(s) for s in _TITLE)
 
 
-@dataclass(slots=True)
-class _Particle:
+@数据类(slots=True)
+class _粒子:
     r"""
     粒子对象, 用于盲文特效
     """
@@ -483,10 +484,10 @@ class _Particle:
         """
         ratio: float = self.life / self.max_life if self.max_life > 0 else 0.0
         if ratio > 0.6:
-            return random.choice(_BR_H)
+            return 随机.choice(_BR_H)
         if ratio > 0.25:
-            return random.choice(_BR_M)
-        return random.choice(_BR_L)
+            return 随机.choice(_BR_M)
+        return 随机.choice(_BR_L)
 
     @property
     def visible_color(self) -> tuple[int, int, int]:
@@ -495,11 +496,11 @@ class _Particle:
         :return: tuple[int, int, int]: RGB 颜色
         """
         ratio: float = self.life / self.max_life if self.max_life > 0 else 0.0
-        return _fade(self.color, ratio)
+        return _淡化(self.color, ratio)
 
 
-def _burst(
-    pool: list[_Particle],
+def _爆发粒子(
+    pool: list[_粒子],
     x: float,
     y: float,
     count: int,
@@ -521,37 +522,37 @@ def _burst(
     :param spread: 初始位置离散半径
     """
     for _ in range(count):
-        angle: float = random.uniform(0.0, math.tau)
-        v_abs: float = random.uniform(speed * 0.3, speed)
-        ttl: float = random.uniform(*life)
+        angle: float = 随机.uniform(0.0, 数学.tau)
+        v_abs: float = 随机.uniform(speed * 0.3, speed)
+        ttl: float = 随机.uniform(*life)
         pool.append(
-            _Particle(
-                x=x + random.uniform(-spread, spread),
-                y=y + random.uniform(-spread * 0.3, spread * 0.3),
-                vx=math.cos(angle) * v_abs,
-                vy=math.sin(angle) * v_abs * 0.4,
+            _粒子(
+                x=x + 随机.uniform(-spread, spread),
+                y=y + 随机.uniform(-spread * 0.3, spread * 0.3),
+                vx=数学.cos(angle) * v_abs,
+                vy=数学.sin(angle) * v_abs * 0.4,
                 life=ttl,
                 max_life=ttl,
-                color=random.choice(colors),
+                color=随机.choice(colors),
             ),
         )
     if len(pool) > _MAX_PARTICLES:
         del pool[: len(pool) - _MAX_PARTICLES]
 
 
-def _play_animation(port: int, startup_state: _ServerStartupState | None = None) -> None:
+def _播放动画(port: int, startup_state: _服务启动状态 | None = None) -> None:
     r"""
     播放启动动画序列
     :param port: 服务端口号
     :param startup_state: 服务启动状态对象（可选）
     :raise RuntimeError: 终端尺寸过小时抛出
     """
-    width, height = shutil.get_terminal_size((80, 24))
+    width, height = 文件工具.get_terminal_size((80, 24))
     if width < 52 or height < 18:
         raise RuntimeError("终端尺寸过小, 跳过动画")
 
-    theme: _Theme = random.choice(_THEMES)
-    rng: random.Random = random.Random()
+    theme: _主题 = 随机.choice(_THEMES)
+    rng: 随机.Random = 随机.Random()
     buffer: list[str] = []
 
     def w(text: str) -> None:
@@ -564,8 +565,8 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         r"""
         刷新输出缓冲到终端
         """
-        sys.stdout.write("".join(buffer))
-        sys.stdout.flush()
+        系统.stdout.write("".join(buffer))
+        系统.stdout.flush()
         buffer.clear()
 
     def put(
@@ -588,11 +589,11 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         clipped: str = text[: width - col + 1]
         if not clipped:
             return
-        payload: str = _at(row, col)
+        payload: str = _定位(row, col)
         if bold:
             payload += _BOLD
         if color is not None:
-            payload += _fg(*color)
+            payload += _前景色(*color)
         w(payload + clipped + _RST)
 
     def clear_row(row: int, c1: int = 1, c2: int | None = None) -> None:
@@ -607,7 +608,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         end_col: int = min(c2 or width, width)
         length: int = end_col - c1 + 1
         if length > 0:
-            w(_at(row, max(1, c1)) + " " * length)
+            w(_定位(row, max(1, c1)) + " " * length)
 
     w(_HIDE_CUR + _CLR_SCR)
     flush()
@@ -628,14 +629,14 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         for sr, sc, sch, sco in stars[idx : idx + batch]:
             put(sr, sc, sch, color=sco)
         flush()
-        time.sleep(0.02)
+        时间.sleep(0.02)
 
     base_y: int = max(3, height // 4)
     wave_amp: float = rng.uniform(0.3, 1.8)
     wave_freq: float = rng.uniform(1.0, 3.0)
     frame_count: int = 58 + rng.randint(-8, 10)
     dt: float = 0.032
-    particles: list[_Particle] = []
+    particles: list[_粒子] = []
     prev_r: int = base_y
     prev_c: int = width + 6
     bili_row: int = min(base_y + _HELI_H + 2, height - 2)
@@ -661,7 +662,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
             cx = min(width - _HELI_W, cx + 1 + (1 if step > 10 else 0))
             cy = min(height - _HELI_H - 1, cy + 1)
 
-            _burst(
+            _爆发粒子(
                 particles,
                 cx + _HELI_W * 0.45,
                 cy + _HELI_H * 0.75,
@@ -679,13 +680,13 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
                 if 1 <= py <= height and 1 <= px <= width:
                     put(py, px, p.ch, color=p.visible_color)
 
-            rotor: str = _ROTORS[step % len(_ROTORS)]
+            rotor: str = _旋翼帧[step % len(_旋翼帧)]
             for ci, ch in enumerate(rotor):
                 col: int = cx + ci
                 if ch != " ":
                     put(cy, col, ch, color=(255, 120, 80), bold=True)
 
-            for bi, line in enumerate(_BODY):
+            for bi, line in enumerate(_机身帧):
                 row: int = cy + 1 + bi
                 for ci, ch in enumerate(line):
                     col: int = cx + ci
@@ -694,9 +695,9 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
 
             local_prev_r, local_prev_c = cy, cx
             flush()
-            time.sleep(0.03)
+            时间.sleep(0.03)
 
-        _burst(
+        _爆发粒子(
             particles,
             cx + _HELI_W * 0.5,
             cy + _HELI_H * 0.8,
@@ -715,7 +716,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
                 if 1 <= py <= height and 1 <= px <= width:
                     put(py, px, p.ch, color=p.visible_color)
             flush()
-            time.sleep(0.025)
+            时间.sleep(0.025)
 
         title: str = "✖ Man!"
         reason_line: str = f"孩子: {reason or '未知错误'}"
@@ -728,12 +729,12 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         put(tr, max(1, (width - len(title)) // 2), title, color=(255, 90, 90), bold=True)
         put(tr + 1, max(1, (width - len(reason_line)) // 2), reason_line, color=(255, 200, 120), bold=True)
         flush()
-        time.sleep(0.35)
+        时间.sleep(0.35)
 
     for frame in range(frame_count):
         t: float = frame / frame_count
         heli_x: int = int((width + 6) + ((-_HELI_W - 6) - (width + 6)) * t)
-        heli_y: int = int(base_y + wave_amp * math.sin(wave_freq * t * math.tau))
+        heli_y: int = int(base_y + wave_amp * 数学.sin(wave_freq * t * 数学.tau))
 
         if startup_state is not None and startup_state.failed.is_set():
             _crash_sequence(heli_x, heli_y, startup_state.reason)
@@ -754,7 +755,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         for _ in range(rng.randint(4, 9)):
             ttl: float = rng.uniform(0.3, 1.1)
             particles.append(
-                _Particle(
+                _粒子(
                     x=exhaust_x + rng.uniform(0.0, 2.4),
                     y=exhaust_y + rng.uniform(-0.6, 0.6),
                     vx=rng.uniform(1.2, 6.5),
@@ -767,13 +768,13 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         if len(particles) > _MAX_PARTICLES:
             del particles[: len(particles) - _MAX_PARTICLES]
 
-        rotor: str = _ROTORS[frame % len(_ROTORS)]
+        rotor: str = _旋翼帧[frame % len(_旋翼帧)]
         for ci, ch in enumerate(rotor):
             col: int = heli_x + ci
             if 1 <= col <= width and 1 <= heli_y <= height and ch != " ":
                 put(heli_y, col, ch, color=theme.heli, bold=True)
 
-        for bi, line in enumerate(_BODY):
+        for bi, line in enumerate(_机身帧):
             row: int = heli_y + 1 + bi
             for ci, ch in enumerate(line):
                 col: int = heli_x + ci
@@ -782,7 +783,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
 
         if not bili_burst_done and abs(heli_x + _HELI_W // 2 - width // 2) < 8:
             bili_burst_done = True
-            _burst(
+            _爆发粒子(
                 particles,
                 width / 2,
                 bili_row,
@@ -795,7 +796,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
 
         prev_r, prev_c = heli_y, heli_x
         flush()
-        time.sleep(dt)
+        时间.sleep(dt)
 
     for _ in range(16):
         particles = [p for p in particles if p.step(0.06)]
@@ -805,11 +806,11 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
             if 1 <= py <= height and 1 <= px <= width:
                 put(py, px, p.ch, color=p.visible_color)
         flush()
-        time.sleep(0.032)
+        时间.sleep(0.032)
 
     bili_text: str = "哔 哩 哔 哩"
     if 1 <= bili_row <= height:
-        text_width: int = _cjk_len(bili_text)
+        text_width: int = _中日韩宽度(bili_text)
         start_col: int = max(1, (width - text_width) // 2)
         cur_col: int = start_col
         for ch in bili_text:
@@ -818,13 +819,13 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
                 for _ in range(3):
                     put(bili_row, cur_col, rng.choice(_BR_H), color=rng.choice(theme.acc), bold=True)
                     flush()
-                    time.sleep(0.016)
+                    时间.sleep(0.016)
                 put(bili_row, cur_col, ch, color=rng.choice(theme.acc), bold=True)
                 flush()
-                time.sleep(0.035)
+                时间.sleep(0.035)
             cur_col += ch_width
 
-    time.sleep(0.24)
+    时间.sleep(0.24)
 
     wipe_mode: str = rng.choice(("down", "up", "center", "split"))
     row_order: list[int] = list(range(1, height + 1))
@@ -844,18 +845,18 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
 
     for row in row_order:
         line: str = "".join(rng.choice(_BR_M) for _ in range(width))
-        put(row, 1, line, color=_lerp(theme.ga, theme.gb, row / height))
+        put(row, 1, line, color=_线性插值(theme.ga, theme.gb, row / height))
         if row % 2 == 0:
             flush()
-            time.sleep(0.005)
+            时间.sleep(0.005)
     flush()
-    time.sleep(0.06)
+    时间.sleep(0.06)
 
     for row in row_order:
         clear_row(row)
         if row % 3 == 0:
             flush()
-            time.sleep(0.0025)
+            时间.sleep(0.0025)
     flush()
 
     title_top: int = max(2, height // 2 - len(_TITLE) // 2 - 4)
@@ -868,9 +869,9 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         for ci, ch in enumerate(line):
             col: int = title_left + ci
             if ch != " " and 1 <= col <= width:
-                put(row, col, rng.choice(_BR_H), color=_lerp(theme.ga, theme.gb, ci / _TITLE_W))
+                put(row, col, rng.choice(_BR_H), color=_线性插值(theme.ga, theme.gb, ci / _TITLE_W))
     flush()
-    time.sleep(0.18)
+    时间.sleep(0.18)
 
     reveal_cols: list[int] = list(range(_TITLE_W))
     reveal_mode: str = rng.choice(("ltr", "rtl", "center", "random", "wave"))
@@ -883,7 +884,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         case "random":
             rng.shuffle(reveal_cols)
         case "wave":
-            reveal_cols.sort(key=lambda c: math.sin(c * 0.23) * 12 + c)
+            reveal_cols.sort(key=lambda c: 数学.sin(c * 0.23) * 12 + c)
         case _:
             ...
 
@@ -896,14 +897,14 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
                     continue
                 col: int = title_left + ci
                 if 1 <= col <= width:
-                    put(row, col, line[ci], color=_lerp(theme.ga, theme.gb, ci / _TITLE_W), bold=True)
+                    put(row, col, line[ci], color=_线性插值(theme.ga, theme.gb, ci / _TITLE_W), bold=True)
         flush()
-        time.sleep(0.015)
+        时间.sleep(0.015)
 
     sub_text: str = "✦ 导出我的哔哩哔哩 ✦"
     sub_row: int = title_top + len(_TITLE) + 1
     if sub_row <= height:
-        sub_w: int = _cjk_len(sub_text)
+        sub_w: int = _中日韩宽度(sub_text)
         sub_left: int = max(1, (width - sub_w) // 2)
         cur_col = sub_left
         for idx, ch in enumerate(sub_text):
@@ -911,11 +912,11 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
             if ch != " " and cur_col + ch_w - 1 <= width:
                 put(sub_row, cur_col, rng.choice(_SPARK), color=rng.choice(theme.acc), bold=True)
                 flush()
-                time.sleep(0.02)
+                时间.sleep(0.02)
                 t_ratio: float = idx / max(len(sub_text) - 1, 1)
-                put(sub_row, cur_col, ch, color=_lerp(theme.ga, theme.gb, t_ratio), bold=True)
+                put(sub_row, cur_col, ch, color=_线性插值(theme.ga, theme.gb, t_ratio), bold=True)
                 flush()
-                time.sleep(0.015)
+                时间.sleep(0.015)
             cur_col += ch_w
 
     sep_row: int = sub_row + 1 if sub_row <= height else title_top + len(_TITLE) + 1
@@ -923,9 +924,9 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         sep_w: int = min(48, width - 4)
         sep_left: int = max(1, (width - sep_w) // 2)
         for i in range(sep_w):
-            put(sep_row, sep_left + i, rng.choice("═━─"), color=_lerp(theme.ga, theme.gb, i / sep_w))
+            put(sep_row, sep_left + i, rng.choice("═━─"), color=_线性插值(theme.ga, theme.gb, i / sep_w))
         flush()
-        time.sleep(0.08)
+        时间.sleep(0.08)
 
     startup_hint: str = (
         "  ✦ 服务已就绪, 浏览器即将自动打开"
@@ -942,7 +943,7 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
         ("  ✦ GitHub │ https://github.com/Water-Run/MyBiOut", theme.ga),
         ("  ✦ Author │ WaterRun", theme.gb),
         ("", (0, 0, 0)),
-        (startup_hint, _lerp(theme.ga, theme.gb, 0.5)),
+        (startup_hint, _线性插值(theme.ga, theme.gb, 0.5)),
     ]
     for idx, (line, color) in enumerate(info_lines):
         row: int = info_top + idx
@@ -957,15 +958,15 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
             cur_col += ch_w
             if char_idx % 5 == 0:
                 flush()
-                time.sleep(0.0045)
+                时间.sleep(0.0045)
         flush()
-        time.sleep(0.02)
+        时间.sleep(0.02)
 
-    fireworks: list[_Particle] = []
+    fireworks: list[_粒子] = []
     for _ in range(rng.randint(3, 6)):
         cx: float = rng.uniform(width * 0.15, width * 0.85)
         cy: float = rng.uniform(2.0, max(3.0, float(title_top - 1)))
-        _burst(fireworks, cx, cy, rng.randint(15, 32), theme.acc, speed=7.0, life=(0.3, 1.2), spread=1.0)
+        _爆发粒子(fireworks, cx, cy, rng.randint(15, 32), theme.acc, speed=7.0, life=(0.3, 1.2), spread=1.0)
 
     for _ in range(22):
         fireworks = [p for p in fireworks if p.step(0.05)]
@@ -975,17 +976,17 @@ def _play_animation(port: int, startup_state: _ServerStartupState | None = None)
             if 1 <= py <= height and 1 <= px <= width:
                 put(py, px, p.ch, color=p.visible_color)
         flush()
-        time.sleep(0.03)
+        时间.sleep(0.03)
 
     for _ in range(rng.randint(12, 28)):
         sr: int = rng.randint(1, height)
         sc: int = rng.randint(1, width)
         put(sr, sc, rng.choice(_SPARK), color=rng.choice(theme.acc))
     flush()
-    time.sleep(0.2)
+    时间.sleep(0.2)
 
     final_row: int = min(height, info_top + len(info_lines) + 1)
-    w(_at(final_row, 1) + _SHOW_CUR + _RST)
+    w(_定位(final_row, 1) + _SHOW_CUR + _RST)
     flush()
 
 
@@ -999,14 +1000,14 @@ _BANNER_FALLBACK: str = r"""
 """
 
 
-def main() -> None:
+def 主程序() -> None:
     r"""
     程序主入口, 解析命令行并启动 FastAPI 服务
     :return: None: 无返回值
     """
-    default_port: int = get_port()
+    default_port: int = 取端口()
 
-    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+    parser: 参数解析.ArgumentParser = 参数解析.ArgumentParser(
         prog="MyBiOut!",
         description="MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集",
     )
@@ -1016,25 +1017,25 @@ def main() -> None:
         default=default_port,
         help=f"指定服务端口号 (默认: {default_port})",
     )
-    args: argparse.Namespace = parser.parse_args()
+    args: 参数解析.Namespace = parser.parse_args()
     port: int = args.port
 
     # ===== 环境检查 =====
-    env_checks: list[_EnvItem] = _check_environment()
-    env_missing: list[_EnvItem] = _get_startup_blockers(env_checks)
+    env_checks: list[_环境项] = _检查环境()
+    env_missing: list[_环境项] = _取启动阻断项(env_checks)
 
     if env_missing:
         # 环境缺失 → 创建预失败状态 → 动画将坠机
         missing_names: str = ", ".join(c.name for c in env_missing)
-        startup_state: _ServerStartupState = _ServerStartupState()
+        startup_state: _服务启动状态 = _服务启动状态()
         startup_state.mark_failed(f"缺少必需组件: {missing_names}")
     else:
-        startup_state = _start_server_in_background(port)
+        startup_state = _后台启动服务(port)
 
     animation_error: Exception | None = None
 
     try:
-        _play_animation(port, startup_state)
+        _播放动画(port, startup_state)
     except Exception as e:
         animation_error = e
 
@@ -1043,7 +1044,7 @@ def main() -> None:
         print(f"  ✦ 端口: {port}")
         print(f"  ✦ 启动失败: {startup_state.reason or '未知原因'}")
         if env_missing:
-            _print_env_detail(env_checks)
+            _打印环境详情(env_checks)
         else:
             print("  ✦ 请检查端口占用/配置后重试")
             print()
@@ -1057,7 +1058,7 @@ def main() -> None:
         print("  ✦ Author: WaterRun")
         print()
 
-    if not _wait_server_startup(startup_state, timeout=25.0):
+    if not _等待服务启动(startup_state, timeout=25.0):
         print(_BANNER_FALLBACK)
         print(f"  ✦ 端口: {port}")
         print(f"  ✦ 启动失败: {startup_state.reason or '服务启动超时'}")
@@ -1069,14 +1070,14 @@ def main() -> None:
         延迟后自动打开浏览器访问地址
         :return: None: 无返回值
         """
-        time.sleep(0.35)
-        webbrowser.open(f"http://localhost:{port}")
+        时间.sleep(0.35)
+        浏览器.open(f"http://localhost:{port}")
 
-    threading.Thread(target=_open_browser, daemon=True).start()
+    线程.Thread(target=_open_browser, daemon=True).start()
 
     try:
         while startup_state.thread is not None and startup_state.thread.is_alive():
-            time.sleep(0.2)
+            时间.sleep(0.2)
     except KeyboardInterrupt:
         if startup_state.server is not None:
             startup_state.server.should_exit = True
@@ -1084,5 +1085,26 @@ def main() -> None:
             startup_state.thread.join(timeout=5.0)
 
 
+_EnvItem = _环境项
+_check_environment = _检查环境
+_print_env_detail = _打印环境详情
+_get_startup_blockers = _取启动阻断项
+_ServerStartupState = _服务启动状态
+_probe_port_bind_error = _探测端口绑定错误
+_start_server_in_background = _后台启动服务
+_wait_server_startup = _等待服务启动
+_at = _定位
+_fg = _前景色
+_lerp = _线性插值
+_fade = _淡化
+_cjk_len = _中日韩宽度
+_Theme = _主题
+_Particle = _粒子
+_burst = _爆发粒子
+_play_animation = _播放动画
+_ROTORS = _旋翼帧
+_BODY = _机身帧
+main = 主程序
+
 if __name__ == "__main__":
-    main()
+    主程序()

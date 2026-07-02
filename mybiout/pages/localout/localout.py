@@ -6,32 +6,35 @@ LocalOut! 本地缓存导出服务层, 负责扫描、解析和导出本地视�
 :time: 2026-04-12
 """
 
-import ctypes
-import hashlib
-import json
-import os
-import re
-import shutil
-import subprocess
-import sys
-import tempfile
-import threading
-import time
-import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import suppress
-from dataclasses import dataclass, field, replace
-from datetime import datetime
-from pathlib import Path
+import ctypes as 系统接口
+import hashlib as 哈希
+import json as 数据交换
+import os as 系统
+import re as 正则
+import shutil as 文件工具
+import subprocess as 子进程
+import sys as 系统信息
+import tempfile as 临时文件
+import threading as 线程
+import time as 时间
+import uuid as 唯一编号
+from concurrent.futures import ThreadPoolExecutor as 线程池执行器
+from concurrent.futures import as_completed as 逐个完成
+from contextlib import suppress as 忽略异常
+from dataclasses import dataclass as 数据类
+from dataclasses import field as 字段
+from dataclasses import replace as 替换数据
+from datetime import datetime as 日期时间
+from pathlib import Path as 路径
 
-from mybiout.pages import utils
+from mybiout.pages import utils as 工具
 
 try:
-    import httpx
+    import httpx as 网络请求
 
     _HAS_HTTPX: bool = True
 except Exception:
-    httpx = None
+    网络请求 = None
     _HAS_HTTPX: bool = False
 
 try:
@@ -74,10 +77,10 @@ _QN_MAP: dict[int, str] = {
 _AUDIO_CODEC_THRESHOLD: int = 30200
 
 _POPEN_EXTRA: dict = {}
-if sys.platform == "win32":
+if 系统信息.platform == "win32":
     _POPEN_EXTRA["creationflags"] = 0x08000000
 
-_COVER_CACHE_DIR: Path = Path(tempfile.gettempdir()) / "mybiout_covers"
+_COVER_CACHE_DIR: 路径 = 路径(临时文件.gettempdir()) / "mybiout_covers"
 _COVER_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -89,29 +92,29 @@ def _find_adb() -> str | None:
     查找 adb 可执行文件路径（参考 biliandout DeviceScanner.find_adb）
     :return: str | None: 路径, 未找到返回 None
     """
-    bin_name: str = "adb.exe" if sys.platform == "win32" else "adb"
-    if shutil.which(bin_name) or shutil.which("adb"):
+    bin_name: str = "adb.exe" if 系统信息.platform == "win32" else "adb"
+    if 文件工具.which(bin_name) or 文件工具.which("adb"):
         return bin_name
-    if sys.platform == "win32":
+    if 系统信息.platform == "win32":
         for candidate in (
-            Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
-            Path(os.environ.get("USERPROFILE", ""))
+            路径(系统.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
+            路径(系统.environ.get("USERPROFILE", ""))
             / "AppData"
             / "Local"
             / "Android"
             / "Sdk"
             / "platform-tools"
             / "adb.exe",
-            Path("C:/Android/sdk/platform-tools/adb.exe"),
-            Path("C:/Program Files/Android/platform-tools/adb.exe"),
-            Path("C:/Program Files (x86)/Android/platform-tools/adb.exe"),
+            路径("C:/Android/sdk/platform-tools/adb.exe"),
+            路径("C:/Program Files/Android/platform-tools/adb.exe"),
+            路径("C:/Program Files (x86)/Android/platform-tools/adb.exe"),
         ):
             if candidate.exists():
                 return str(candidate)
     return None
 
 
-def _adb_run(adb: str, serial: str, *args: str, timeout: float = 10) -> subprocess.CompletedProcess:
+def _adb_run(adb: str, serial: str, *args: str, timeout: float = 10) -> 子进程.CompletedProcess:
     r"""
     执行 adb [-s serial] <args> 命令
     :param: adb: adb 可执行文件路径
@@ -124,7 +127,7 @@ def _adb_run(adb: str, serial: str, *args: str, timeout: float = 10) -> subproce
     if serial:
         cmd += ["-s", serial]
     cmd += list(args)
-    return subprocess.run(
+    return 子进程.run(
         cmd,
         capture_output=True,
         text=True,
@@ -143,7 +146,7 @@ def _get_adb_devices() -> list[tuple[str, str]]:
     if not adb:
         return devices
     try:
-        result: subprocess.CompletedProcess = _adb_run(adb, "", "devices", "-l", timeout=8)
+        result: 子进程.CompletedProcess = _adb_run(adb, "", "devices", "-l", timeout=8)
         if result.returncode != 0:
             return devices
         for line in result.stdout.strip().splitlines()[1:]:
@@ -166,28 +169,28 @@ def _get_adb_devices() -> list[tuple[str, str]]:
 # ===== 通用工具 =====
 
 
-def _uid() -> str:
-    return uuid.uuid4().hex[:12]
+def _生成编号() -> str:
+    return 唯一编号.uuid4().hex[:12]
 
 
-def _ts() -> str:
-    return datetime.now().strftime("%H:%M:%S")
+def _短时间() -> str:
+    return 日期时间.now().strftime("%H:%M:%S")
 
 
-def _ts_full() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def _完整时间() -> str:
+    return 日期时间.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _get_volume_label(letter: str) -> str:
+def _取卷标(letter: str) -> str:
     r"""
     获取驱动器卷标
     :param: letter: 单个大写盘符字母
     :return: str: 卷标名称
     """
-    if sys.platform == "win32":
-        buf: ctypes.Array = ctypes.create_unicode_buffer(261)
+    if 系统信息.platform == "win32":
+        buf: 系统接口.Array = 系统接口.create_unicode_buffer(261)
         try:
-            ret: int = ctypes.windll.kernel32.GetVolumeInformationW(
+            ret: int = 系统接口.windll.kernel32.GetVolumeInformationW(
                 f"{letter}:\\",
                 buf,
                 261,
@@ -204,25 +207,25 @@ def _get_volume_label(letter: str) -> str:
     return f"存储设备 ({letter}:)"
 
 
-def _sanitize(name: str) -> str:
-    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip(". ")
+def _清理文件名(name: str) -> str:
+    name = 正则.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip(". ")
     return name[:200] if name else "untitled"
 
 
-def _size_mb(b: int | float) -> float:
+def _兆字节(b: int | float) -> float:
     return round(b / 1048576, 1) if b else 0
 
 
 # ===== 数据模型 =====
 
 
-@dataclass(slots=True)
-class VideoCard:
+@数据类(slots=True)
+class 视频卡片:
     r"""
     视频缓存卡片数据模型, 表示一个被扫描到的缓存视频
     """
 
-    id: str = field(default_factory=_uid)
+    id: str = 字段(default_factory=_生成编号)
     title: str = ""
     bvid: str = ""
     avid: str = ""
@@ -252,7 +255,7 @@ class VideoCard:
     def to_dict(self) -> dict:
         alive: bool = True
         if self.source_type in ("local", "pc", "drive") and self.video_path:
-            alive = Path(self.video_path).exists()
+            alive = 路径(self.video_path).exists()
         return {
             "id": self.id,
             "title": self.title,
@@ -264,7 +267,7 @@ class VideoCard:
             "quality": self.quality,
             "resolution": self.resolution,
             "size_bytes": self.size_bytes,
-            "size_mb": _size_mb(self.size_bytes),
+            "size_mb": _兆字节(self.size_bytes),
             "publish_time": self.publish_time,
             "folder_name": self.folder_name,
             "source_label": self.source_label,
@@ -272,29 +275,29 @@ class VideoCard:
             "cover_url": f"/api/localout/cover/{self.id}" if self.cover_path else "",
             "video_path": self.video_path,
             "output_path": self.output_path,
-            "path_display": self.output_path or str(Path(self.video_path).parent if self.video_path else ""),
+            "path_display": self.output_path or str(路径(self.video_path).parent if self.video_path else ""),
             "alive": alive,
             "status": self.status,
             "error": self.error,
         }
 
-    def clone(self) -> VideoCard:
-        return replace(self, id=_uid(), status="queued", error="", output_path="")
+    def clone(self) -> 视频卡片:
+        return 替换数据(self, id=_生成编号(), status="queued", error="", output_path="")
 
 
 # ===== 全局状态 =====
 
 
-class _State:
+class _本地状态:
     r"""
     LocalOut 全局运行状态管理
     """
 
     def __init__(self) -> None:
-        self.lock: threading.RLock = threading.RLock()
-        self.source_cards: list[VideoCard] = []
-        self.task_cards: list[VideoCard] = []
-        self.completed_cards: list[VideoCard] = []
+        self.lock: 线程.RLock = 线程.RLock()
+        self.source_cards: list[视频卡片] = []
+        self.task_cards: list[视频卡片] = []
+        self.completed_cards: list[视频卡片] = []
         self.logs: list[dict] = []
         self.scan_status: str = "idle"
         self.scan_progress: float = 0.0
@@ -302,18 +305,18 @@ class _State:
         self.export_progress: float = 0.0
         self.export_total: int = 0
         self.export_done: int = 0
-        self._scan_thread: threading.Thread | None = None
-        self._scan_cancel: threading.Event = threading.Event()
-        self._scan_pause: threading.Event = threading.Event()
-        self._export_thread: threading.Thread | None = None
-        self._export_cancel: threading.Event = threading.Event()
+        self._scan_thread: 线程.Thread | None = None
+        self._scan_cancel: 线程.Event = 线程.Event()
+        self._scan_pause: 线程.Event = 线程.Event()
+        self._export_thread: 线程.Thread | None = None
+        self._export_cancel: 线程.Event = 线程.Event()
         self._known_keys: set[str] = set()
         self._available_keys: set[str] = set()
         self._last_available_refresh: float = 0.0
 
     def log(self, level: str, msg: str) -> None:
         with self.lock:
-            self.logs.append({"time": _ts(), "level": level, "msg": msg})
+            self.logs.append({"time": _短时间(), "level": level, "msg": msg})
             if len(self.logs) > 500:
                 self.logs = self.logs[-300:]
 
@@ -333,11 +336,11 @@ class _State:
                 "export_done": self.export_done,
             }
 
-    def _dedup_key(self, c: VideoCard) -> str:
+    def _dedup_key(self, c: 视频卡片) -> str:
         # 含 device_serial 避免不同 ADB 设备的相同路径发生碰撞
         return f"{c.source_type}|{c.device_serial}|{c.video_path}|{c.audio_path}"
 
-    def add_source_card(self, c: VideoCard) -> bool:
+    def add_source_card(self, c: 视频卡片) -> bool:
         k: str = self._dedup_key(c)
         with self.lock:
             if k in self._known_keys:
@@ -347,18 +350,18 @@ class _State:
             return True
 
 
-S: _State = _State()
+状态: _本地状态 = _本地状态()
 
 
 # ===== 解析 / 查找函数 =====
 
 
-def _parse_entry_json(
-    path: Path,
+def _解析入口JSON(
+    path: 路径,
     source_label: str,
     source_type: str,
     serial: str = "",
-) -> VideoCard | None:
+) -> 视频卡片 | None:
     r"""
     解析安卓缓存 entry.json 文件
     :param: path: entry.json 路径
@@ -368,7 +371,7 @@ def _parse_entry_json(
     :return: VideoCard | None
     """
     try:
-        data: dict = json.loads(path.read_text(encoding="utf-8"))
+        data: dict = 数据交换.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
 
@@ -376,7 +379,7 @@ def _parse_entry_json(
     w: int = page_data.get("width", 0)
     h: int = page_data.get("height", 0)
     type_tag: str = str(data.get("type_tag", ""))
-    parent_dir: Path = path.parent
+    parent_dir: 路径 = path.parent
 
     video_path: str = ""
     audio_path: str = ""
@@ -402,7 +405,7 @@ def _parse_entry_json(
     if not video_path:
         return None
 
-    return VideoCard(
+    return 视频卡片(
         title=data.get("title", ""),
         bvid=data.get("bvid", "") or "",
         avid=str(data.get("avid", "")),
@@ -417,11 +420,11 @@ def _parse_entry_json(
         device_serial=serial,
         video_path=video_path,
         audio_path=audio_path,
-        cover_path=_find_cover_upward(parent_dir),
+        cover_path=_向上寻找封面(parent_dir),
     )
 
 
-def _find_m4s_recursive(root: Path, source_label: str, source_type: str) -> list[VideoCard]:
+def _递归寻找M4S(root: 路径, source_label: str, source_type: str) -> list[视频卡片]:
     r"""
     递归搜索目录中的 video.m4s / audio.m4s 文件对（无需 JSON 元数据）
     逻辑参考 biliandout ScanWorker._find_m4s_local：
@@ -432,23 +435,23 @@ def _find_m4s_recursive(root: Path, source_label: str, source_type: str) -> list
     :param: source_type: 来源类型
     :return: list[VideoCard]
     """
-    cards: list[VideoCard] = []
-    vp: Path = root / "video.m4s"
-    ap: Path = root / "audio.m4s"
+    cards: list[视频卡片] = []
+    vp: 路径 = root / "video.m4s"
+    ap: 路径 = root / "audio.m4s"
     if vp.exists() and ap.exists():
-        if card := _make_card_from_m4s_dir(root, source_label, source_type):
+        if card := _从M4S目录制卡(root, source_label, source_type):
             cards.append(card)
     else:
         try:
             for sub in root.iterdir():
                 if sub.is_dir():
-                    cards.extend(_find_m4s_recursive(sub, source_label, source_type))
+                    cards.extend(_递归寻找M4S(sub, source_label, source_type))
         except PermissionError:
             pass
     return cards
 
 
-def _parse_ls_output(stdout: str) -> list[str]:
+def _解析列表输出(stdout: str) -> list[str]:
     r"""
     解析 adb shell ls 输出，过滤空行、错误前缀、控制字符（处理彩色输出）
     参考 biliandout ScanWorker 经验：某些 Android ROM 默认 ls 输出带 ANSI 颜色
@@ -456,7 +459,7 @@ def _parse_ls_output(stdout: str) -> list[str]:
     :return: list[str]: 清理后的条目名列表
     """
     out: list[str] = []
-    ansi_re: re.Pattern[str] = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+    ansi_re: 正则.Pattern[str] = 正则.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
     for line in stdout.splitlines():
         cleaned: str = ansi_re.sub("", line).strip()
         if not cleaned:
@@ -469,7 +472,7 @@ def _parse_ls_output(stdout: str) -> list[str]:
     return out
 
 
-def _find_pc_m4s(cache_dir: Path) -> tuple[str, str]:
+def _寻找电脑M4S(cache_dir: 路径) -> tuple[str, str]:
     r"""
     在 PC 缓存目录中查找 video 和 audio m4s 文件（通过 codec-id 区分）
     :param: cache_dir: 缓存子目录
@@ -495,7 +498,7 @@ def _find_pc_m4s(cache_dir: Path) -> tuple[str, str]:
     return video, audio
 
 
-def _parse_video_info_json(path: Path, source_label: str) -> VideoCard | None:
+def _解析视频信息JSON(path: 路径, source_label: str) -> 视频卡片 | None:
     r"""
     解析 PC 缓存 videoInfo.json 文件
     :param: path: videoInfo.json 路径
@@ -503,7 +506,7 @@ def _parse_video_info_json(path: Path, source_label: str) -> VideoCard | None:
     :return: VideoCard | None
     """
     try:
-        data: dict = json.loads(path.read_text(encoding="utf-8"))
+        data: dict = 数据交换.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
 
@@ -511,15 +514,15 @@ def _parse_video_info_json(path: Path, source_label: str) -> VideoCard | None:
     pubdate: int = data.get("pubdate", 0)
     publish_time: str = ""
     if pubdate:
-        with suppress(Exception):
-            publish_time = datetime.fromtimestamp(pubdate).strftime("%Y-%m-%d %H:%M")
+        with 忽略异常(Exception):
+            publish_time = 日期时间.fromtimestamp(pubdate).strftime("%Y-%m-%d %H:%M")
 
-    cache_dir: Path = path.parent
-    video_path, audio_path = _find_pc_m4s(cache_dir)
+    cache_dir: 路径 = path.parent
+    video_path, audio_path = _寻找电脑M4S(cache_dir)
     if not video_path:
         return None
 
-    return VideoCard(
+    return 视频卡片(
         title=data.get("title", "") or data.get("groupTitle", ""),
         bvid=data.get("bvid", "") or "",
         avid=str(data.get("aid", "") or ""),
@@ -534,18 +537,18 @@ def _parse_video_info_json(path: Path, source_label: str) -> VideoCard | None:
         source_type="pc",
         video_path=video_path,
         audio_path=audio_path,
-        cover_path=_find_cover_upward(cache_dir),
+        cover_path=_向上寻找封面(cache_dir),
     )
 
 
-def _parse_index_json(path: Path) -> tuple[str, str, int]:
+def _解析索引JSON(path: 路径) -> tuple[str, str, int]:
     r"""
     解析 Android 新版 index.json (与 video.m4s/audio.m4s 同目录)
     :param: path: index.json 路径
     :return: (分辨率字符串, 帧率字符串, 视频码率)
     """
     try:
-        data: dict = json.loads(path.read_text(encoding="utf-8"))
+        data: dict = 数据交换.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return "", "", 0
     video_list: list = data.get("video", []) or []
@@ -565,17 +568,17 @@ def _parse_index_json(path: Path) -> tuple[str, str, int]:
     return resolution, frame_rate, int(v.get("bandwidth", 0) or 0)
 
 
-def _find_cover_upward(start: Path, max_depth: int = 3) -> str:
+def _向上寻找封面(start: 路径, max_depth: int = 3) -> str:
     r"""
     从 start 起向上查找 cover.jpg / cover.jpeg / cover.png (含 start 自身)
     :param: start: 起始目录
     :param: max_depth: 最多上溯层数
     :return: str: cover 路径, 找不到返回空串
     """
-    cur: Path = start
+    cur: 路径 = start
     for _ in range(max_depth + 1):
         for name in ("cover.jpg", "cover.jpeg", "cover.png"):
-            cand: Path = cur / name
+            cand: 路径 = cur / name
             if cand.exists():
                 return str(cand)
         if cur.parent == cur:
@@ -584,7 +587,7 @@ def _find_cover_upward(start: Path, max_depth: int = 3) -> str:
     return ""
 
 
-def _make_card_from_m4s_dir(m4s_dir: Path, source_label: str, source_type: str) -> VideoCard | None:
+def _从M4S目录制卡(m4s_dir: 路径, source_label: str, source_type: str) -> 视频卡片 | None:
     r"""
     针对 "目录中含 video.m4s + audio.m4s" 的通用情况构造 VideoCard
     自动尝试解析同目录下 index.json 与上溯查找封面
@@ -593,28 +596,28 @@ def _make_card_from_m4s_dir(m4s_dir: Path, source_label: str, source_type: str) 
     :param: source_type: 来源类型
     :return: VideoCard | None
     """
-    vp: Path = m4s_dir / "video.m4s"
-    ap: Path = m4s_dir / "audio.m4s"
+    vp: 路径 = m4s_dir / "video.m4s"
+    ap: 路径 = m4s_dir / "audio.m4s"
     if not (vp.exists() and ap.exists()):
         return None
 
     size: int = 0
-    with suppress(OSError):
+    with 忽略异常(OSError):
         size = vp.stat().st_size + ap.stat().st_size
 
     resolution: str = ""
     frame_rate: str = ""
     if (idx := m4s_dir / "index.json").exists():
-        resolution, frame_rate, _ = _parse_index_json(idx)
+        resolution, frame_rate, _ = _解析索引JSON(idx)
 
     quality: str = ""
-    with suppress(ValueError):
+    with 忽略异常(ValueError):
         quality = _QN_MAP.get(int(m4s_dir.name), "")
     if frame_rate:
         quality = f"{quality} {frame_rate}".strip()
 
-    folder: Path = m4s_dir.parent if m4s_dir.parent != m4s_dir else m4s_dir
-    return VideoCard(
+    folder: 路径 = m4s_dir.parent if m4s_dir.parent != m4s_dir else m4s_dir
+    return 视频卡片(
         folder_name=folder.name or m4s_dir.name,
         source_label=source_label,
         source_type=source_type,
@@ -623,27 +626,27 @@ def _make_card_from_m4s_dir(m4s_dir: Path, source_label: str, source_type: str) 
         size_bytes=size,
         resolution=resolution,
         quality=quality,
-        cover_path=_find_cover_upward(m4s_dir.parent),
+        cover_path=_向上寻找封面(m4s_dir.parent),
     )
 
 
-def _crawler_enrich(card: VideoCard) -> None:
+def _爬虫补全(card: 视频卡片) -> None:
     r"""
     若设置启用爬虫降级, 当卡片缺失关键元数据(title/up)时, 尝试用 BV 号补全
     :param: card: 待补全卡片 (就地修改)
     """
-    timeout: float | None = utils.get_crawler_fallback_timeout()
+    timeout: float | None = 工具.取爬虫兜底超时()
     if timeout is None or not _HAS_HTTPX:
         return
     if card.title and card.up_name:
         return
     if not card.bvid:
-        if m := re.search(r"(BV[\w]{10,})", card.folder_name or ""):
+        if m := 正则.search(r"(BV[\w]{10,})", card.folder_name or ""):
             card.bvid = m.group(1)
         else:
             return
     try:
-        with httpx.Client(headers=_CRAWLER_HEADERS, timeout=timeout) as c:
+        with 网络请求.Client(headers=_CRAWLER_HEADERS, timeout=timeout) as c:
             r = c.get(
                 "https://api.bilibili.com/x/web-interface/view",
                 params={"bvid": card.bvid},
@@ -657,8 +660,8 @@ def _crawler_enrich(card: VideoCard) -> None:
         if not card.up_name:
             card.up_name = info.get("owner", {}).get("name", "")
         if not card.publish_time and (pubdate := info.get("pubdate")):
-            with suppress(Exception):
-                card.publish_time = datetime.fromtimestamp(pubdate).strftime("%Y-%m-%d %H:%M")
+            with 忽略异常(Exception):
+                card.publish_time = 日期时间.fromtimestamp(pubdate).strftime("%Y-%m-%d %H:%M")
     except Exception:
         pass
 
@@ -666,7 +669,7 @@ def _crawler_enrich(card: VideoCard) -> None:
 # ===== 扫描函数 =====
 
 
-def _scan_local_dir(root: Path, source_label: str) -> list[VideoCard]:
+def _扫描本地目录(root: 路径, source_label: str) -> list[视频卡片]:
     r"""
     扫描本地目录：优先解析 entry.json / videoInfo.json，
     若均无则递归查找任意 video.m4s / audio.m4s 对
@@ -674,135 +677,135 @@ def _scan_local_dir(root: Path, source_label: str) -> list[VideoCard]:
     :param: source_label: 来源标签
     :return: list[VideoCard]
     """
-    cards: list[VideoCard] = []
-    entry_files: list[Path] = list(root.rglob("entry.json"))
-    vi_files: list[Path] = list(root.rglob("videoInfo.json"))
+    cards: list[视频卡片] = []
+    entry_files: list[路径] = list(root.rglob("entry.json"))
+    vi_files: list[路径] = list(root.rglob("videoInfo.json"))
     total: int = len(entry_files) + len(vi_files)
 
     for i, ef in enumerate(entry_files):
-        if S._scan_cancel.is_set():
+        if 状态._scan_cancel.is_set():
             break
-        while S._scan_pause.is_set() and not S._scan_cancel.is_set():
-            time.sleep(0.2)
-        if (c := _parse_entry_json(ef, source_label, "local")) and S.add_source_card(c):
+        while 状态._scan_pause.is_set() and not 状态._scan_cancel.is_set():
+            时间.sleep(0.2)
+        if (c := _解析入口JSON(ef, source_label, "local")) and 状态.add_source_card(c):
             cards.append(c)
         if total:
-            with S.lock:
-                S.scan_progress = (i + 1) / total
+            with 状态.lock:
+                状态.scan_progress = (i + 1) / total
 
     for i, vf in enumerate(vi_files):
-        if S._scan_cancel.is_set():
+        if 状态._scan_cancel.is_set():
             break
-        while S._scan_pause.is_set() and not S._scan_cancel.is_set():
-            time.sleep(0.2)
-        if (c := _parse_video_info_json(vf, source_label)) and S.add_source_card(c):
+        while 状态._scan_pause.is_set() and not 状态._scan_cancel.is_set():
+            时间.sleep(0.2)
+        if (c := _解析视频信息JSON(vf, source_label)) and 状态.add_source_card(c):
             cards.append(c)
         if total:
-            with S.lock:
-                S.scan_progress = (len(entry_files) + i + 1) / total
+            with 状态.lock:
+                状态.scan_progress = (len(entry_files) + i + 1) / total
 
     # 通用回退：当目录中没有任何 JSON 元数据时，递归查找 m4s 对
     if not cards and not entry_files and not vi_files:
-        fallback: list[VideoCard] = _find_m4s_recursive(root, source_label, "local")
+        fallback: list[视频卡片] = _递归寻找M4S(root, source_label, "local")
         for c in fallback:
-            if S.add_source_card(c):
+            if 状态.add_source_card(c):
                 cards.append(c)
 
     return cards
 
 
-def _scan_pc_cache(root: Path, source_label: str) -> list[VideoCard]:
+def _扫描电脑缓存(root: 路径, source_label: str) -> list[视频卡片]:
     r"""
     扫描 PC 桌面端缓存目录
     :param: root: 缓存根目录
     :param: source_label: 来源标签
     :return: list[VideoCard]
     """
-    cards: list[VideoCard] = []
+    cards: list[视频卡片] = []
     if not root.is_dir():
-        S.log("error", f"PC 缓存路径不存在: {root}")
+        状态.log("error", f"PC 缓存路径不存在: {root}")
         return cards
 
-    subdirs: list[Path] = [d for d in root.iterdir() if d.is_dir()]
+    subdirs: list[路径] = [d for d in root.iterdir() if d.is_dir()]
     total: int = len(subdirs)
 
     for i, sd in enumerate(subdirs):
-        if S._scan_cancel.is_set():
+        if 状态._scan_cancel.is_set():
             break
-        while S._scan_pause.is_set() and not S._scan_cancel.is_set():
-            time.sleep(0.2)
+        while 状态._scan_pause.is_set() and not 状态._scan_cancel.is_set():
+            时间.sleep(0.2)
 
         if (vf := sd / "videoInfo.json").exists():
-            if (c := _parse_video_info_json(vf, source_label)) and S.add_source_card(c):
+            if (c := _解析视频信息JSON(vf, source_label)) and 状态.add_source_card(c):
                 cards.append(c)
         else:
-            video, audio = _find_pc_m4s(sd)
+            video, audio = _寻找电脑M4S(sd)
             if video:
-                c = VideoCard(
+                c = 视频卡片(
                     folder_name=sd.name,
                     source_label=source_label,
                     source_type="pc",
                     video_path=video,
                     audio_path=audio,
-                    cover_path=_find_cover_upward(Path(video).parent),
+                    cover_path=_向上寻找封面(路径(video).parent),
                 )
-                if S.add_source_card(c):
+                if 状态.add_source_card(c):
                     cards.append(c)
             else:
-                for nested in _find_m4s_recursive(sd, source_label, "pc"):
-                    if S.add_source_card(nested):
+                for nested in _递归寻找M4S(sd, source_label, "pc"):
+                    if 状态.add_source_card(nested):
                         cards.append(nested)
 
         if total:
-            with S.lock:
-                S.scan_progress = (i + 1) / total
+            with 状态.lock:
+                状态.scan_progress = (i + 1) / total
 
     return cards
 
 
-def _scan_drive(root: Path, source_label: str) -> list[VideoCard]:
+def _扫描磁盘(root: 路径, source_label: str) -> list[视频卡片]:
     r"""
     扫描挂载为本地驱动器的 Android 设备缓存
     :param: root: 下载目录（如 E:/Android/data/tv.danmaku.bili/download）
     :param: source_label: 来源标签
     :return: list[VideoCard]
     """
-    cards: list[VideoCard] = []
+    cards: list[视频卡片] = []
     if not root.is_dir():
-        S.log("error", f"驱动器缓存路径不存在: {root}")
+        状态.log("error", f"驱动器缓存路径不存在: {root}")
         return cards
 
-    entry_files: list[Path] = list(root.rglob("entry.json"))
+    entry_files: list[路径] = list(root.rglob("entry.json"))
     total: int = len(entry_files)
 
     for i, ef in enumerate(entry_files):
-        if S._scan_cancel.is_set():
+        if 状态._scan_cancel.is_set():
             break
-        while S._scan_pause.is_set() and not S._scan_cancel.is_set():
-            time.sleep(0.2)
-        if (c := _parse_entry_json(ef, source_label, "drive")) and S.add_source_card(c):
+        while 状态._scan_pause.is_set() and not 状态._scan_cancel.is_set():
+            时间.sleep(0.2)
+        if (c := _解析入口JSON(ef, source_label, "drive")) and 状态.add_source_card(c):
             cards.append(c)
         if total:
-            with S.lock:
-                S.scan_progress = (i + 1) / total
+            with 状态.lock:
+                状态.scan_progress = (i + 1) / total
 
     # 通用回退
     if not cards and not entry_files:
-        fallback: list[VideoCard] = _find_m4s_recursive(root, source_label, "drive")
+        fallback: list[视频卡片] = _递归寻找M4S(root, source_label, "drive")
         for c in fallback:
-            if S.add_source_card(c):
+            if 状态.add_source_card(c):
                 cards.append(c)
 
     return cards
 
 
-def _scan_adb_folder(
+def _扫描ADB文件夹(
     adb: str,
     serial: str,
     remote_path: str,
     root_folder: str,
     source_label: str,
-) -> list[VideoCard]:
+) -> list[视频卡片]:
     r"""
     递归搜索 ADB 设备目录中的 video.m4s / audio.m4s 文件对
     逻辑参考 biliandout ScanWorker._find_m4s_adb：
@@ -815,11 +818,11 @@ def _scan_adb_folder(
     :param: source_label: 来源标签
     :return: list[VideoCard]
     """
-    cards: list[VideoCard] = []
-    if S._scan_cancel.is_set():
+    cards: list[视频卡片] = []
+    if 状态._scan_cancel.is_set():
         return cards
     try:
-        res: subprocess.CompletedProcess = _adb_run(
+        res: 子进程.CompletedProcess = _adb_run(
             adb,
             serial,
             "shell",
@@ -828,16 +831,16 @@ def _scan_adb_folder(
         )
         if res.returncode != 0:
             return cards
-        entries: list[str] = _parse_ls_output(res.stdout)
+        entries: list[str] = _解析列表输出(res.stdout)
         if "video.m4s" in entries and "audio.m4s" in entries:
-            if card := _make_adb_card(adb, serial, remote_path, root_folder, source_label):
+            if card := _制作ADB卡片(adb, serial, remote_path, root_folder, source_label):
                 cards.append(card)
         else:
             for entry in entries:
                 if entry in (".", ".."):
                     continue
                 cards.extend(
-                    _scan_adb_folder(
+                    _扫描ADB文件夹(
                         adb,
                         serial,
                         f"{remote_path}/{entry}",
@@ -850,17 +853,17 @@ def _scan_adb_folder(
     return cards
 
 
-def _iter_adb_packages(package: str) -> list[tuple[str, str]]:
+def _遍历ADB包(package: str) -> list[tuple[str, str]]:
     requested: str = package.strip()
     if not requested:
         return list(_BILI_PACKAGES)
     if requested in _BILI_PACKAGE_NAMES:
         return [(requested, _BILI_PACKAGE_NAMES[requested])]
-    S.log("warn", f"未知 B 站包名: {requested}")
+    状态.log("warn", f"未知 B 站包名: {requested}")
     return []
 
 
-def _pull_cover_adb(adb: str, serial: str, remote_dir: str, identifier: str) -> str:
+def _拉取ADB封面(adb: str, serial: str, remote_dir: str, identifier: str) -> str:
     r"""
     从 ADB 设备拉取 cover.jpg 到本地缓存目录，命中缓存直接返回
     参考 biliandout ScanWorker._pull_cover_adb
@@ -870,18 +873,18 @@ def _pull_cover_adb(adb: str, serial: str, remote_dir: str, identifier: str) -> 
     :param: identifier: 唯一标识（用于哈希命名）
     :return: str: 本地缓存路径, 失败返回空串
     """
-    safe_id: str = hashlib.md5(f"{remote_dir}_{identifier}".encode()).hexdigest()
+    safe_id: str = 哈希.md5(f"{remote_dir}_{identifier}".encode()).hexdigest()
     for ext in ("jpg", "jpeg", "png"):
-        cached: Path = _COVER_CACHE_DIR / f"{safe_id}.{ext}"
+        cached: 路径 = _COVER_CACHE_DIR / f"{safe_id}.{ext}"
         if cached.exists() and cached.stat().st_size > 0:
             return str(cached)
 
     cur: str = remote_dir
     for _ in range(4):
         for ext in ("jpg", "jpeg", "png"):
-            target: Path = _COVER_CACHE_DIR / f"{safe_id}.{ext}"
+            target: 路径 = _COVER_CACHE_DIR / f"{safe_id}.{ext}"
             try:
-                res: subprocess.CompletedProcess = _adb_run(
+                res: 子进程.CompletedProcess = _adb_run(
                     adb,
                     serial,
                     "pull",
@@ -900,13 +903,13 @@ def _pull_cover_adb(adb: str, serial: str, remote_dir: str, identifier: str) -> 
     return ""
 
 
-def _make_adb_card(
+def _制作ADB卡片(
     adb: str,
     serial: str,
     remote_path: str,
     root_folder: str,
     source_label: str,
-) -> VideoCard | None:
+) -> 视频卡片 | None:
     r"""
     解析 ADB 设备上某 m4s 目录，尝试拉取 entry.json / index.json 获取元数据后生成 VideoCard
     参考 biliandout ScanWorker._parse_video_adb
@@ -939,9 +942,9 @@ def _make_adb_card(
             parent_remote = "/".join(_parts[:-1])
     tmp_path: str = ""
     try:
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+        with 临时文件.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
             tmp_path = tmp.name
-        pull_res: subprocess.CompletedProcess = _adb_run(
+        pull_res: 子进程.CompletedProcess = _adb_run(
             adb,
             serial,
             "pull",
@@ -949,8 +952,8 @@ def _make_adb_card(
             tmp_path,
             timeout=10,
         )
-        if pull_res.returncode == 0 and Path(tmp_path).exists():
-            data: dict = json.loads(Path(tmp_path).read_text(encoding="utf-8"))
+        if pull_res.returncode == 0 and 路径(tmp_path).exists():
+            data: dict = 数据交换.loads(路径(tmp_path).read_text(encoding="utf-8"))
             title = data.get("title", root_folder) or root_folder
             bvid = data.get("bvid", "") or ""
             avid = str(data.get("avid", ""))
@@ -965,15 +968,15 @@ def _make_adb_card(
         pass
     finally:
         if tmp_path:
-            Path(tmp_path).unlink(missing_ok=True)
+            路径(tmp_path).unlink(missing_ok=True)
 
     # 尝试拉取 index.json 解析分辨率/帧率（与 m4s 同目录）
     if not resolution or not frame_rate:
         idx_tmp: str = ""
         try:
-            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            with 临时文件.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
                 idx_tmp = tmp.name
-            idx_res: subprocess.CompletedProcess = _adb_run(
+            idx_res: 子进程.CompletedProcess = _adb_run(
                 adb,
                 serial,
                 "pull",
@@ -981,8 +984,8 @@ def _make_adb_card(
                 idx_tmp,
                 timeout=10,
             )
-            if idx_res.returncode == 0 and Path(idx_tmp).exists():
-                res_r, fr_r, _ = _parse_index_json(Path(idx_tmp))
+            if idx_res.returncode == 0 and 路径(idx_tmp).exists():
+                res_r, fr_r, _ = _解析索引JSON(路径(idx_tmp))
                 if not resolution and res_r:
                     resolution = res_r
                 if fr_r:
@@ -991,22 +994,22 @@ def _make_adb_card(
             pass
         finally:
             if idx_tmp:
-                Path(idx_tmp).unlink(missing_ok=True)
+                路径(idx_tmp).unlink(missing_ok=True)
 
     # 从目录名推断画质
     if not quality:
-        with suppress(ValueError, IndexError):
+        with 忽略异常(ValueError, IndexError):
             quality = _QN_MAP.get(int(remote_path.rsplit("/", 1)[-1]), "")
     if frame_rate:
         quality = f"{quality} {frame_rate}".strip()
 
     # 拉取封面（向上 4 层查找）
-    cover_path: str = _pull_cover_adb(adb, serial, parent_remote, root_folder)
+    cover_path: str = _拉取ADB封面(adb, serial, parent_remote, root_folder)
 
     # 若 entry.json 未提供大小，通过 stat 获取
     if not size_bytes:
         try:
-            stat_res: subprocess.CompletedProcess = _adb_run(
+            stat_res: 子进程.CompletedProcess = _adb_run(
                 adb,
                 serial,
                 "shell",
@@ -1018,7 +1021,7 @@ def _make_adb_card(
         except Exception:
             pass
 
-    return VideoCard(
+    return 视频卡片(
         title=title,
         bvid=bvid,
         avid=avid,
@@ -1036,7 +1039,7 @@ def _make_adb_card(
     )
 
 
-def _scan_adb_device(serial: str, source_label: str, package: str = "") -> list[VideoCard]:
+def _扫描ADB设备(serial: str, source_label: str, package: str = "") -> list[视频卡片]:
     r"""
     扫描 ADB 设备上所有哔哩哔哩包的下载目录
     参考 biliandout ScanWorker._scan_adb
@@ -1044,16 +1047,16 @@ def _scan_adb_device(serial: str, source_label: str, package: str = "") -> list[
     :param: source_label: 来源标签
     :return: list[VideoCard]
     """
-    cards: list[VideoCard] = []
+    cards: list[视频卡片] = []
     adb: str | None = _find_adb()
     if not adb:
-        S.log("error", "未找到 ADB 可执行文件，请安装 ADB 并将其加入 PATH")
+        状态.log("error", "未找到 ADB 可执行文件，请安装 ADB 并将其加入 PATH")
         return cards
 
-    for pkg, pkg_name in _iter_adb_packages(package):
+    for pkg, pkg_name in _遍历ADB包(package):
         remote_base: str = f"/sdcard/Android/data/{pkg}/download"
         try:
-            res: subprocess.CompletedProcess = _adb_run(
+            res: 子进程.CompletedProcess = _adb_run(
                 adb,
                 serial,
                 "shell",
@@ -1062,32 +1065,32 @@ def _scan_adb_device(serial: str, source_label: str, package: str = "") -> list[
             )
             if res.returncode != 0:
                 continue
-            folders: list[str] = _parse_ls_output(res.stdout)
+            folders: list[str] = _解析列表输出(res.stdout)
             total: int = len(folders)
             for i, folder_name in enumerate(folders):
-                if S._scan_cancel.is_set():
+                if 状态._scan_cancel.is_set():
                     break
-                while S._scan_pause.is_set() and not S._scan_cancel.is_set():
-                    time.sleep(0.2)
-                for c in _scan_adb_folder(
+                while 状态._scan_pause.is_set() and not 状态._scan_cancel.is_set():
+                    时间.sleep(0.2)
+                for c in _扫描ADB文件夹(
                     adb,
                     serial,
                     f"{remote_base}/{folder_name}",
                     folder_name,
                     source_label,
                 ):
-                    if S.add_source_card(c):
+                    if 状态.add_source_card(c):
                         cards.append(c)
                 if total:
-                    with S.lock:
-                        S.scan_progress = (i + 1) / total
+                    with 状态.lock:
+                        状态.scan_progress = (i + 1) / total
         except Exception as e:
-            S.log("warn", f"扫描 {pkg_name} 失败: {e}")
+            状态.log("warn", f"扫描 {pkg_name} 失败: {e}")
 
     return cards
 
 
-def _scan_thread_fn(
+def _扫描线程函数(
     source_type: str,
     path: str,
     label: str,
@@ -1103,58 +1106,58 @@ def _scan_thread_fn(
     :param: package: 保留参数
     """
     try:
-        S.log("info", f"开始扫描: {label}")
-        with S.lock:
-            S.scan_status = "scanning"
-            S.scan_progress = 0.0
+        状态.log("info", f"开始扫描: {label}")
+        with 状态.lock:
+            状态.scan_status = "scanning"
+            状态.scan_progress = 0.0
 
         match source_type:
             case "pc":
-                found = _scan_pc_cache(Path(path), label)
+                found = _扫描电脑缓存(路径(path), label)
             case "drive":
-                found = _scan_drive(Path(path), label)
+                found = _扫描磁盘(路径(path), label)
             case "adb":
-                found = _scan_adb_device(serial, label, package)
+                found = _扫描ADB设备(serial, label, package)
             case _:
-                found = _scan_local_dir(Path(path), label)
+                found = _扫描本地目录(路径(path), label)
 
-        if utils.get_crawler_fallback_timeout() is not None and not S._scan_cancel.is_set():
-            with S.lock:
-                pending: list[VideoCard] = [c for c in S.source_cards if not (c.title and c.up_name)]
+        if 工具.取爬虫兜底超时() is not None and not 状态._scan_cancel.is_set():
+            with 状态.lock:
+                pending: list[视频卡片] = [c for c in 状态.source_cards if not (c.title and c.up_name)]
             for c in pending:
-                if S._scan_cancel.is_set():
+                if 状态._scan_cancel.is_set():
                     break
-                _crawler_enrich(c)
+                _爬虫补全(c)
 
-        with S.lock:
-            S.scan_status = "idle"
-            S.scan_progress = 1.0
+        with 状态.lock:
+            状态.scan_status = "idle"
+            状态.scan_progress = 1.0
 
-        if S._scan_cancel.is_set():
-            S.log("warn", "扫描已取消")
+        if 状态._scan_cancel.is_set():
+            状态.log("warn", "扫描已取消")
         else:
-            S.log("success", f"扫描完成: 发现 {len(found)} 个视频")
+            状态.log("success", f"扫描完成: 发现 {len(found)} 个视频")
     except Exception as e:
-        S.log("error", f"扫描异常: {e}")
-        with S.lock:
-            S.scan_status = "idle"
+        状态.log("error", f"扫描异常: {e}")
+        with 状态.lock:
+            状态.scan_status = "idle"
     finally:
-        S._scan_cancel.clear()
-        S._scan_pause.clear()
+        状态._scan_cancel.clear()
+        状态._scan_pause.clear()
 
 
 # ===== 导出函数 =====
 
 
-def _build_filename(card: VideoCard) -> str:
+def _构建文件名(card: 视频卡片) -> str:
     r"""
     按设置中的 name_parts 组合导出文件名
     :param: card: 视频卡片
     :return: str: 文件名（含 .mp4），空串表示应跳过
     """
-    raw: str = utils.get_setting("localout", "name_parts")
+    raw: str = 工具.取设置("localout", "name_parts")
     parts: set[str] = set(raw.split(","))
-    action: str = utils.get_setting("localout", "incomplete_title_action")
+    action: str = 工具.取设置("localout", "incomplete_title_action")
 
     display_title: str = card.title
     if not display_title:
@@ -1187,14 +1190,14 @@ def _build_filename(card: VideoCard) -> str:
     if "publish_time" in parts and card.publish_time:
         tails.append(card.publish_time)
     if "export_time" in parts:
-        tails.append(f"导出于{_ts_full()}")
+        tails.append(f"导出于{_完整时间()}")
     if tails:
         main += "--" + ",".join(tails)
 
-    return _sanitize(main) + ".mp4"
+    return _清理文件名(main) + ".mp4"
 
 
-def _local_combine(card: VideoCard, output: str) -> None:
+def _本地合并(card: 视频卡片, output: str) -> None:
     r"""
     本地文件合并，自动区分两种命名方案：
 
@@ -1214,15 +1217,15 @@ def _local_combine(card: VideoCard, output: str) -> None:
     vp: str = card.video_path
     ap: str = card.audio_path
 
-    if not vp or not Path(vp).exists():
+    if not vp or not 路径(vp).exists():
         raise FileNotFoundError(f"视频文件不存在: {vp}")
 
-    if Path(vp).name.lower() == "video.m4s":
+    if 路径(vp).name.lower() == "video.m4s":
         # Android 标准命名 → combine(父目录, 输出)
-        result: bool = _ffm4s.combine(str(Path(vp).parent), output)
+        result: bool = _ffm4s.combine(str(路径(vp).parent), output)
     else:
         # PC codec-id 命名 → convert(视频, 音频, 输出)
-        if not ap or not Path(ap).exists():
+        if not ap or not 路径(ap).exists():
             raise FileNotFoundError(f"音频文件不存在: {ap}")
         result = _ffm4s.convert(vp, ap, output)
 
@@ -1230,7 +1233,7 @@ def _local_combine(card: VideoCard, output: str) -> None:
         raise RuntimeError("biliffm4s 合并失败")
 
 
-def _export_adb_single(card: VideoCard, output: str) -> None:
+def _导出单个ADB(card: 视频卡片, output: str) -> None:
     r"""
     通过 ADB 拉取视频/音频到临时目录后合并为 mp4
     参考 biliandout DeviceScanner.pull_and_convert ADB 分支
@@ -1245,15 +1248,15 @@ def _export_adb_single(card: VideoCard, output: str) -> None:
     if not serial:
         raise RuntimeError("ADB 设备序列号为空")
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        local_video: str = str(Path(tmp_dir) / "video.m4s")
-        local_audio: str = str(Path(tmp_dir) / "audio.m4s")
+    with 临时文件.TemporaryDirectory() as tmp_dir:
+        local_video: str = str(路径(tmp_dir) / "video.m4s")
+        local_audio: str = str(路径(tmp_dir) / "audio.m4s")
 
         for remote, local, name in (
             (card.video_path, local_video, "视频"),
             (card.audio_path, local_audio, "音频"),
         ):
-            pull_res: subprocess.CompletedProcess = _adb_run(
+            pull_res: 子进程.CompletedProcess = _adb_run(
                 adb,
                 serial,
                 "pull",
@@ -1270,7 +1273,7 @@ def _export_adb_single(card: VideoCard, output: str) -> None:
             raise RuntimeError("biliffm4s 合并失败")
 
 
-def _export_single(card: VideoCard, output_dir: Path) -> None:
+def _导出单个(card: 视频卡片, output_dir: 路径) -> None:
     r"""
     导出单个视频（自动区分本地与 ADB 来源）
     :param: card: 视频卡片
@@ -1279,92 +1282,92 @@ def _export_single(card: VideoCard, output_dir: Path) -> None:
     if not _HAS_FFM4S:
         raise RuntimeError("biliffm4s 未安装")
 
-    fname: str = _build_filename(card)
+    fname: str = _构建文件名(card)
     if not fname:
         raise RuntimeError("标题不完整且策略为跳过")
 
-    output: Path = output_dir / fname
+    output: 路径 = output_dir / fname
     counter: int = 1
     while output.exists():
         output = output_dir / f"{output.stem}_{counter}.mp4"
         counter += 1
 
     if card.source_type == "adb":
-        _export_adb_single(card, str(output))
+        _导出单个ADB(card, str(output))
     else:
-        _local_combine(card, str(output))
+        _本地合并(card, str(output))
     card.output_path = str(output)
 
 
-def _export_thread_fn(card_ids: list[str]) -> None:
+def _导出线程函数(card_ids: list[str]) -> None:
     r"""
     导出线程入口函数
     :param: card_ids: 待导出的卡片 ID 列表
     """
-    output_dir: Path = utils.get_export_path() / utils.get_setting("localout", "folder")
+    output_dir: 路径 = 工具.取导出路径() / 工具.取设置("localout", "folder")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    concurrent: int = max(1, min(int(utils.get_setting("localout", "ffmpeg_concurrent") or "3"), 32))
+    concurrent: int = max(1, min(int(工具.取设置("localout", "ffmpeg_concurrent") or "3"), 32))
 
-    with S.lock:
-        targets: list[VideoCard] = [c for c in S.task_cards if c.id in card_ids]
-        S.export_total = len(targets)
-        S.export_done = 0
-        S.export_progress = 0.0
-        S.export_status = "exporting"
+    with 状态.lock:
+        targets: list[视频卡片] = [c for c in 状态.task_cards if c.id in card_ids]
+        状态.export_total = len(targets)
+        状态.export_done = 0
+        状态.export_progress = 0.0
+        状态.export_status = "exporting"
 
-    S.log("info", f"开始导出 {len(targets)} 个视频 (并发 {concurrent})")
+    状态.log("info", f"开始导出 {len(targets)} 个视频 (并发 {concurrent})")
 
-    def _do_one(card: VideoCard) -> None:
-        if S._export_cancel.is_set():
+    def _do_one(card: 视频卡片) -> None:
+        if 状态._export_cancel.is_set():
             return
-        with S.lock:
+        with 状态.lock:
             card.status = "exporting"
-        S.log("info", f"导出中: {card.title or card.folder_name}")
+        状态.log("info", f"导出中: {card.title or card.folder_name}")
         try:
-            _export_single(card, output_dir)
-            with S.lock:
+            _导出单个(card, output_dir)
+            with 状态.lock:
                 card.status = "success"
-                S.task_cards = [c for c in S.task_cards if c.id != card.id]
-                S.completed_cards.append(card)
-                S.export_done += 1
-                S.export_progress = S.export_done / S.export_total if S.export_total else 1
-            S.log("success", f"导出完成: {card.title or card.folder_name}")
+                状态.task_cards = [c for c in 状态.task_cards if c.id != card.id]
+                状态.completed_cards.append(card)
+                状态.export_done += 1
+                状态.export_progress = 状态.export_done / 状态.export_total if 状态.export_total else 1
+            状态.log("success", f"导出完成: {card.title or card.folder_name}")
         except Exception as e:
-            with S.lock:
+            with 状态.lock:
                 card.status = "failed"
                 card.error = str(e)
-                S.export_done += 1
-                S.export_progress = S.export_done / S.export_total if S.export_total else 1
-            S.log("error", f"导出失败: {card.title or card.folder_name} — {e}")
+                状态.export_done += 1
+                状态.export_progress = 状态.export_done / 状态.export_total if 状态.export_total else 1
+            状态.log("error", f"导出失败: {card.title or card.folder_name} — {e}")
 
-    with ThreadPoolExecutor(max_workers=concurrent) as pool:
+    with 线程池执行器(max_workers=concurrent) as pool:
         futs: dict = {pool.submit(_do_one, c): c for c in targets}
-        for _f in as_completed(futs):
-            if S._export_cancel.is_set():
+        for _f in 逐个完成(futs):
+            if 状态._export_cancel.is_set():
                 break
 
-    with S.lock:
-        S.export_status = "idle"
-    if S._export_cancel.is_set():
-        S.log("warn", "导出已取消")
+    with 状态.lock:
+        状态.export_status = "idle"
+    if 状态._export_cancel.is_set():
+        状态.log("warn", "导出已取消")
     else:
-        S.log("success", f"全部导出任务结束 (成功 {S.export_done}/{S.export_total})")
-    S._export_cancel.clear()
+        状态.log("success", f"全部导出任务结束 (成功 {状态.export_done}/{状态.export_total})")
+    状态._export_cancel.clear()
 
 
 # ===== 公开 API =====
 
 
-def get_state() -> dict:
+def 取状态() -> dict:
     r"""
     获取当前状态快照
     :return: dict
     """
-    return S.snapshot()
+    return 状态.snapshot()
 
 
-def get_env_status() -> dict:
+def 取环境状态() -> dict:
     r"""
     获取环境状态信息，用于前端显示诊断
     :return: dict: 环境状态
@@ -1390,7 +1393,7 @@ def get_env_status() -> dict:
     }
 
 
-def get_available_sources() -> dict:
+def 取可用来源() -> dict:
     r"""
     获取可用的扫描源列表
     包括：浏览按钮 / PC 缓存 / 挂载驱动器 Android 设备 / ADB Android 设备
@@ -1419,10 +1422,10 @@ def get_available_sources() -> dict:
         warnings.append("ADB 未找到，无法扫描 Android 设备（USB调试模式）")
 
     # PC 桌面端缓存
-    pc_path: str = utils.get_setting("localout", "bilibili_pc_cache_path").strip()
+    pc_path: str = 工具.取设置("localout", "bilibili_pc_cache_path").strip()
     if pc_path:
-        optional: bool = utils.get_setting("localout", "bilibili_pc_cache_optional_when_installed") == "true"
-        if not (optional and not Path(pc_path).is_dir()):
+        optional: bool = 工具.取设置("localout", "bilibili_pc_cache_optional_when_installed") == "true"
+        if not (optional and not 路径(pc_path).is_dir()):
             sources.append(
                 {
                     "id": "pc_cache",
@@ -1439,13 +1442,13 @@ def get_available_sources() -> dict:
     # 参考 biliandout DeviceScanner.get_drive_devices
     drive_count: int = 0
     for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
-        drive: Path = Path(f"{letter}:/")
+        drive: 路径 = 路径(f"{letter}:/")
         if not drive.exists():
             continue
-        android_data: Path = drive / "Android" / "data"
+        android_data: 路径 = drive / "Android" / "data"
         if not android_data.exists():
             continue
-        device_name: str = _get_volume_label(letter)
+        device_name: str = _取卷标(letter)
         for pkg, name in _BILI_PACKAGES:
             for download_path in (
                 android_data / pkg / "download",
@@ -1486,18 +1489,18 @@ def get_available_sources() -> dict:
                 }
             )
 
-    now: float = time.time()
-    if now - S._last_available_refresh >= 1.0:
-        with S.lock:
-            S._last_available_refresh = now
-            S._available_keys = {
+    now: float = 时间.time()
+    if now - 状态._last_available_refresh >= 1.0:
+        with 状态.lock:
+            状态._last_available_refresh = now
+            状态._available_keys = {
                 f"{s.get('type', '')}|{s.get('label', '')}" for s in sources if s.get("type") in ("drive", "adb")
             }
 
     return {"sources": sources, "warnings": warnings}
 
 
-def browse_local() -> str | None:
+def 浏览本地() -> str | None:
     r"""
     弹出文件夹对话框选择本地缓存目录
     :return: str | None
@@ -1515,7 +1518,7 @@ def browse_local() -> str | None:
         return None
 
 
-def add_source(
+def 添加来源(
     source_type: str,
     path: str = "",
     label: str = "",
@@ -1537,8 +1540,8 @@ def add_source(
     serial = serial.strip()
     package = package.strip()
 
-    with S.lock:
-        if S.scan_status == "scanning":
+    with 状态.lock:
+        if 状态.scan_status == "scanning":
             return {"ok": False, "error": "已有扫描在进行中"}
 
     if source_type not in {"pc", "drive", "adb", "local"}:
@@ -1550,153 +1553,153 @@ def add_source(
         if package and package not in _BILI_PACKAGE_NAMES:
             return {"ok": False, "error": f"未知 B 站包名: {package}"}
     else:
-        if not path or not Path(path).is_dir():
+        if not path or not 路径(path).is_dir():
             return {"ok": False, "error": f"路径不存在: {path or '(空)'}"}
 
-    S._scan_cancel.clear()
-    S._scan_pause.clear()
-    t: threading.Thread = threading.Thread(
-        target=_scan_thread_fn,
+    状态._scan_cancel.clear()
+    状态._scan_pause.clear()
+    t: 线程.Thread = 线程.Thread(
+        target=_扫描线程函数,
         args=(source_type, path, label or path or source_type, serial, package),
         daemon=True,
     )
-    with S.lock:
-        S._scan_thread = t
+    with 状态.lock:
+        状态._scan_thread = t
     t.start()
     return {"ok": True}
 
 
-def pause_scan() -> None:
-    S._scan_pause.set()
-    with S.lock:
-        if S.scan_status == "scanning":
-            S.scan_status = "paused"
-    S.log("info", "扫描已暂停")
+def 暂停扫描() -> None:
+    状态._scan_pause.set()
+    with 状态.lock:
+        if 状态.scan_status == "scanning":
+            状态.scan_status = "paused"
+    状态.log("info", "扫描已暂停")
 
 
-def resume_scan() -> None:
-    S._scan_pause.clear()
-    with S.lock:
-        if S.scan_status == "paused":
-            S.scan_status = "scanning"
-    S.log("info", "扫描已继续")
+def 继续扫描() -> None:
+    状态._scan_pause.clear()
+    with 状态.lock:
+        if 状态.scan_status == "paused":
+            状态.scan_status = "scanning"
+    状态.log("info", "扫描已继续")
 
 
-def cancel_scan() -> None:
-    S._scan_cancel.set()
-    S._scan_pause.clear()
-    with S.lock:
-        S.scan_status = "idle"
+def 取消扫描() -> None:
+    状态._scan_cancel.set()
+    状态._scan_pause.clear()
+    with 状态.lock:
+        状态.scan_status = "idle"
 
 
-def add_to_tasks(card_ids: list[str]) -> dict:
+def 加入任务(card_ids: list[str]) -> dict:
     r"""
     将源卡片添加到任务栏
     :param: card_ids: 源卡片 ID 列表
     :return: dict
     """
     added: int = 0
-    with S.lock:
-        existing: set[tuple[str, str]] = {(c.video_path, c.audio_path) for c in S.task_cards}
+    with 状态.lock:
+        existing: set[tuple[str, str]] = {(c.video_path, c.audio_path) for c in 状态.task_cards}
         for sid in card_ids:
-            for sc in S.source_cards:
+            for sc in 状态.source_cards:
                 if sc.id == sid:
                     key: tuple[str, str] = (sc.video_path, sc.audio_path)
                     if key not in existing:
-                        S.task_cards.append(sc.clone())
+                        状态.task_cards.append(sc.clone())
                         existing.add(key)
                         added += 1
                     break
-    S.log("info", f"已添加 {added} 个视频到任务栏")
+    状态.log("info", f"已添加 {added} 个视频到任务栏")
     return {"ok": True, "added": added}
 
 
-def remove_source_cards(card_ids: list[str]) -> None:
+def 移除来源卡片(card_ids: list[str]) -> None:
     r"""
     移除指定源卡片
     :param: card_ids: 卡片 ID 列表
     """
     ids: set[str] = set(card_ids)
-    with S.lock:
-        removed: list[VideoCard] = [c for c in S.source_cards if c.id in ids]
-        S.source_cards = [c for c in S.source_cards if c.id not in ids]
+    with 状态.lock:
+        removed: list[视频卡片] = [c for c in 状态.source_cards if c.id in ids]
+        状态.source_cards = [c for c in 状态.source_cards if c.id not in ids]
         for c in removed:
-            S._known_keys.discard(S._dedup_key(c))
+            状态._known_keys.discard(状态._dedup_key(c))
 
 
-def remove_task_cards(card_ids: list[str]) -> None:
+def 移除任务卡片(card_ids: list[str]) -> None:
     r"""
     移除指定任务卡片
     :param: card_ids: 卡片 ID 列表
     """
     ids: set[str] = set(card_ids)
-    with S.lock:
-        S.task_cards = [c for c in S.task_cards if c.id not in ids]
+    with 状态.lock:
+        状态.task_cards = [c for c in 状态.task_cards if c.id not in ids]
 
 
-def clear_source() -> None:
-    with S.lock:
-        S.source_cards.clear()
-        S._known_keys.clear()
-    S.log("info", "源栏已清空")
+def 清空来源() -> None:
+    with 状态.lock:
+        状态.source_cards.clear()
+        状态._known_keys.clear()
+    状态.log("info", "源栏已清空")
 
 
-def clear_tasks() -> None:
-    with S.lock:
-        S.task_cards = [c for c in S.task_cards if c.status == "exporting"]
-    S.log("info", "任务栏已清空 (导出中的任务保留)")
+def 清空任务() -> None:
+    with 状态.lock:
+        状态.task_cards = [c for c in 状态.task_cards if c.status == "exporting"]
+    状态.log("info", "任务栏已清空 (导出中的任务保留)")
 
 
-def clear_completed() -> None:
-    with S.lock:
-        S.completed_cards.clear()
-    S.log("info", "完成栏已清空")
+def 清空完成() -> None:
+    with 状态.lock:
+        状态.completed_cards.clear()
+    状态.log("info", "完成栏已清空")
 
 
-def start_export(card_ids: list[str]) -> dict:
+def 开始导出(card_ids: list[str]) -> dict:
     r"""
     开始导出任务
     :param: card_ids: 待导出卡片 ID，为空则导出全部排队中的任务
     :return: dict
     """
-    with S.lock:
-        if S.export_status == "exporting":
+    with 状态.lock:
+        if 状态.export_status == "exporting":
             return {"ok": False, "error": "导出正在进行中"}
     if not card_ids:
-        with S.lock:
-            card_ids = [c.id for c in S.task_cards if c.status == "queued"]
+        with 状态.lock:
+            card_ids = [c.id for c in 状态.task_cards if c.status == "queued"]
     if not card_ids:
         return {"ok": False, "error": "没有可导出的任务"}
 
-    S._export_cancel.clear()
-    t: threading.Thread = threading.Thread(
-        target=_export_thread_fn,
+    状态._export_cancel.clear()
+    t: 线程.Thread = 线程.Thread(
+        target=_导出线程函数,
         args=(card_ids,),
         daemon=True,
     )
-    with S.lock:
-        S._export_thread = t
+    with 状态.lock:
+        状态._export_thread = t
     t.start()
     return {"ok": True}
 
 
-def cancel_export() -> None:
-    S._export_cancel.set()
-    S.log("info", "正在取消导出...")
+def 取消导出() -> None:
+    状态._export_cancel.set()
+    状态.log("info", "正在取消导出...")
 
 
-def get_cover_bytes(card_id: str) -> tuple[bytes, str] | None:
+def 取封面字节(card_id: str) -> tuple[bytes, str] | None:
     r"""
     根据卡片 id 取出封面字节
     :param: card_id: 卡片 id
     :return: (字节, content-type) 或 None
     """
-    with S.lock:
-        pool: list[VideoCard] = S.source_cards + S.task_cards + S.completed_cards
+    with 状态.lock:
+        pool: list[视频卡片] = 状态.source_cards + 状态.task_cards + 状态.completed_cards
         for c in pool:
             if c.id != card_id or not c.cover_path:
                 continue
-            p: Path = Path(c.cover_path)
+            p: 路径 = 路径(c.cover_path)
             if not p.exists():
                 continue
             suffix: str = p.suffix.lower()
@@ -1706,3 +1709,54 @@ def get_cover_bytes(card_id: str) -> tuple[bytes, str] | None:
             except OSError:
                 return None
     return None
+
+
+_uid = _生成编号
+_ts = _短时间
+_ts_full = _完整时间
+_get_volume_label = _取卷标
+_sanitize = _清理文件名
+_size_mb = _兆字节
+VideoCard = 视频卡片
+_State = _本地状态
+S = 状态
+_parse_entry_json = _解析入口JSON
+_find_m4s_recursive = _递归寻找M4S
+_parse_ls_output = _解析列表输出
+_find_pc_m4s = _寻找电脑M4S
+_parse_video_info_json = _解析视频信息JSON
+_parse_index_json = _解析索引JSON
+_find_cover_upward = _向上寻找封面
+_make_card_from_m4s_dir = _从M4S目录制卡
+_crawler_enrich = _爬虫补全
+_scan_local_dir = _扫描本地目录
+_scan_pc_cache = _扫描电脑缓存
+_scan_drive = _扫描磁盘
+_scan_adb_folder = _扫描ADB文件夹
+_iter_adb_packages = _遍历ADB包
+_pull_cover_adb = _拉取ADB封面
+_make_adb_card = _制作ADB卡片
+_scan_adb_device = _扫描ADB设备
+_scan_thread_fn = _扫描线程函数
+_build_filename = _构建文件名
+_local_combine = _本地合并
+_export_adb_single = _导出单个ADB
+_export_single = _导出单个
+_export_thread_fn = _导出线程函数
+get_state = 取状态
+get_env_status = 取环境状态
+get_available_sources = 取可用来源
+browse_local = 浏览本地
+add_source = 添加来源
+pause_scan = 暂停扫描
+resume_scan = 继续扫描
+cancel_scan = 取消扫描
+add_to_tasks = 加入任务
+remove_source_cards = 移除来源卡片
+remove_task_cards = 移除任务卡片
+clear_source = 清空来源
+clear_tasks = 清空任务
+clear_completed = 清空完成
+start_export = 开始导出
+cancel_export = 取消导出
+get_cover_bytes = 取封面字节

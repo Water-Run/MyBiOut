@@ -59,7 +59,7 @@ def test_entry_animation_is_shared_random_and_logo_free() -> None:
     js = entry_js.read_text(encoding="utf-8")
     variants = set(re.findall(r"name:\s*['\"]([^'\"]+)['\"]", js))
     assert len(variants) >= 15
-    assert "ENTRY_VARIANTS" in js
+    assert "入口变体表" in js
     assert "Math.random" in js
     assert "mybiout-entry-ready" in js
 
@@ -125,16 +125,16 @@ def test_entry_animation_speed_and_algorithmic_variation_controls() -> None:
     css = entry_css.read_text(encoding="utf-8")
     js = entry_js.read_text(encoding="utf-8")
 
-    assert re.search(r"ENTRY_SPEED\s*=\s*1\.3\b", js)
-    assert "speedMs(" in js
-    assert "speedSec(" in js
-    assert "const generated =" in js
-    assert "generateVariant(" in js
-    assert "algorithm:" in js
-    assert "grid:" in js
+    assert re.search(r"入口速度\s*=\s*1\.3\b", js)
+    assert "按毫秒加速(" in js
+    assert "按秒加速(" in js
+    assert "const 生成后 =" in js
+    assert "生成变体(" in js
+    assert "算法:" in js
+    assert "网格:" in js
     assert "density:" in js
-    assert "angle:" in js
-    assert "seed:" in js
+    assert "角度:" in js
+    assert "种子:" in js
 
     assert "--entry-overlay-delay" in css
     assert "--entry-overlay-duration" in css

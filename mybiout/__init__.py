@@ -6,12 +6,12 @@ MyBiOut! 包初始化模块, 定义版本号
 :time: 2026-03-31
 """
 
-import sys
+import sys as 系统
 
-if sys.platform != "win32":
-    raise ImportError("MyBiOut! 仅支持 Windows 系统。 (MyBiOut! only supports Windows systems.)")
+if 系统.platform != "win32":
+    raise ImportError("MyBiOut! 仅支持 Windows 系统。")
 
-if sys.maxsize <= 2**32:
-    raise ImportError("MyBiOut! 仅支持 64 位 Windows 系统。 (MyBiOut! only supports 64-bit Windows systems.)")
+if 系统.maxsize <= 2**32:
+    raise ImportError("MyBiOut! 仅支持 64 位 Windows 系统。")
 
 __version__: str = "60314.0"
