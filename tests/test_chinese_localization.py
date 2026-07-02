@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -141,6 +142,27 @@ def test_external_http_contract_remains_unchanged() -> None:
     assert invalid.json() == {"ok": False, "error": "请求体不是合法 JSON"}
 
 
+def test_api_routes_import_chinese_implementations_without_renaming_paths() -> None:
+    source = (ROOT / "mybiout/pages/apis.py").read_text(encoding="utf-8")
+
+    assert '@应用.post("/api/man/chat")' in source
+    assert '@应用.post("/api/man/chat-stream")' in source
+    assert "/api/man/对话" not in source
+    assert "from mybiout.pages.ohmyconfig.ohmyconfig import 取设置" in source
+    assert "from mybiout.pages.localout.localout import 添加来源" in source
+    assert "from mybiout.pages.bbdown.bbdown import 添加任务" in source
+    assert "from mybiout.pages.mdout.mdout import 添加并获取" in source
+    assert "from mybiout.pages.man.man import 对话" in source
+    assert "from mybiout.pages.ohmyconfig import ohmyconfig as 设置模块" in source
+
+    assert "import get_settings" not in source
+    assert "import validate_and_save" not in source
+    assert "import get_state" not in source
+    assert "import add_task" not in source
+    assert "import chat_stream_sse" not in source
+    assert not re.search(r"from mybiout\.pages\..* import [A-Za-z_]+$", source, flags=re.MULTILINE)
+
+
 def test_entry_animation_internal_script_names_are_chinese() -> None:
     js = (ROOT / "mybiout/assets/entry.js").read_text(encoding="utf-8")
 
@@ -155,3 +177,120 @@ def test_entry_animation_internal_script_names_are_chinese() -> None:
     assert "ENTRY_VARIANTS" not in js
     assert "function generateVariant(" not in js
     assert "function speedMs(" not in js
+
+
+def test_home_animation_uses_chinese_internal_names_but_keeps_dom_contract() -> None:
+    html = (ROOT / "mybiout/pages/index.html").read_text(encoding="utf-8")
+
+    assert 'id="github-btn"' in html
+    assert 'id="overlay-t1"' in html
+    assert 'id="overlay-t2"' in html
+    assert 'id="flash-overlay"' in html
+    assert "document.getElementById('github-btn')" in html
+    assert "window.addEventListener('resize'" in html
+
+    assert "class 爆裂粒子" in html
+    assert "class 冲击波" in html
+    assert "function 环形爆裂(" in html
+    assert "function 彩屑爆裂(" in html
+    assert "function 播放动画(" in html
+    assert "function 结束动画(" in html
+    assert "requestAnimationFrame(震动步进)" in html
+
+    assert "class Burst" not in html
+    assert "function playAnim(" not in html
+    assert "requestAnimationFrame(step)" not in html
+    assert "github-按钮" not in html
+    assert "overlay-文字一" not in html
+    assert "闪白-overlay" not in html
+
+
+def test_settings_page_script_uses_chinese_names_and_keeps_legacy_hooks() -> None:
+    html = (ROOT / "mybiout/pages/ohmyconfig/ohmyconfig.html").read_text(encoding="utf-8")
+
+    assert "function 显示提示(" in html
+    assert "async function 接口读取(" in html
+    assert "async function 保存设置(" in html
+    assert "async function 重置文件夹(" in html
+    assert "window.showToast = 显示提示" in html
+    assert "window.saveSetting = 保存设置" in html
+    assert "window.resetFolder = 重置文件夹" in html
+
+    assert "function showToast(" not in html
+    assert "async function apiGet(" not in html
+    assert "async function saveSetting(" not in html
+    assert "function resetFolder(" not in html
+
+
+def test_feature_page_inline_scripts_use_chinese_window_hooks() -> None:
+    bbdown = (ROOT / "mybiout/pages/bbdown/bbdown.html").read_text(encoding="utf-8")
+    mdout = (ROOT / "mybiout/pages/mdout/mdout.html").read_text(encoding="utf-8")
+    man = (ROOT / "mybiout/pages/man/man.html").read_text(encoding="utf-8")
+
+    assert "async function 添加任务(" in bbdown
+    assert "window.addTask = 添加任务" in bbdown
+    assert "function 渲染任务(" in bbdown
+    assert "window.cancelCurrent = 取消当前" in bbdown
+    assert "window.retryTask = 重试任务" in bbdown
+    assert "const 取元素 = id => document.getElementById(id)" in bbdown
+    assert "取元素('bg-cv')" in bbdown
+    assert "let 星星组 = []" in bbdown
+
+    assert "function 打开面板(" in mdout
+    assert "window.openPanel = 打开面板" in mdout
+    assert "async function 添加并获取(" in mdout
+    assert "window.exportSelected = 导出选中" in mdout
+    assert "function 渲染网格(" in mdout
+    assert "const 面板配置 = {" in mdout
+    assert "const 已选编号 = new Set()" in mdout
+    assert "function 提示(" in mdout
+    assert "function 转义属性(" in mdout
+    assert 'id="bg-cv"' in mdout
+    assert ">原文</button>" in mdout
+    assert "'富文本'" in mdout
+
+    assert "function 添加用户消息(" in man
+    assert "async function 发送对话(" in man
+    assert "window.sendChat = 发送对话" in man
+    assert "function 渲染Markdown(" in man
+    assert "function 初始化背景(" in man
+    assert "const 取元素 = id => document.getElementById(id)" in man
+    assert "function 提示(" in man
+    assert "function 转义网页(" in man
+    assert 'id="bg-cv"' in man
+
+    assert "window.addTask = async function" not in bbdown
+    assert "const $ = id => document.getElementById(id)" not in bbdown
+    assert "window.openPanel = function" not in mdout
+    assert "window.sendChat = async function" not in man
+    assert "function escH(" not in mdout
+    assert "function escAttr(" not in mdout
+    assert "function toast(" not in mdout
+    assert "function escH(" not in man
+    assert "function toast(" not in man
+    assert ">Raw</button>" not in mdout
+    assert "'Rich'" not in mdout
+
+
+def test_localout_inline_script_uses_chinese_window_hooks() -> None:
+    html = (ROOT / "mybiout/pages/localout/localout.html").read_text(encoding="utf-8")
+
+    assert "async function 切换下拉(" in html
+    assert "window.toggleDD = 切换下拉" in html
+    assert "async function 添加来源(" in html
+    assert "window.doAddSource = 添加来源" in html
+    assert "function 渲染卡片(" in html
+    assert "function 更新进度(" in html
+    assert "async function 轮询(" in html
+    assert "window.startExport = 开始导出" in html
+    assert "const 已选来源 = new Set(), 已选任务 = new Set()" in html
+    assert "const 取元素 = id => document.getElementById(id)" in html
+    assert "取元素('bg-cv')" in html
+
+    assert "async function toggleDD(" not in html
+    assert "async function doAddSource(" not in html
+    assert "function cardHtml(" not in html
+    assert "function updateProgress(" not in html
+    assert "selSrc" not in html
+    assert "selTask" not in html
+    assert "const $ = id => document.getElementById(id)" not in html

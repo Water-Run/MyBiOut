@@ -514,9 +514,9 @@
                 <div class="setting-hint">导出内容的统一存储位置，默认 C:\MyBiOut!</div>
                 <div class="setting-controls">
                     <input type="text" id="s-export-path" style="width:420px" readonly>
-                    <button class="btn btn-orange" onclick="browsePath()">浏览</button>
-                    <button class="btn btn-pink" onclick="desktopPath()">设为桌面目录</button>
-                    <button class="btn btn-ghost" onclick="resetExportPath()">恢复默认</button>
+                    <button class="btn btn-orange" onclick="浏览路径()">浏览</button>
+                    <button class="btn btn-pink" onclick="桌面路径()">设为桌面目录</button>
+                    <button class="btn btn-ghost" onclick="重置导出路径()">恢复默认</button>
                 </div>
             </div>
 
@@ -525,9 +525,9 @@
                 <div class="setting-hint">统一的 B 站登录凭证, 用于 BBDown 下载高画质视频和 MdOut 获取收藏夹等</div>
                 <div class="setting-controls">
                     <input type="text" id="s-sessdata" style="width:420px" placeholder="留空则不使用认证">
-                    <button class="btn btn-orange" onclick="confirmSessdataShared()">保存</button>
-                    <button class="btn btn-pink" onclick="triggerPlaywrightLogin()">扫码登录获取</button>
-                    <button class="btn btn-danger" onclick="clearSessdataShared()">清空</button>
+                    <button class="btn btn-orange" onclick="确认会话数据()">保存</button>
+                    <button class="btn btn-pink" onclick="触发扫码登录()">扫码登录获取</button>
+                    <button class="btn btn-danger" onclick="清空会话数据()">清空</button>
                 </div>
             </div>
 
@@ -546,11 +546,11 @@
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="inline-label">Base:</span>
                     <input type="text" id="s-api-base-url" style="width:380px" placeholder="https://api.openai.com/v1"
-                        onchange="saveText('api','base_url',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                        onchange="保存文本('api','base_url',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
                 </div>
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="inline-label">超时:</span>
-                    <select id="s-api-timeout" onchange="saveSelect('api','timeout',this.value)">
+                    <select id="s-api-timeout" onchange="保存选择('api','timeout',this.value)">
                         <option value="infinite">直到灵符耗尽</option>
                         <option value="8s">很短</option>
                         <option value="20s">短</option>
@@ -560,8 +560,8 @@
                     </select>
                 </div>
                 <div style="display:flex;gap:10px;margin-top:2px">
-                    <button class="btn btn-orange" onclick="confirmApi()">保存</button>
-                    <button class="btn btn-danger" onclick="clearApi()">清空</button>
+                    <button class="btn btn-orange" onclick="确认接口设置()">保存</button>
+                    <button class="btn btn-danger" onclick="清空接口设置()">清空</button>
                 </div>
                 </div>
             </div>
@@ -576,8 +576,8 @@
                 <div class="setting-hint">位于导出根目录下，用于存放本地缓存导出结果</div>
                 <div class="setting-controls">
                     <input type="text" id="s-localout-folder" style="width:260px"
-                        onchange="saveFolder('localout',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="btn btn-ghost" onclick="resetFolder('localout')">恢复默认</button>
+                        onchange="保存文件夹('localout',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="btn btn-ghost" onclick="重置文件夹('localout')">恢复默认</button>
                 </div>
             </div>
 
@@ -585,10 +585,10 @@
                 <div class="setting-label">哔哩哔哩桌面端缓存路径</div>
                 <div class="setting-hint">默认 C:\Users\[当前用户名]\Videos\bilibili；留空表示不扫描桌面端缓存</div>
                 <div class="setting-controls">
-                    <input type="text" id="s-bili-pc-path" style="width:520px" oninput="syncConditional()"
-                        onchange="saveBiliPcPath(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="btn btn-orange" onclick="browseBiliPcPath()">浏览</button>
-                    <button class="btn btn-ghost" onclick="resetBiliPcPath()">恢复默认</button>
+                    <input type="text" id="s-bili-pc-path" style="width:520px" oninput="同步条件显示()"
+                        onchange="保存哔哩电脑路径(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="btn btn-orange" onclick="浏览哔哩电脑路径()">浏览</button>
+                    <button class="btn btn-ghost" onclick="重置哔哩电脑路径()">恢复默认</button>
                 </div>
             </div>
 
@@ -598,7 +598,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-bili-pc-path-only-if-installed"
-                            onchange="saveToggle('localout','bilibili_pc_cache_optional_when_installed',this.checked)">
+                            onchange="保存开关('localout','bilibili_pc_cache_optional_when_installed',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -610,19 +610,19 @@
                 <div class="setting-controls">
                     <div class="check-group">
                         <label class="check-item"><input type="checkbox" name="name-parts" value="bv"
-                                onchange="onNamePartsChanged(this)"> BV号</label>
+                                onchange="命名部件已变化(this)"> BV号</label>
                         <label class="check-item"><input type="checkbox" name="name-parts" value="title"
-                                onchange="onNamePartsChanged(this)"> 视频标题（默认）</label>
+                                onchange="命名部件已变化(this)"> 视频标题（默认）</label>
                         <label class="check-item"><input type="checkbox" name="name-parts" value="up"
-                                onchange="onNamePartsChanged(this)"> UP主名称</label>
+                                onchange="命名部件已变化(this)"> UP主名称</label>
                         <label class="check-item"><input type="checkbox" name="name-parts" value="group"
-                                onchange="onNamePartsChanged(this)"> 分组标题</label>
+                                onchange="命名部件已变化(this)"> 分组标题</label>
                         <label class="check-item"><input type="checkbox" name="name-parts" value="part"
-                                onchange="onNamePartsChanged(this)"> 分P号</label>
+                                onchange="命名部件已变化(this)"> 分P号</label>
                         <label class="check-item"><input type="checkbox" name="name-parts" value="publish_time"
-                                onchange="onNamePartsChanged(this)"> 发布时间</label>
+                                onchange="命名部件已变化(this)"> 发布时间</label>
                         <label class="check-item"><input type="checkbox" name="name-parts" value="export_time"
-                                onchange="onNamePartsChanged(this)"> 导出时间</label>
+                                onchange="命名部件已变化(this)"> 导出时间</label>
                     </div>
                 </div>
             </div>
@@ -645,7 +645,7 @@
                 <div class="setting-hint">配置导出时的降级策略，默认优先保证可导出性</div>
                 <div class="setting-controls">
                     <select id="s-incomplete-title-action"
-                        onchange="saveSelect('localout','incomplete_title_action',this.value)">
+                        onchange="保存选择('localout','incomplete_title_action',this.value)">
                         <option value="partial_or_folder">有多少用多少，否则使用文件夹名称（默认）</option>
                         <option value="folder_only">直接使用文件夹名称</option>
                         <option value="skip">跳过导出</option>
@@ -658,7 +658,7 @@
                 <div class="setting-hint">本地缓存无法解析标题/UP主等元数据时, 尝试通过 B 站 API 爬取补全</div>
                 <div class="setting-controls">
                     <select id="s-crawler-fallback"
-                        onchange="saveSelect('localout','crawler_fallback',this.value)">
+                        onchange="保存选择('localout','crawler_fallback',this.value)">
                         <option value="disabled">不启用(默认)</option>
                         <option value="1s">超时 1 秒</option>
                         <option value="2s">超时 2 秒</option>
@@ -671,7 +671,7 @@
                 <div class="setting-label">FFmpeg 并发数</div>
                 <div class="setting-hint">并发越高速度通常越快，但资源占用会增加</div>
                 <div class="setting-controls">
-                    <select id="s-ffmpeg" onchange="saveSelect('localout','ffmpeg_concurrent',this.value)">
+                    <select id="s-ffmpeg" onchange="保存选择('localout','ffmpeg_concurrent',this.value)">
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
@@ -694,8 +694,8 @@
                 <div class="setting-hint">BBDown 下载结果输出目录</div>
                 <div class="setting-controls">
                     <input type="text" id="s-bbdown-folder" style="width:260px"
-                        onchange="saveFolder('bbdown',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="btn btn-ghost" onclick="resetFolder('bbdown')">恢复默认</button>
+                        onchange="保存文件夹('bbdown',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="btn btn-ghost" onclick="重置文件夹('bbdown')">恢复默认</button>
                 </div>
             </div>
 
@@ -705,7 +705,7 @@
                 <div class="setting-controls">
                     <input type="text" id="s-bbdown-quality" style="width:420px"
                         placeholder="如: 8K 超高清,1080P 高码率,1080P 高清"
-                        onchange="saveText('bbdown','quality_priority',this.value)"
+                        onchange="保存文本('bbdown','quality_priority',this.value)"
                         onkeydown="if(event.key==='Enter')this.blur()">
                 </div>
             </div>
@@ -715,7 +715,7 @@
                 <div class="setting-hint">按优先级排列，逗号分隔；留空则由 BBDown 自动选择</div>
                 <div class="setting-controls">
                     <input type="text" id="s-bbdown-encoding" style="width:420px" placeholder="如: hevc,av1,avc"
-                        onchange="saveText('bbdown','encoding_priority',this.value)"
+                        onchange="保存文本('bbdown','encoding_priority',this.value)"
                         onkeydown="if(event.key==='Enter')this.blur()">
                 </div>
             </div>
@@ -726,7 +726,7 @@
                     &lt;publishDate&gt; 等</div>
                 <div class="setting-controls">
                     <input type="text" id="s-bbdown-file-pattern" style="width:420px"
-                        onchange="saveText('bbdown','file_pattern',this.value)"
+                        onchange="保存文本('bbdown','file_pattern',this.value)"
                         onkeydown="if(event.key==='Enter')this.blur()">
                 </div>
             </div>
@@ -736,7 +736,7 @@
                 <div class="setting-hint">BBDown 的 -M 参数；多P时目录/文件命名规则</div>
                 <div class="setting-controls">
                     <input type="text" id="s-bbdown-multi-pattern" style="width:420px"
-                        onchange="saveText('bbdown','multi_file_pattern',this.value)"
+                        onchange="保存文本('bbdown','multi_file_pattern',this.value)"
                         onkeydown="if(event.key==='Enter')this.blur()">
                 </div>
             </div>
@@ -747,7 +747,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-bbdown-danmaku"
-                            onchange="saveToggle('bbdown','download_danmaku',this.checked)">
+                            onchange="保存开关('bbdown','download_danmaku',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -759,7 +759,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-bbdown-skip-sub"
-                            onchange="saveToggle('bbdown','skip_subtitle',this.checked)">
+                            onchange="保存开关('bbdown','skip_subtitle',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -771,7 +771,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-bbdown-skip-cover"
-                            onchange="saveToggle('bbdown','skip_cover',this.checked)">
+                            onchange="保存开关('bbdown','skip_cover',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -783,7 +783,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-bbdown-aria2c"
-                            onchange="saveToggle('bbdown','use_aria2c',this.checked)">
+                            onchange="保存开关('bbdown','use_aria2c',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -798,9 +798,9 @@
                 <div class="setting-label">输出目录名称</div>
                 <div class="setting-hint">Markdown 导出结果输出目录</div>
                 <div class="setting-controls">
-                    <input type="text" id="s-mdout-folder" style="width:260px" onchange="saveFolder('mdout',this.value)"
+                    <input type="text" id="s-mdout-folder" style="width:260px" onchange="保存文件夹('mdout',this.value)"
                         onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="btn btn-ghost" onclick="resetFolder('mdout')">恢复默认</button>
+                    <button class="btn btn-ghost" onclick="重置文件夹('mdout')">恢复默认</button>
                 </div>
             </div>
 
@@ -810,7 +810,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-mdout-include-cover"
-                            onchange="saveToggle('mdout','include_cover',this.checked)">
+                            onchange="保存开关('mdout','include_cover',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -822,7 +822,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-mdout-include-tags"
-                            onchange="saveToggle('mdout','include_tags',this.checked)">
+                            onchange="保存开关('mdout','include_tags',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -834,7 +834,7 @@
                 <div class="setting-controls">
                     <label class="toggle">
                         <input type="checkbox" id="s-mdout-include-stats"
-                            onchange="saveToggle('mdout','include_stats',this.checked)">
+                            onchange="保存开关('mdout','include_stats',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
                 </div>
@@ -844,7 +844,7 @@
                 <div class="setting-label">收藏夹详情程度</div>
                 <div class="setting-hint">导出用户页收藏夹时的详细程度；完整模式会逐个请求收藏夹内容</div>
                 <div class="setting-controls">
-                    <select id="s-mdout-fav-detail" onchange="saveSelect('mdout','favorite_detail',this.value)">
+                    <select id="s-mdout-fav-detail" onchange="保存选择('mdout','favorite_detail',this.value)">
                         <option value="basic">基本（仅标题和数量）</option>
                         <option value="full">完整（包含收藏内容列表）</option>
                     </select>
@@ -855,7 +855,7 @@
                 <div class="setting-label">请求间隔</div>
                 <div class="setting-hint">相邻 API 请求之间的等待时间，避免过快被 B 站限流</div>
                 <div class="setting-controls">
-                    <select id="s-mdout-delay" onchange="saveSelect('mdout','request_delay',this.value)">
+                    <select id="s-mdout-delay" onchange="保存选择('mdout','request_delay',this.value)">
                         <option value="0.3">0.3s</option>
                         <option value="0.5">0.5s（推荐）</option>
                         <option value="1.0">1.0s</option>
@@ -872,7 +872,7 @@
                 <div class="setting-label">一键恢复默认设置</div>
                 <div class="setting-hint">将所有设置重置为初始值，包括 API Key、SESSDATA 等敏感信息</div>
                 <div class="setting-controls">
-                    <button class="btn btn-danger" onclick="confirmResetAll()">恢复默认设置</button>
+                    <button class="btn btn-danger" onclick="确认重置全部()">恢复默认设置</button>
                 </div>
             </div>
         </div>
@@ -886,8 +886,8 @@
             <h3>明文存储提示</h3>
             <p>API Key 将以明文写入配置文件。<br>请确认你已了解该风险后再保存。</p>
             <div class="modal-btns">
-                <button class="btn btn-orange" onclick="doSaveApi()">确认保存</button>
-                <button class="btn btn-ghost" onclick="closeApiModal()">取消</button>
+                <button class="btn btn-orange" onclick="保存接口设置()">确认保存</button>
+                <button class="btn btn-ghost" onclick="关闭接口弹窗()">取消</button>
             </div>
         </div>
     </div>
@@ -898,8 +898,8 @@
             <h3>明文存储提示</h3>
             <p>SESSDATA 将以明文写入配置文件。<br>它相当于你的登录凭证，请勿泄露。</p>
             <div class="modal-btns">
-                <button class="btn btn-orange" onclick="doSaveSessdataShared()">确认保存</button>
-                <button class="btn btn-ghost" onclick="closeSessdataModal()">取消</button>
+                <button class="btn btn-orange" onclick="保存会话数据()">确认保存</button>
+                <button class="btn btn-ghost" onclick="关闭会话弹窗()">取消</button>
             </div>
         </div>
     </div>
@@ -910,8 +910,8 @@
             <h3>⚠ 确认重置</h3>
             <p>这将把所有设置恢复为默认值。<br>API Key、SESSDATA 等配置将被清空。<br>此操作不可撤销！</p>
             <div class="modal-btns">
-                <button class="btn btn-danger" onclick="doResetAll()">确认重置</button>
-                <button class="btn btn-ghost" onclick="closeResetModal()">取消</button>
+                <button class="btn btn-danger" onclick="执行重置全部()">确认重置</button>
+                <button class="btn btn-ghost" onclick="关闭重置弹窗()">取消</button>
             </div>
         </div>
     </div>
@@ -919,63 +919,63 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        let _toastT = null;
-        let _previewTimer = null;
+        let _提示计时器 = null;
+        let _预览计时器 = null;
 
-        function showToast(msg, isErr) {
+        function 显示提示(msg, isErr) {
             const el = document.getElementById('toast');
-            if (_toastT) clearTimeout(_toastT);
+            if (_提示计时器) clearTimeout(_提示计时器);
             el.textContent = msg;
             el.className = 'toast show' + (isErr ? ' err' : '');
-            _toastT = setTimeout(() => { el.className = 'toast'; _toastT = null; }, 2200);
+            _提示计时器 = setTimeout(() => { el.className = 'toast'; _提示计时器 = null; }, 2200);
         }
 
-        async function apiGet(url) { return (await fetch(url)).json(); }
+        async function 接口读取(url) { return (await fetch(url)).json(); }
 
-        async function apiPost(url, body) {
+        async function 接口提交(url, body) {
             const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             return { ok: r.ok, data: await r.json() };
         }
 
-        function escHtml(s) {
+        function 转义网页(s) {
             return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
         }
-        function span(cls, text) { return `<span class="${cls}">${escHtml(text)}</span>`; }
+        function 小段(cls, text) { return `<span class="${cls}">${转义网页(text)}</span>`; }
 
-        function nowForExport() {
+        function 当前导出时间() {
             const d = new Date(), pad = n => String(n).padStart(2, '0');
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
 
-        function collectNameParts() {
+        function 收集命名部件() {
             return Array.from(document.querySelectorAll('input[name="name-parts"]:checked')).map(el => el.value);
         }
 
-        function renderCurrentPattern() {
-            const selected = new Set(collectNameParts());
+        function 渲染当前命名模式() {
+            const selected = new Set(收集命名部件());
             let base = '';
-            if (selected.has('up')) base += `${span('seg-up', 'UP主名称')}${span('seg-sep', '--')}`;
-            if (selected.has('bv')) base += `${span('seg-sep', '{')}${span('seg-bv', 'BV号')}${span('seg-sep', '}')}`;
+            if (selected.has('up')) base += `${小段('seg-up', 'UP主名称')}${小段('seg-sep', '--')}`;
+            if (selected.has('bv')) base += `${小段('seg-sep', '{')}${小段('seg-bv', 'BV号')}${小段('seg-sep', '}')}`;
             if (selected.has('group') || selected.has('part')) {
-                const mid = `${selected.has('group') ? span('seg-group', '分组标题') : ''}${selected.has('part') ? span('seg-part', '[分P号]') : ''}`;
-                base += `${span('seg-sep', '(')}${mid}${span('seg-sep', ')')}`;
+                const mid = `${selected.has('group') ? 小段('seg-group', '分组标题') : ''}${selected.has('part') ? 小段('seg-part', '[分P号]') : ''}`;
+                base += `${小段('seg-sep', '(')}${mid}${小段('seg-sep', ')')}`;
             }
-            if (selected.has('title')) base += span('seg-title', '视频标题');
+            if (selected.has('title')) base += 小段('seg-title', '视频标题');
             const tails = [];
-            if (selected.has('publish_time')) tails.push(span('seg-publish', '发布时间'));
-            if (selected.has('export_time')) tails.push(span('seg-export', `导出于${nowForExport()}`));
+            if (selected.has('publish_time')) tails.push(小段('seg-publish', '发布时间'));
+            if (selected.has('export_time')) tails.push(小段('seg-export', `导出于${当前导出时间()}`));
             if (!base && tails.length === 0) {
-                document.getElementById('name-preview-current').innerHTML = span('seg-muted', '（请至少保留一个命名字段）');
+                document.getElementById('name-preview-current').innerHTML = 小段('seg-muted', '（请至少保留一个命名字段）');
                 return;
             }
-            if (tails.length > 0) base += `${span('seg-sep', '--')}${tails.join(span('seg-sep', ','))}`;
+            if (tails.length > 0) base += `${小段('seg-sep', '--')}${tails.join(小段('seg-sep', ','))}`;
             document.getElementById('name-preview-current').innerHTML = base;
         }
 
-        function updateNamePreview() { renderCurrentPattern(); }
+        function 更新命名预览() { 渲染当前命名模式(); }
 
-        async function loadSettings() {
-            const s = await apiGet('/api/settings');
+        async function 载入设置() {
+            const s = await 接口读取('/api/settings');
 
             document.getElementById('s-export-path').value = s.export?.path ?? '';
             document.getElementById('s-sessdata').value = s.export?.sessdata ?? '';
@@ -997,7 +997,7 @@
             const rawParts = s.localout?.name_parts ?? 'title';
             const selectedParts = new Set(rawParts.split(',').map(x => x.trim()).filter(Boolean));
             document.querySelectorAll('input[name="name-parts"]').forEach(el => { el.checked = selectedParts.has(el.value); });
-            if (collectNameParts().length === 0) {
+            if (收集命名部件().length === 0) {
                 const titleBox = document.querySelector('input[name="name-parts"][value="title"]');
                 if (titleBox) titleBox.checked = true;
             }
@@ -1021,117 +1021,123 @@
             document.getElementById('s-mdout-fav-detail').value = s.mdout?.favorite_detail ?? 'basic';
             document.getElementById('s-mdout-delay').value = s.mdout?.request_delay ?? '0.5';
 
-            syncConditional();
-            updateNamePreview();
-            if (_previewTimer) clearInterval(_previewTimer);
-            _previewTimer = setInterval(updateNamePreview, 1000);
+            同步条件显示();
+            更新命名预览();
+            if (_预览计时器) clearInterval(_预览计时器);
+            _预览计时器 = setInterval(更新命名预览, 1000);
         }
 
-        function syncConditional() {
+        function 同步条件显示() {
             const hasBiliPcPath = (document.getElementById('s-bili-pc-path').value || '').trim().length > 0;
-            toggle$('row-bili-pc-path-only-if-installed', hasBiliPcPath);
+            切换显示('row-bili-pc-path-only-if-installed', hasBiliPcPath);
         }
-        function toggle$(id, show) { document.getElementById(id).classList.toggle('vis', show); }
+        function 切换显示(id, show) { document.getElementById(id).classList.toggle('vis', show); }
 
-        async function saveSetting(sec, key, val) {
-            const { ok, data } = await apiPost('/api/setting', { section: sec, key, value: val });
-            if (ok) { showToast('保存成功'); return true; }
-            showToast(data.error || '保存失败', true); return false;
+        async function 保存设置(sec, key, val) {
+            const { ok, data } = await 接口提交('/api/setting', { section: sec, key, value: val });
+            if (ok) { 显示提示('保存成功'); return true; }
+            显示提示(data.error || '保存失败', true); return false;
         }
-        async function saveToggle(sec, key, checked) { syncConditional(); await saveSetting(sec, key, checked ? 'true' : 'false'); }
-        async function saveSelect(sec, key, val) { await saveSetting(sec, key, val); }
-        async function saveText(sec, key, val) { await saveSetting(sec, key, val); }
-        async function saveFolder(sec, val) {
-            const ok = await saveSetting(sec, 'folder', val);
-            if (!ok) { const s = await apiGet('/api/settings'); document.getElementById('s-' + sec + '-folder').value = s[sec]?.folder ?? ''; }
+        async function 保存开关(sec, key, checked) { 同步条件显示(); await 保存设置(sec, key, checked ? 'true' : 'false'); }
+        async function 保存选择(sec, key, val) { await 保存设置(sec, key, val); }
+        async function 保存文本(sec, key, val) { await 保存设置(sec, key, val); }
+        async function 保存文件夹(sec, val) {
+            const ok = await 保存设置(sec, 'folder', val);
+            if (!ok) { const s = await 接口读取('/api/settings'); document.getElementById('s-' + sec + '-folder').value = s[sec]?.folder ?? ''; }
         }
-        async function saveBiliPcPath(val) {
+        async function 重置文件夹(sec) {
+            const 默认文件夹 = { localout: 'localout!', bbdown: 'bbdown!', mdout: 'mdout!' };
+            const val = 默认文件夹[sec] || '';
+            document.getElementById('s-' + sec + '-folder').value = val;
+            await 保存文件夹(sec, val);
+        }
+        async function 保存哔哩电脑路径(val) {
             const v = (val || '').trim();
-            const ok = await saveSetting('localout', 'bilibili_pc_cache_path', v);
-            if (!ok) { const s = await apiGet('/api/settings'); document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? ''; }
-            syncConditional();
+            const ok = await 保存设置('localout', 'bilibili_pc_cache_path', v);
+            if (!ok) { const s = await 接口读取('/api/settings'); document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? ''; }
+            同步条件显示();
         }
-        async function browseBiliPcPath() {
-            showToast('请在弹出的窗口中选择目录');
+        async function 浏览哔哩电脑路径() {
+            显示提示('请在弹出的窗口中选择目录');
             const r = await fetch('/api/browse-folder', { method: 'POST' }); const d = await r.json();
-            if (d.ok && d.path) { document.getElementById('s-bili-pc-path').value = d.path; await saveBiliPcPath(d.path); }
+            if (d.ok && d.path) { document.getElementById('s-bili-pc-path').value = d.path; await 保存哔哩电脑路径(d.path); }
         }
-        async function resetBiliPcPath() {
-            const d = await apiGet('/api/default-bili-pc-cache-path'); const def = d.path ?? '';
-            document.getElementById('s-bili-pc-path').value = def; await saveBiliPcPath(def);
+        async function 重置哔哩电脑路径() {
+            const d = await 接口读取('/api/default-bili-pc-cache-path'); const def = d.path ?? '';
+            document.getElementById('s-bili-pc-path').value = def; await 保存哔哩电脑路径(def);
         }
-        async function onNamePartsChanged(changedEl) {
-            const parts = collectNameParts();
-            if (parts.length === 0) { changedEl.checked = true; showToast('至少需要保留一个命名字段', true); updateNamePreview(); return; }
-            updateNamePreview(); await saveSelect('localout', 'name_parts', parts.join(','));
+        async function 命名部件已变化(changedEl) {
+            const parts = 收集命名部件();
+            if (parts.length === 0) { changedEl.checked = true; 显示提示('至少需要保留一个命名字段', true); 更新命名预览(); return; }
+            更新命名预览(); await 保存选择('localout', 'name_parts', parts.join(','));
         }
-        async function browsePath() {
-            showToast('请在弹出的窗口中选择目录');
+        async function 浏览路径() {
+            显示提示('请在弹出的窗口中选择目录');
             const r = await fetch('/api/browse-folder', { method: 'POST' }); const d = await r.json();
-            if (d.ok && d.path) { document.getElementById('s-export-path').value = d.path; await saveSetting('export', 'path', d.path); }
+            if (d.ok && d.path) { document.getElementById('s-export-path').value = d.path; await 保存设置('export', 'path', d.path); }
         }
-        async function desktopPath() {
-            const d = await apiGet('/api/desktop-path');
-            document.getElementById('s-export-path').value = d.path; await saveSetting('export', 'path', d.path);
+        async function 桌面路径() {
+            const d = await 接口读取('/api/desktop-path');
+            document.getElementById('s-export-path').value = d.path; await 保存设置('export', 'path', d.path);
         }
-        async function resetExportPath() {
-            const def = 'C:\\MyBiOut!'; document.getElementById('s-export-path').value = def; await saveSetting('export', 'path', def);
+        async function 重置导出路径() {
+            const def = 'C:\\MyBiOut!'; document.getElementById('s-export-path').value = def; await 保存设置('export', 'path', def);
         }
 
         /* API Key */
-        function confirmApi() {
+        function 确认接口设置() {
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
-            if (!k && !m) { showToast('请至少填写一项', true); return; }
+            if (!k && !m) { 显示提示('请至少填写一项', true); return; }
             document.getElementById('api-modal').classList.add('show');
         }
-        async function doSaveApi() {
-            closeApiModal();
+        async function 保存接口设置() {
+            关闭接口弹窗();
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
             const b = document.getElementById('s-api-base-url').value.trim();
             const t = document.getElementById('s-api-timeout').value;
 
-            await apiPost('/api/setting', { section: 'api', key: 'key', value: k });
-            await apiPost('/api/setting', { section: 'api', key: 'model', value: m });
-            await apiPost('/api/setting', { section: 'api', key: 'base_url', value: b || 'https://api.openai.com/v1' });
-            await apiPost('/api/setting', { section: 'api', key: 'timeout', value: t || 'infinite' });
+            await 接口提交('/api/setting', { section: 'api', key: 'key', value: k });
+            await 接口提交('/api/setting', { section: 'api', key: 'model', value: m });
+            await 接口提交('/api/setting', { section: 'api', key: 'base_url', value: b || 'https://api.openai.com/v1' });
+            await 接口提交('/api/setting', { section: 'api', key: 'timeout', value: t || 'infinite' });
 
-            showToast('API 设置已保存');
+            显示提示('API 设置已保存');
         }
-        function closeApiModal() { document.getElementById('api-modal').classList.remove('show'); }
-        async function clearApi() {
+        function 关闭接口弹窗() { document.getElementById('api-modal').classList.remove('show'); }
+        async function 清空接口设置() {
             document.getElementById('s-api-key').value = '';
             document.getElementById('s-api-model').value = '';
             document.getElementById('s-api-base-url').value = 'https://api.openai.com/v1';
             document.getElementById('s-api-timeout').value = 'infinite';
 
-            await apiPost('/api/setting', { section: 'api', key: 'key', value: '' });
-            await apiPost('/api/setting', { section: 'api', key: 'model', value: '' });
-            await apiPost('/api/setting', { section: 'api', key: 'base_url', value: 'https://api.openai.com/v1' });
-            await apiPost('/api/setting', { section: 'api', key: 'timeout', value: 'infinite' });
+            await 接口提交('/api/setting', { section: 'api', key: 'key', value: '' });
+            await 接口提交('/api/setting', { section: 'api', key: 'model', value: '' });
+            await 接口提交('/api/setting', { section: 'api', key: 'base_url', value: 'https://api.openai.com/v1' });
+            await 接口提交('/api/setting', { section: 'api', key: 'timeout', value: 'infinite' });
 
-            showToast('API 设置已清空');
+            显示提示('API 设置已清空');
         }
 
         /* 统一 SESSDATA */
-        function confirmSessdataShared() {
+        function 确认会话数据() {
             const v = document.getElementById('s-sessdata').value.trim();
-            if (!v) { showToast('SESSDATA 为空', true); return; }
+            if (!v) { 显示提示('SESSDATA 为空', true); return; }
             document.getElementById('sessdata-modal').classList.add('show');
         }
-        async function doSaveSessdataShared() {
-            closeSessdataModal();
+        async function 保存会话数据() {
+            关闭会话弹窗();
             const v = document.getElementById('s-sessdata').value.trim();
-            await saveSetting('export', 'sessdata', v);
+            await 保存设置('export', 'sessdata', v);
         }
-        async function clearSessdataShared() {
+        async function 清空会话数据() {
             document.getElementById('s-sessdata').value = '';
-            await saveSetting('export', 'sessdata', '');
-            showToast('SESSDATA 已清空');
+            await 保存设置('export', 'sessdata', '');
+            显示提示('SESSDATA 已清空');
         }
-        async function triggerPlaywrightLogin() {
-            showToast('正在启动扫码登录窗口...');
+        async function 触发扫码登录() {
+            显示提示('正在启动扫码登录窗口...');
             try {
                 const r = await fetch('/api/auto-sessdata', {
                     method: 'POST',
@@ -1141,37 +1147,74 @@
                 const d = await r.json();
                 if (d.status === 'success' && d.sessdata) {
                     document.getElementById('s-sessdata').value = d.sessdata;
-                    await saveSetting('export', 'sessdata', d.sessdata);
-                    showToast('扫码登录成功，已保存 SESSDATA！');
+                    await 保存设置('export', 'sessdata', d.sessdata);
+                    显示提示('扫码登录成功，已保存 SESSDATA！');
                 } else {
-                    showToast(d.error || '扫码登录失败', true);
+                    显示提示(d.error || '扫码登录失败', true);
                 }
             } catch (e) {
-                showToast('扫码登录异常: ' + e.message, true);
+                显示提示('扫码登录异常: ' + e.message, true);
             }
         }
 
-        function confirmResetAll() {
+        function 确认重置全部() {
                 document.getElementById('reset-modal').classList.add('show');
             }
-            function closeResetModal() { document.getElementById('reset-modal').classList.remove('show'); }
-            async function doResetAll() {
-                closeResetModal();
+            function 关闭重置弹窗() { document.getElementById('reset-modal').classList.remove('show'); }
+            async function 执行重置全部() {
+                关闭重置弹窗();
                 try {
                     const r = await fetch('/api/reset-all-settings', { method: 'POST' });
                     const d = await r.json();
                     if (d.ok) {
-                        showToast('已恢复默认设置，正在重新加载...');
-                        setTimeout(() => loadSettings(), 500);
+                        显示提示('已恢复默认设置，正在重新加载...');
+                        setTimeout(() => 载入设置(), 500);
                     } else {
-                        showToast('重置失败', true);
+                        显示提示('重置失败', true);
                     }
-                } catch (e) { showToast('重置失败: ' + e.message, true); }
+                } catch (e) { 显示提示('重置失败: ' + e.message, true); }
             }
 
-            function closeSessdataModal() { document.getElementById('sessdata-modal').classList.remove('show'); }
+            function 关闭会话弹窗() { document.getElementById('sessdata-modal').classList.remove('show'); }
             
-        loadSettings();
+        window.showToast = 显示提示;
+        window.apiGet = 接口读取;
+        window.apiPost = 接口提交;
+        window.escHtml = 转义网页;
+        window.span = 小段;
+        window.nowForExport = 当前导出时间;
+        window.collectNameParts = 收集命名部件;
+        window.renderCurrentPattern = 渲染当前命名模式;
+        window.updateNamePreview = 更新命名预览;
+        window.loadSettings = 载入设置;
+        window.syncConditional = 同步条件显示;
+        window.saveSetting = 保存设置;
+        window.saveToggle = 保存开关;
+        window.saveSelect = 保存选择;
+        window.saveText = 保存文本;
+        window.saveFolder = 保存文件夹;
+        window.resetFolder = 重置文件夹;
+        window.saveBiliPcPath = 保存哔哩电脑路径;
+        window.browseBiliPcPath = 浏览哔哩电脑路径;
+        window.resetBiliPcPath = 重置哔哩电脑路径;
+        window.onNamePartsChanged = 命名部件已变化;
+        window.browsePath = 浏览路径;
+        window.desktopPath = 桌面路径;
+        window.resetExportPath = 重置导出路径;
+        window.confirmApi = 确认接口设置;
+        window.doSaveApi = 保存接口设置;
+        window.closeApiModal = 关闭接口弹窗;
+        window.clearApi = 清空接口设置;
+        window.confirmSessdataShared = 确认会话数据;
+        window.doSaveSessdataShared = 保存会话数据;
+        window.clearSessdataShared = 清空会话数据;
+        window.triggerPlaywrightLogin = 触发扫码登录;
+        window.confirmResetAll = 确认重置全部;
+        window.closeResetModal = 关闭重置弹窗;
+        window.doResetAll = 执行重置全部;
+        window.closeSessdataModal = 关闭会话弹窗;
+
+        载入设置();
     </script>
     <script src="/assets/entry.js"></script>
 </body>

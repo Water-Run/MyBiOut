@@ -625,7 +625,7 @@
                         <li><b>用户信息</b>：用户资料、关注粉丝、投稿统计、收藏夹列表和可选详情。</li>
                         <li><b>专栏文章</b>：文章标题、作者、简介、数据统计和链接信息。</li>
                     </ul>
-                    <p>流程是输入链接或编号，点击解析并添加，等待获取完成后在预览区检查内容。预览支持 <b>Rich</b> 和 <b>Raw</b> 两种模式，确认后可以导出选中项或导出全部就绪项。</p>
+                    <p>流程是输入链接或编号，点击解析并添加，等待获取完成后在预览区检查内容。预览支持 <b>富文本</b> 和 <b>原文</b> 两种模式，确认后可以导出选中项或导出全部就绪项。</p>
                     <h3>MdOut 常见情况</h3>
                     <ul>
                         <li><b>收藏夹或详细信息缺失</b>：通常需要有效 SESSDATA，或受 B 站接口权限/风控影响。</li>
@@ -754,10 +754,10 @@
                 </div>
 
                 <div class="chat-input-bar">
-                    <input type="text" id="chat-input" placeholder="What can i say about..."
-                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat(false)}">
-                    <button class="btn btn-pk" id="btn-send" onclick="sendChat(false)">发送</button>
-                    <button class="btn btn-or" id="btn-bs" onclick="sendChat(true)">直接说</button>
+                    <input type="text" id="chat-input" placeholder="想问点什么..."
+                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();发送对话(false)}">
+                    <button class="btn btn-pk" id="btn-send" onclick="发送对话(false)">发送</button>
+                    <button class="btn btn-or" id="btn-bs" onclick="发送对话(true)">直接说</button>
                 </div>
             </div>
         </div>
@@ -767,97 +767,97 @@
 
 <script>
     (function () {
-        const $ = id => document.getElementById(id);
-        function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        const 取元素 = id => document.getElementById(id);
+        function 转义网页(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-        let _tt = null;
-        function toast(msg, err) {
-            const el = $('toast'); if (_tt) clearTimeout(_tt);
+        let _提示计时器 = null;
+        function 提示(msg, err) {
+            const el = 取元素('toast'); if (_提示计时器) clearTimeout(_提示计时器);
             el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
-            _tt = setTimeout(() => el.className = 'toast', 2200);
+            _提示计时器 = setTimeout(() => el.className = 'toast', 2200);
         }
 
-        let sending = false;
-        let currentBotDiv = null;
+        let 正在发送 = false;
+        let 当前回复块 = null;
 
-        function addUserMsg(text) {
-            const welcome = $('chat-msgs').querySelector('.chat-welcome');
+        function 添加用户消息(text) {
+            const welcome = 取元素('chat-msgs').querySelector('.chat-welcome');
             if (welcome) welcome.remove();
             const div = document.createElement('div');
             div.className = 'msg msg-user';
-            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble">${escH(text)}</div></div>`;
-            $('chat-msgs').appendChild(div);
-            $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble">${转义网页(text)}</div></div>`;
+            取元素('chat-msgs').appendChild(div);
+            取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
         }
 
-        function addLoadingMsg() {
-            const welcome = $('chat-msgs').querySelector('.chat-welcome');
+        function 添加加载消息() {
+            const welcome = 取元素('chat-msgs').querySelector('.chat-welcome');
             if (welcome) welcome.remove();
             const div = document.createElement('div');
             div.className = 'msg msg-bot';
             div.id = 'msg-loading';
             div.innerHTML = `<div class="msg-inner"><div class="msg-bubble"><div class="msg-loading"><span></span><span></span><span></span></div></div></div>`;
-            $('chat-msgs').appendChild(div);
-            $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+            取元素('chat-msgs').appendChild(div);
+            取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
         }
 
-        function removeLoading() {
-            const el = $('msg-loading');
+        function 移除加载() {
+            const el = 取元素('msg-loading');
             if (el) el.remove();
         }
 
-        function createBotMsgContainer() {
-            removeLoading();
+        function 创建回复容器() {
+            移除加载();
             const div = document.createElement('div');
             div.className = 'msg msg-bot';
             div.innerHTML = `<div class="msg-inner"><div class="msg-bubble" id="stream-bubble"></div></div>`;
-            $('chat-msgs').appendChild(div);
+            取元素('chat-msgs').appendChild(div);
             return div.querySelector('#stream-bubble');
         }
 
-        function renderMarkdown(text) {
+        function 渲染Markdown(text) {
             try { return marked.parse(text); }
-            catch (e) { return escH(text).replace(/\n/g, '<br>'); }
+            catch (e) { return 转义网页(text).replace(/\n/g, '<br>'); }
         }
 
-        window.sendChat = async function (forceBs) {
-            if (sending) return;
-            const input = $('chat-input');
+        async function 发送对话(forceBs) {
+            if (正在发送) return;
+            const input = 取元素('chat-input');
             const text = input.value.trim();
-            if (!text) { toast('请输入问题', true); return; }
+            if (!text) { 提示('请输入问题', true); return; }
 
-            sending = true;
-            $('btn-send').disabled = true;
-            $('btn-bs').disabled = true;
+            正在发送 = true;
+            取元素('btn-send').disabled = true;
+            取元素('btn-bs').disabled = true;
             input.value = '';
-            addUserMsg(text);
+            添加用户消息(text);
 
             if (forceBs) {
                 // 非流式: 直接说模式
-                addLoadingMsg();
+                添加加载消息();
                 try {
                     const r = await fetch('/api/man/chat', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ prompt: text, force_bs: true })
                     });
                     const data = await r.json();
-                    removeLoading();
+                    移除加载();
                     if (data.ok) {
-                        const bubble = createBotMsgContainer();
-                        bubble.innerHTML = escH(data.reply).replace(/\n/g, '<br>');
+                        const bubble = 创建回复容器();
+                        bubble.innerHTML = 转义网页(data.reply).replace(/\n/g, '<br>');
                         if (data.note) {
-                            bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + escH(data.note) + '</em>';
+                            bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + 转义网页(data.note) + '</em>';
                         }
                     } else {
-                        toast(data.error || '请求失败', true);
+                        提示(data.error || '请求失败', true);
                     }
                 } catch (e) {
-                    removeLoading();
-                    toast('网络错误: ' + e.message, true);
+                    移除加载();
+                    提示('网络错误: ' + e.message, true);
                 }
             } else {
                 // 流式传输
-                addLoadingMsg();
+                添加加载消息();
                 try {
                     const response = await fetch('/api/man/chat-stream', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -888,8 +888,8 @@
                                 const chunk = JSON.parse(dataStr);
 
                                 if (chunk.error) {
-                                    removeLoading();
-                                    toast(chunk.error, true);
+                                    移除加载();
+                                    提示(chunk.error, true);
                                     break;
                                 }
 
@@ -898,28 +898,28 @@
 
                                 if (chunk.content) {
                                     if (!bubble) {
-                                        bubble = createBotMsgContainer();
+                                        bubble = 创建回复容器();
                                     }
                                     fullReply += chunk.content;
                                     if (source === 'llm') {
-                                        bubble.innerHTML = renderMarkdown(fullReply);
+                                        bubble.innerHTML = 渲染Markdown(fullReply);
                                     } else {
-                                        bubble.innerHTML = escH(fullReply).replace(/\n/g, '<br>');
+                                        bubble.innerHTML = 转义网页(fullReply).replace(/\n/g, '<br>');
                                     }
-                                    $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+                                    取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
                                 }
 
                                 if (chunk.done) {
                                     if (!bubble && fullReply) {
-                                        bubble = createBotMsgContainer();
+                                        bubble = 创建回复容器();
                                         if (source === 'llm') {
-                                            bubble.innerHTML = renderMarkdown(fullReply);
+                                            bubble.innerHTML = 渲染Markdown(fullReply);
                                         } else {
-                                            bubble.innerHTML = escH(fullReply).replace(/\n/g, '<br>');
+                                            bubble.innerHTML = 转义网页(fullReply).replace(/\n/g, '<br>');
                                         }
                                     }
                                     if (bubble && note) {
-                                        bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + escH(note) + '</em>';
+                                        bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + 转义网页(note) + '</em>';
                                     }
                                 }
                             } catch (e) { }
@@ -927,35 +927,36 @@
                     }
 
                     if (!bubble) {
-                        removeLoading();
-                        if (!fullReply) toast('未收到回复', true);
+                        移除加载();
+                        if (!fullReply) 提示('未收到回复', true);
                     }
 
                 } catch (e) {
-                    removeLoading();
-                    toast('网络错误: ' + e.message, true);
+                    移除加载();
+                    提示('网络错误: ' + e.message, true);
                 }
             }
 
-            sending = false;
-            $('btn-send').disabled = false;
-            $('btn-bs').disabled = false;
+            正在发送 = false;
+            取元素('btn-send').disabled = false;
+            取元素('btn-bs').disabled = false;
             input.focus();
-            $('chat-msgs').scrollTop = $('chat-msgs').scrollHeight;
+            取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
         };
 
         /* BG STARS */
-        function initBg() {
-            const cv = $('bg-cv'), cx = cv.getContext('2d');
-            const O = '#F5A623', P = '#E85B8A';
-            let stars = [];
-            function resize() { cv.width = innerWidth; cv.height = innerHeight; }
-            resize(); window.addEventListener('resize', resize);
-            for (let i = 0; i < 28; i++) stars.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2, rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2, c: Math.random() > .5 ? O : P, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2 });
-            function dS(x, y, r, sz, col, al) { if (al < .01) return; cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r); cx.beginPath(); for (let i = 0; i < 5; i++) { const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5; i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz); cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4); } cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore(); }
-            (function loop() { cx.clearRect(0, 0, cv.width, cv.height); stars.forEach(s => { s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012; if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; } if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20; dS(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase))); }); requestAnimationFrame(loop); })();
+        function 初始化背景() {
+            const 画布 = 取元素('bg-cv'), 画笔 = 画布.getContext('2d');
+            const 橙色 = '#F5A623', 粉色 = '#E85B8A';
+            let 星星组 = [];
+            function 调整尺寸() { 画布.width = innerWidth; 画布.height = innerHeight; }
+            调整尺寸(); window.addEventListener('resize', 调整尺寸);
+            for (let i = 0; i < 28; i++) 星星组.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2, rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2, c: Math.random() > .5 ? 橙色 : 粉色, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2 });
+            function 绘制星星(x, y, r, sz, col, al) { if (al < .01) return; 画笔.save(); 画笔.globalAlpha = al; 画笔.translate(x, y); 画笔.rotate(r); 画笔.beginPath(); for (let i = 0; i < 5; i++) { const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5; i ? 画笔.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : 画笔.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz); 画笔.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4); } 画笔.closePath(); 画笔.fillStyle = col; 画笔.fill(); 画笔.restore(); }
+            (function 循环() { 画笔.clearRect(0, 0, 画布.width, 画布.height); 星星组.forEach(s => { s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012; if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; } if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20; 绘制星星(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase))); }); requestAnimationFrame(循环); })();
         }
-        initBg();
+        window.sendChat = 发送对话;
+        初始化背景();
     })();
 </script>
     <script src="/assets/entry.js"></script>

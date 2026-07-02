@@ -535,7 +535,7 @@
             }
         }
 
-        /* Preview */
+        /* 预览 */
         .preview-area {
             flex: 1;
             overflow-y: auto;
@@ -844,7 +844,7 @@
         <!-- ===== CARD GRID VIEW ===== -->
         <div class="main-area card-grid" id="view-grid">
             <!-- Video (largest) -->
-            <div class="func-card card-video" onclick="openPanel('video')">
+            <div class="func-card card-video" onclick="打开面板('video')">
                 <div class="func-count" id="cnt-video">0</div>
                 <div class="func-emoji">🎬</div>
                 <div class="func-name">视频信息导出</div>
@@ -856,7 +856,7 @@
             </div>
 
             <!-- User (medium) -->
-            <div class="func-card card-user" onclick="openPanel('user')">
+            <div class="func-card card-user" onclick="打开面板('user')">
                 <div class="func-count" id="cnt-user">0</div>
                 <div class="func-emoji">👤</div>
                 <div class="func-name">用户信息导出</div>
@@ -865,7 +865,7 @@
             </div>
 
             <!-- Article (small) -->
-            <div class="func-card card-article" onclick="openPanel('article')">
+            <div class="func-card card-article" onclick="打开面板('article')">
                 <div class="func-count" id="cnt-article">0</div>
                 <div class="func-emoji">📝</div>
                 <div class="func-name">专栏导出</div>
@@ -882,7 +882,7 @@
                 </div>
                 <div class="done-scroll" id="done-scroll"></div>
                 <div class="done-ft">
-                    <button class="btn btn-gh btn-xs" onclick="event.stopPropagation();clearDone()">清空</button>
+                    <button class="btn btn-gh btn-xs" onclick="event.stopPropagation();清空完成()">清空</button>
                 </div>
             </div>
         </div>
@@ -892,7 +892,7 @@
             <div class="panel-wrap">
                 <!-- Panel Header -->
                 <div class="panel-top">
-                    <button class="btn btn-pk" onclick="closePanel()">← 返回</button>
+                    <button class="btn btn-pk" onclick="关闭面板()">← 返回</button>
                     <span class="panel-icon" id="p-icon">🎬</span>
                     <span class="panel-title" id="p-title">视频信息导出</span>
                     <span class="panel-type-hint" id="p-hint">BV号 · av号 · 视频链接</span>
@@ -901,11 +901,11 @@
                 <!-- Input Bar -->
                 <div class="panel-input">
                     <input type="text" id="url-input" placeholder="输入链接或ID..."
-                        onkeydown="if(event.key==='Enter')addFetch()">
-                    <button class="btn btn-or" onclick="addFetch()">添加并获取</button>
+                        onkeydown="if(event.key==='Enter')添加并获取()">
+                    <button class="btn btn-or" onclick="添加并获取()">添加并获取</button>
                 </div>
 
-                <!-- Body: List + Preview -->
+                <!-- 主体：列表与预览 -->
                 <div class="panel-body">
                     <!-- List -->
                     <div class="panel-col">
@@ -915,21 +915,21 @@
                         </div>
                         <div class="panel-list" id="p-list"></div>
                         <div class="panel-col-ft">
-                            <button class="btn btn-gh btn-xs" onclick="selAll()">全选</button>
-                            <button class="btn btn-gh btn-xs" onclick="selNone()">取消</button>
-                            <button class="btn btn-gh btn-xs" onclick="clearPanelCards()">清空</button>
-                            <button class="btn btn-gh btn-xs" onclick="openExportFolder()" style="margin-left:auto">📂 打开文件夹</button>
-                            <button class="btn btn-gn" onclick="exportSelected()">导出选中</button>
-                            <button class="btn btn-or" onclick="exportAllReady()">导出全部</button>
+                            <button class="btn btn-gh btn-xs" onclick="全选()">全选</button>
+                            <button class="btn btn-gh btn-xs" onclick="取消选择()">取消</button>
+                            <button class="btn btn-gh btn-xs" onclick="清空面板卡片()">清空</button>
+                            <button class="btn btn-gh btn-xs" onclick="打开导出文件夹()" style="margin-left:auto">📂 打开文件夹</button>
+                            <button class="btn btn-gn" onclick="导出选中()">导出选中</button>
+                            <button class="btn btn-or" onclick="导出全部就绪()">导出全部</button>
                         </div>
                     </div>
 
-                    <!-- Preview -->
+                    <!-- 预览 -->
                     <div class="panel-col">
                         <div class="panel-col-hd">
                             <h3>📄 预览</h3>
                             <div class="panel-col-hd-right">
-                                <button class="btn btn-gh btn-xs" id="btn-raw" onclick="toggleRaw()">Raw</button>
+                                <button class="btn btn-gh btn-xs" id="btn-raw" onclick="切换原文()">原文</button>
                             </div>
                         </div>
                         <div class="preview-area">
@@ -955,74 +955,74 @@
 
     <script>
         (function () {
-            /* ===== STATE ===== */
-            let currentPanel = null; // 'video' | 'user' | 'article' | null
-            let _last = null;
-            let prevLogLen = 0;
-            let showRaw = false;
-            const sel = new Set();
+            /* ===== 状态 ===== */
+            let 当前面板 = null; // 'video' | 'user' | 'article' | null
+            let _上次状态 = null;
+            let 上次日志长度 = 0;
+            let 显示原文 = false;
+            const 已选编号 = new Set();
 
-            const PANELS = {
+            const 面板配置 = {
                 video: { icon: '🎬', title: '视频信息导出', hint: 'BV号 · av号 · 视频链接 · b23短链', placeholder: '输入BV号、av号或视频链接...' },
                 user: { icon: '👤', title: '用户信息导出', hint: 'UID · 空间链接', placeholder: '输入UID或空间链接...' },
                 article: { icon: '📝', title: '专栏导出', hint: 'cv号 · 专栏链接', placeholder: '输入cv号或专栏链接...' },
             };
 
-            /* ===== UTILS ===== */
-            const $ = id => document.getElementById(id);
-            function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-            function escAttr(s) { return escH(s || '').replace(/'/g, '&#39;').replace(/\\/g, '\\\\'); }
+            /* ===== 辅助工具 ===== */
+            const 取元素 = id => document.getElementById(id);
+            function 转义网页(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            function 转义属性(s) { return 转义网页(s || '').replace(/'/g, '&#39;').replace(/\\/g, '\\\\'); }
 
-            let _tt = null;
-            function toast(msg, err) {
-                const el = $('toast'); if (_tt) clearTimeout(_tt);
+            let _提示计时器 = null;
+            function 提示(msg, err) {
+                const el = 取元素('toast'); if (_提示计时器) clearTimeout(_提示计时器);
                 el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
-                _tt = setTimeout(() => el.className = 'toast', 2200);
+                _提示计时器 = setTimeout(() => el.className = 'toast', 2200);
             }
 
             /* ===== PANEL OPEN / CLOSE ===== */
-            window.openPanel = function (type) {
-                currentPanel = type;
-                sel.clear();
-                const cfg = PANELS[type];
-                $('p-icon').textContent = cfg.icon;
-                $('p-title').textContent = cfg.title;
-                $('p-hint').textContent = cfg.hint;
-                $('url-input').placeholder = cfg.placeholder;
-                $('url-input').value = '';
-                $('view-grid').style.display = 'none';
-                $('view-panel').style.display = '';
-                $('hdr-back').href = 'javascript:void(0)';
-                $('hdr-back').onclick = function (e) { e.preventDefault(); closePanel(); };
-                resetPreview();
-                poll();
+            function 打开面板(type) {
+                当前面板 = type;
+                已选编号.clear();
+                const cfg = 面板配置[type];
+                取元素('p-icon').textContent = cfg.icon;
+                取元素('p-title').textContent = cfg.title;
+                取元素('p-hint').textContent = cfg.hint;
+                取元素('url-input').placeholder = cfg.placeholder;
+                取元素('url-input').value = '';
+                取元素('view-grid').style.display = 'none';
+                取元素('view-panel').style.display = '';
+                取元素('hdr-back').href = 'javascript:void(0)';
+                取元素('hdr-back').onclick = function (e) { e.preventDefault(); 关闭面板(); };
+                重置预览();
+                轮询();
             };
 
-            window.closePanel = function () {
-                currentPanel = null;
-                sel.clear();
-                $('view-panel').style.display = 'none';
-                $('view-grid').style.display = '';
-                $('hdr-back').href = '/';
-                $('hdr-back').onclick = null;
-                poll();
+            function 关闭面板() {
+                当前面板 = null;
+                已选编号.clear();
+                取元素('view-panel').style.display = 'none';
+                取元素('view-grid').style.display = '';
+                取元素('hdr-back').href = '/';
+                取元素('hdr-back').onclick = null;
+                轮询();
             };
 
             /* ===== ADD ===== */
-            window.addFetch = async function () {
-                const v = $('url-input').value.trim();
-                if (!v) { toast('请输入链接或ID', true); return; }
+            async function 添加并获取() {
+                const v = 取元素('url-input').value.trim();
+                if (!v) { 提示('请输入链接或ID', true); return; }
 
-                // Pre-check type
+                // 预先识别类型
                 try {
                     const pr = await (await fetch('/api/mdout/parse', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ text: v })
                     })).json();
-                    if (pr.type === 'unknown') { toast('无法识别该链接', true); return; }
-                    if (pr.type !== currentPanel) {
+                    if (pr.type === 'unknown') { 提示('无法识别该链接', true); return; }
+                    if (pr.type !== 当前面板) {
                         const labels = { video: '视频', user: '用户', article: '专栏' };
-                        toast(`这是${labels[pr.type] || '其他'}链接，请去对应卡片操作`, true);
+                        提示(`这是${labels[pr.type] || '其他'}链接，请去对应卡片操作`, true);
                         return;
                     }
                 } catch (e) { }
@@ -1031,136 +1031,136 @@
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: v })
                 })).json();
-                if (!r.ok) { toast(r.error || '添加失败', true); return; }
-                $('url-input').value = '';
-                toast('已添加');
+                if (!r.ok) { 提示(r.error || '添加失败', true); return; }
+                取元素('url-input').value = '';
+                提示('已添加');
             };
 
             /* ===== ITEM CLICK / SELECT ===== */
-            window.clickItem = async function (id) {
-                if (sel.has(id)) sel.delete(id); else sel.add(id);
+            async function 点击项目(id) {
+                if (已选编号.has(id)) 已选编号.delete(id); else 已选编号.add(id);
                 await fetch('/api/mdout/select', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ card_id: id })
                 });
-                poll();
+                轮询();
             };
 
-            window.selAll = function () {
-                if (!_last) return;
-                _last.cards.filter(c => c.item_type === currentPanel).forEach(c => sel.add(c.id));
-                poll();
+            function 全选() {
+                if (!_上次状态) return;
+                _上次状态.cards.filter(c => c.item_type === 当前面板).forEach(c => 已选编号.add(c.id));
+                轮询();
             };
-            window.selNone = function () { sel.clear(); poll(); };
+            function 取消选择() { 已选编号.clear(); 轮询(); };
 
             /* ===== EXPORT ===== */
-            window.exportSelected = async function () {
-                const ids = [...sel].filter(id => {
-                    const c = _last?.cards?.find(x => x.id === id);
+            async function 导出选中() {
+                const ids = [...已选编号].filter(id => {
+                    const c = _上次状态?.cards?.find(x => x.id === id);
                     return c && c.status === 'ready';
                 });
-                if (!ids.length) { toast('请选择就绪的项目', true); return; }
+                if (!ids.length) { 提示('请选择就绪的项目', true); return; }
                 const r = await (await fetch('/api/mdout/export', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ card_ids: ids })
                 })).json();
-                if (r.ok) { sel.clear(); toast('已导出 ' + r.exported + ' 项'); }
-                else toast(r.error || '导出失败', true);
+                if (r.ok) { 已选编号.clear(); 提示('已导出 ' + r.exported + ' 项'); }
+                else 提示(r.error || '导出失败', true);
             };
 
-            window.exportAllReady = async function () {
-                // Only export items of current panel type
-                if (!_last) return;
-                const ids = _last.cards.filter(c => c.item_type === currentPanel && c.status === 'ready').map(c => c.id);
-                if (!ids.length) { toast('没有可导出的项目', true); return; }
+            async function 导出全部就绪() {
+                // 只导出当前面板类型的项目
+                if (!_上次状态) return;
+                const ids = _上次状态.cards.filter(c => c.item_type === 当前面板 && c.status === 'ready').map(c => c.id);
+                if (!ids.length) { 提示('没有可导出的项目', true); return; }
                 const r = await (await fetch('/api/mdout/export', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ card_ids: ids })
                 })).json();
-                if (r.ok) { sel.clear(); toast('已导出 ' + r.exported + ' 项'); }
-                else toast(r.error || '导出失败', true);
+                if (r.ok) { 已选编号.clear(); 提示('已导出 ' + r.exported + ' 项'); }
+                else 提示(r.error || '导出失败', true);
             };
 
             /* ===== CLEAR ===== */
-            window.clearPanelCards = async function () {
-                if (!_last) return;
-                const ids = _last.cards.filter(c => c.item_type === currentPanel).map(c => c.id);
+            async function 清空面板卡片() {
+                if (!_上次状态) return;
+                const ids = _上次状态.cards.filter(c => c.item_type === 当前面板).map(c => c.id);
                 if (!ids.length) return;
                 await fetch('/api/mdout/remove', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ card_ids: ids })
                 });
-                sel.clear();
-                resetPreview();
+                已选编号.clear();
+                重置预览();
             };
 
-            window.clearDone = async function () {
+            async function 清空完成() {
                 await fetch('/api/mdout/clear-completed', { method: 'POST' });
             };
 
-            window.openExportFolder = async function () {
+            async function 打开导出文件夹() {
                 const r = await (await fetch('/api/mdout/open-folder', { method: 'POST' })).json();
-                if (!r.ok) toast(r.error || '无法打开文件夹', true);
+                if (!r.ok) 提示(r.error || '无法打开文件夹', true);
             };
 
-            window.openFile = async function (path) {
-                if (!path) { toast('文件路径不存在', true); return; }
+            async function 打开文件(path) {
+                if (!path) { 提示('文件路径不存在', true); return; }
                 const r = await (await fetch('/api/open-explorer', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: path })
                 })).json();
-                if (!r.ok) toast(r.error || '无法打开', true);
+                if (!r.ok) 提示(r.error || '无法打开', true);
             };
 
             /* ===== PREVIEW ===== */
-            window.toggleRaw = function () {
-                showRaw = !showRaw;
-                $('btn-raw').textContent = showRaw ? 'Rich' : 'Raw';
-                renderPreview(_last?.selected_markdown || '');
+            function 切换原文() {
+                显示原文 = !显示原文;
+                取元素('btn-raw').textContent = 显示原文 ? '富文本' : '原文';
+                渲染预览(_上次状态?.selected_markdown || '');
             };
 
-            function resetPreview() {
-                $('prev-empty').style.display = '';
-                $('prev-rich').style.display = 'none';
-                $('prev-raw').style.display = 'none';
+            function 重置预览() {
+                取元素('prev-empty').style.display = '';
+                取元素('prev-rich').style.display = 'none';
+                取元素('prev-raw').style.display = 'none';
             }
 
-            function renderPreview(md) {
-                if (!md) { resetPreview(); return; }
-                $('prev-empty').style.display = 'none';
-                if (showRaw) {
-                    $('prev-rich').style.display = 'none';
-                    $('prev-raw').style.display = '';
-                    $('prev-raw').textContent = md;
+            function 渲染预览(md) {
+                if (!md) { 重置预览(); return; }
+                取元素('prev-empty').style.display = 'none';
+                if (显示原文) {
+                    取元素('prev-rich').style.display = 'none';
+                    取元素('prev-raw').style.display = '';
+                    取元素('prev-raw').textContent = md;
                 } else {
-                    $('prev-raw').style.display = 'none';
-                    $('prev-rich').style.display = '';
-                    try { $('prev-rich').innerHTML = marked.parse(md); }
-                    catch (e) { $('prev-rich').textContent = md; }
+                    取元素('prev-raw').style.display = 'none';
+                    取元素('prev-rich').style.display = '';
+                    try { 取元素('prev-rich').innerHTML = marked.parse(md); }
+                    catch (e) { 取元素('prev-rich').textContent = md; }
                 }
             }
 
             /* ===== RENDER GRID ===== */
-            function renderGrid(state) {
+            function 渲染网格(state) {
                 const cards = state.cards;
                 const counts = { video: 0, user: 0, article: 0 };
                 cards.forEach(c => { if (counts[c.item_type] !== undefined) counts[c.item_type]++; });
 
                 ['video', 'user', 'article'].forEach(t => {
-                    const el = $('cnt-' + t);
+                    const el = 取元素('cnt-' + t);
                     el.textContent = counts[t];
                     el.classList.toggle('has', counts[t] > 0);
                 });
 
-                // Completed list
-                const doneEl = $('done-scroll');
+                // 已完成列表
+                const doneEl = 取元素('done-scroll');
                 const completed = state.completed || [];
-                $('cnt-done').textContent = completed.length;
-                $('cnt-done').classList.toggle('has', completed.length > 0);
+                取元素('cnt-done').textContent = completed.length;
+                取元素('cnt-done').classList.toggle('has', completed.length > 0);
 
                 const doneHtml = completed.length
                     ? completed.slice(-20).reverse().map(c =>
-                        '<div class="done-item" ondblclick="openFile(\'' + escAttr(c.output_path) + '\')" title="双击打开文件"><b>✓</b> ' + escH(c.title || c.filename || '—') + '</div>'
+                        '<div class="done-item" ondblclick="打开文件(\'' + 转义属性(c.output_path) + '\')" title="双击打开文件"><b>✓</b> ' + 转义网页(c.title || c.filename || '—') + '</div>'
                     ).join('')
                     : '<div class="done-empty">暂无导出记录</div>';
 
@@ -1171,28 +1171,28 @@
             }
 
             /* ===== RENDER PANEL ===== */
-            function renderPanel(state) {
-                if (!currentPanel) return;
-                const items = state.cards.filter(c => c.item_type === currentPanel);
-                $('p-badge').textContent = items.length;
+            function 渲染面板(state) {
+                if (!当前面板) return;
+                const items = state.cards.filter(c => c.item_type === 当前面板);
+                取元素('p-badge').textContent = items.length;
 
                 const statusLabels = { pending: '等待中', fetching: '获取中...', ready: '就绪', failed: '失败' };
                 const listHtml = items.length
                     ? items.map(c => {
-                        const isSel = sel.has(c.id);
+                        const isSel = 已选编号.has(c.id);
                         const tcls = 'item-' + (c.item_type || 'video');
                         const stHtml = statusLabels[c.status]
                             ? '<div class="item-status ' + c.status + '">' + statusLabels[c.status] +
-                            (c.status === 'failed' && c.error ? ': ' + escH(c.error) : '') + '</div>'
+                            (c.status === 'failed' && c.error ? ': ' + 转义网页(c.error) : '') + '</div>'
                             : '';
-                        return '<div class="item ' + tcls + (isSel ? ' sel' : '') + '" onclick="clickItem(\'' + c.id + '\')">' +
-                            '<div class="item-title">' + escH(c.title || c.input_text || '—') + '</div>' +
-                            '<div class="item-sub">' + escH(c.subtitle || c.id_value || '') + '</div>' +
+                        return '<div class="item ' + tcls + (isSel ? ' sel' : '') + '" onclick="点击项目(\'' + c.id + '\')">' +
+                            '<div class="item-title">' + 转义网页(c.title || c.input_text || '—') + '</div>' +
+                            '<div class="item-sub">' + 转义网页(c.subtitle || c.id_value || '') + '</div>' +
                             stHtml + '</div>';
                     }).join('')
                     : '<div class="empty-hint"><span class="em-icon">📋</span>在上方输入链接添加</div>';
 
-                const listEl = $('p-list');
+                const listEl = 取元素('p-list');
                 if (listEl._lh !== listHtml) {
                     const st = listEl.scrollTop;
                     listEl.innerHTML = listHtml;
@@ -1200,88 +1200,101 @@
                     listEl._lh = listHtml;
                 }
 
-                // Preview
-                renderPreview(state.selected_markdown || '');
+                // 预览
+                渲染预览(state.selected_markdown || '');
 
-                // Clean stale selections
+                // 清理失效选择
                 const validIds = new Set(items.map(c => c.id));
-                for (const id of sel) { if (!validIds.has(id)) sel.delete(id); }
+                for (const id of 已选编号) { if (!validIds.has(id)) 已选编号.delete(id); }
             }
 
-            /* ===== LOGS ===== */
-            function renderLogs(logs) {
-                if (logs.length === prevLogLen) return;
-                const el = $('log-msgs');
-                logs.slice(prevLogLen).forEach(l => {
+            /* ===== 日志 ===== */
+            function 渲染日志(logs) {
+                if (logs.length === 上次日志长度) return;
+                const el = 取元素('log-msgs');
+                logs.slice(上次日志长度).forEach(l => {
                     const d = document.createElement('div'); d.className = 'lm';
-                    d.innerHTML = '<span class="lm-time">[' + escH(l.time) + ']</span> <span class="lm-' + l.level + '">' + escH(l.msg) + '</span>';
+                    d.innerHTML = '<span class="lm-time">[' + 转义网页(l.time) + ']</span> <span class="lm-' + l.level + '">' + 转义网页(l.msg) + '</span>';
                     el.appendChild(d);
                 });
-                prevLogLen = logs.length;
+                上次日志长度 = logs.length;
                 el.scrollTop = el.scrollHeight;
             }
 
-            /* ===== POLL ===== */
-            async function poll() {
+            /* ===== 轮询 ===== */
+            async function 轮询() {
                 try {
                     const r = await fetch('/api/mdout/state');
                     const s = await r.json();
-                    _last = s;
+                    _上次状态 = s;
 
-                    renderGrid(s);
-                    if (currentPanel) renderPanel(s);
-                    renderLogs(s.logs);
+                    渲染网格(s);
+                    if (当前面板) 渲染面板(s);
+                    渲染日志(s.logs);
 
-                    $('st-fetch').textContent = s.cards.length;
-                    $('st-done').textContent = (s.completed || []).length;
+                    取元素('st-fetch').textContent = s.cards.length;
+                    取元素('st-done').textContent = (s.completed || []).length;
                 } catch (e) { }
             }
 
             /* ===== BG STARS ===== */
-            function initBg() {
-                const cv = $('bg-cv'), cx = cv.getContext('2d');
-                const O = '#F5A623', P = '#E85B8A';
-                let stars = [];
+            function 初始化背景() {
+                const 画布 = 取元素('bg-cv'), 画笔 = 画布.getContext('2d');
+                const 橙色 = '#F5A623', 粉色 = '#E85B8A';
+                let 星星组 = [];
 
-                function resize() { cv.width = innerWidth; cv.height = innerHeight; }
-                resize();
-                window.addEventListener('resize', resize);
+                function 调整尺寸() { 画布.width = innerWidth; 画布.height = innerHeight; }
+                调整尺寸();
+                window.addEventListener('resize', 调整尺寸);
 
-                for (let i = 0; i < 28; i++) stars.push({
+                for (let i = 0; i < 28; i++) 星星组.push({
                     x: Math.random() * innerWidth, y: Math.random() * innerHeight,
                     sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2,
                     rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2,
-                    c: Math.random() > .5 ? O : P, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2
+                    c: Math.random() > .5 ? 橙色 : 粉色, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2
                 });
 
-                function dS(x, y, r, sz, col, al) {
+                function 绘制星星(x, y, r, sz, col, al) {
                     if (al < .01) return;
-                    cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(r); cx.beginPath();
+                    画笔.save(); 画笔.globalAlpha = al; 画笔.translate(x, y); 画笔.rotate(r); 画笔.beginPath();
                     for (let i = 0; i < 5; i++) {
                         const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5;
-                        i ? cx.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : cx.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
-                        cx.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
+                        i ? 画笔.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : 画笔.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
+                        画笔.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
                     }
-                    cx.closePath(); cx.fillStyle = col; cx.fill(); cx.restore();
+                    画笔.closePath(); 画笔.fillStyle = col; 画笔.fill(); 画笔.restore();
                 }
 
-                (function loop() {
-                    cx.clearRect(0, 0, cv.width, cv.height);
-                    stars.forEach(s => {
+                (function 循环() {
+                    画笔.clearRect(0, 0, 画布.width, 画布.height);
+                    星星组.forEach(s => {
                         s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
                         if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; }
                         if (s.x < -20) s.x = innerWidth + 20;
                         if (s.x > innerWidth + 20) s.x = -20;
-                        dS(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
+                        绘制星星(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
                     });
-                    requestAnimationFrame(loop);
+                    requestAnimationFrame(循环);
                 })();
             }
 
             /* ===== INIT ===== */
-            initBg();
-            poll();
-            setInterval(poll, 600);
+            window.openPanel = 打开面板;
+            window.closePanel = 关闭面板;
+            window.addFetch = 添加并获取;
+            window.clickItem = 点击项目;
+            window.selAll = 全选;
+            window.selNone = 取消选择;
+            window.exportSelected = 导出选中;
+            window.exportAllReady = 导出全部就绪;
+            window.clearPanelCards = 清空面板卡片;
+            window.clearDone = 清空完成;
+            window.openExportFolder = 打开导出文件夹;
+            window.openFile = 打开文件;
+            window.toggleRaw = 切换原文;
+            初始化背景();
+            轮询();
+            setInterval(轮询, 600);
         })();
     </script>
     <script src="/assets/entry.js"></script>

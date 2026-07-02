@@ -389,7 +389,7 @@
         </div>
         <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
         <a class="github-link" id="github-btn" href="https://github.com/Water-Run/MyBiOut" target="_blank"
-            rel="noopener">来仓库点 Star ⭐ 提交 Issue 🐛</a>
+            rel="noopener">来仓库点星标 ⭐ 提交问题 🐛</a>
         <div class="cards">
             <a class="card" href="/localout">
                 <img src="./assets/localout.png" alt="本地缓存导出">
@@ -420,121 +420,121 @@
 
     <script>
         (function () {
-            const O = '#F5A623', P = '#E85B8A';
+            const 橙色 = '#F5A623', 粉色 = '#E85B8A';
 
-            const ov = document.getElementById('star-overlay');
-            const cv = document.getElementById('star-canvas');
-            const cx2d = cv.getContext('2d');
-            const t1 = document.getElementById('overlay-t1');
-            const t2 = document.getElementById('overlay-t2');
-            const btn = document.getElementById('github-btn');
-            const flashEl = document.getElementById('flash-overlay');
+            const 遮罩 = document.getElementById('star-overlay');
+            const 画布 = document.getElementById('star-canvas');
+            const 画笔 = 画布.getContext('2d');
+            const 文字一 = document.getElementById('overlay-t1');
+            const 文字二 = document.getElementById('overlay-t2');
+            const 按钮 = document.getElementById('github-btn');
+            const 闪光层 = document.getElementById('flash-overlay');
 
-            let parts = [], rafId = null, alive = false;
-            let loopT0 = null, showOrbit = false;
-            let doFade = false, fadeT0 = 0;
-            let _tids = [], _ivids = [];
+            let 粒子们 = [], 动画帧号 = null, 运行中 = false;
+            let 循环起点 = null, 显示轨道 = false;
+            let 正在淡出 = false, 淡出起点 = 0;
+            let _定时器号 = [], _间隔号 = [];
             /* ★ 核心状态：是否等待用户返回 */
-            let waitingForReturn = false;
+            let 等待返回 = false;
 
-            const tm = (f, d) => _tids.push(setTimeout(f, d));
-            const iv = (f, d) => { const id = setInterval(f, d); _ivids.push(id); };
-            function clearAll() {
-                _tids.forEach(clearTimeout); _tids = [];
-                _ivids.forEach(clearInterval); _ivids = [];
+            const 延迟执行 = (f, d) => _定时器号.push(setTimeout(f, d));
+            const 间隔执行 = (f, d) => { const id = setInterval(f, d); _间隔号.push(id); };
+            function 清理计时器() {
+                _定时器号.forEach(clearTimeout); _定时器号 = [];
+                _间隔号.forEach(clearInterval); _间隔号 = [];
             }
 
-            function resize() { cv.width = innerWidth; cv.height = innerHeight; }
-            window.addEventListener('resize', () => { if (alive) resize(); });
+            function 调整尺寸() { 画布.width = innerWidth; 画布.height = innerHeight; }
+            window.addEventListener('resize', () => { if (运行中) 调整尺寸(); });
 
-            function flash(duration) {
-                flashEl.style.transition = 'none';
-                flashEl.style.opacity = '0.88';
+            function 闪白(duration) {
+                闪光层.style.transition = 'none';
+                闪光层.style.opacity = '0.88';
                 requestAnimationFrame(() => {
-                    flashEl.style.transition = 'opacity ' + (duration || 400) + 'ms ease-out';
-                    flashEl.style.opacity = '0';
+                    闪光层.style.transition = 'opacity ' + (duration || 400) + 'ms ease-out';
+                    闪光层.style.opacity = '0';
                 });
             }
 
-            function screenShake(intensity, duration) {
+            function 屏幕震动(intensity, duration) {
                 const start = performance.now();
-                (function step() {
+                (function 震动步进() {
                     const elapsed = performance.now() - start;
-                    if (elapsed > duration || !alive) { ov.style.transform = ''; return; }
+                    if (elapsed > duration || !运行中) { 遮罩.style.transform = ''; return; }
                     const decay = 1 - elapsed / duration;
                     const x = (Math.random() - .5) * 2 * intensity * decay;
                     const y = (Math.random() - .5) * 2 * intensity * decay;
-                    ov.style.transform = `translate(${x}px,${y}px)`;
-                    requestAnimationFrame(step);
+                    遮罩.style.transform = `translate(${x}px,${y}px)`;
+                    requestAnimationFrame(震动步进);
                 })();
             }
 
-            function dstar(x, y, r, rot, col, a) {
+            function 绘制星星(x, y, r, rot, col, a) {
                 if (a < .012) return;
-                cx2d.save();
-                cx2d.globalAlpha = Math.min(1, a);
-                cx2d.translate(x, y); cx2d.rotate(rot);
-                cx2d.beginPath();
+                画笔.save();
+                画笔.globalAlpha = Math.min(1, a);
+                画笔.translate(x, y); 画笔.rotate(rot);
+                画笔.beginPath();
                 for (let i = 0; i < 5; i++) {
                     const ao = i * 2 * Math.PI / 5 - Math.PI / 2;
                     const ai = ao + Math.PI / 5;
-                    i ? cx2d.lineTo(Math.cos(ao) * r, Math.sin(ao) * r)
-                        : cx2d.moveTo(Math.cos(ao) * r, Math.sin(ao) * r);
-                    cx2d.lineTo(Math.cos(ai) * r * .4, Math.sin(ai) * r * .4);
+                    i ? 画笔.lineTo(Math.cos(ao) * r, Math.sin(ao) * r)
+                        : 画笔.moveTo(Math.cos(ao) * r, Math.sin(ao) * r);
+                    画笔.lineTo(Math.cos(ai) * r * .4, Math.sin(ai) * r * .4);
                 }
-                cx2d.closePath(); cx2d.fillStyle = col; cx2d.fill();
-                cx2d.restore();
+                画笔.closePath(); 画笔.fillStyle = col; 画笔.fill();
+                画笔.restore();
             }
 
-            function drawGlow(x, y, r, col, alpha) {
+            function 绘制辉光(x, y, r, col, alpha) {
                 if (alpha < 0.01 || r < 1) return;
-                cx2d.save();
-                cx2d.globalAlpha = alpha;
-                const grad = cx2d.createRadialGradient(x, y, 0, x, y, r);
+                画笔.save();
+                画笔.globalAlpha = alpha;
+                const grad = 画笔.createRadialGradient(x, y, 0, x, y, r);
                 grad.addColorStop(0, col);
                 grad.addColorStop(1, 'transparent');
-                cx2d.fillStyle = grad;
-                cx2d.fillRect(x - r, y - r, r * 2, r * 2);
-                cx2d.restore();
+                画笔.fillStyle = grad;
+                画笔.fillRect(x - r, y - r, r * 2, r * 2);
+                画笔.restore();
             }
 
             /* ======== PARTICLES ======== */
 
-            class Burst {
+            class 爆裂粒子 {
                 constructor(px, py, big) {
                     const a = Math.random() * Math.PI * 2;
                     const s = big ? Math.random() * 15 + 5 : Math.random() * 9 + 2;
                     this.x = px; this.y = py;
                     this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
                     this.sz = big ? Math.random() * 24 + 10 : Math.random() * 13 + 5;
-                    this.c = Math.random() > .5 ? O : P;
+                    this.c = Math.random() > .5 ? 橙色 : 粉色;
                     this.r = Math.random() * Math.PI * 2;
                     this.rv = (Math.random() - .5) * .32;
                     this.life = 1;
                     this.dc = big ? .006 + Math.random() * .009 : .009 + Math.random() * .014;
                     this.g = .2;
                 }
-                step() { this.x += this.vx; this.y += this.vy; this.vy += this.g; this.vx *= .99; this.r += this.rv; this.life -= this.dc; return this.life > 0; }
-                draw() { dstar(this.x, this.y, this.sz, this.r, this.c, this.life); }
+                步进() { this.x += this.vx; this.y += this.vy; this.vy += this.g; this.vx *= .99; this.r += this.rv; this.life -= this.dc; return this.life > 0; }
+                绘制() { 绘制星星(this.x, this.y, this.sz, this.r, this.c, this.life); }
             }
 
-            class Rain {
+            class 星雨 {
                 constructor() {
                     this.x = Math.random() * innerWidth;
                     this.y = -Math.random() * 70 - 10;
                     this.vy = Math.random() * 3.2 + 1.4;
                     this.vx = (Math.random() - .5) * 1.6;
                     this.sz = Math.random() * 14 + 5;
-                    this.c = Math.random() > .5 ? O : P;
+                    this.c = Math.random() > .5 ? 橙色 : 粉色;
                     this.r = Math.random() * Math.PI * 2;
                     this.rv = (Math.random() - .5) * .07;
                     this.al = Math.random() * .5 + .5;
                 }
-                step() { this.x += this.vx; this.y += this.vy; this.r += this.rv; return this.y < innerHeight + 30; }
-                draw() { dstar(this.x, this.y, this.sz, this.r, this.c, this.al); }
+                步进() { this.x += this.vx; this.y += this.vy; this.r += this.rv; return this.y < innerHeight + 30; }
+                绘制() { 绘制星星(this.x, this.y, this.sz, this.r, this.c, this.al); }
             }
 
-            class Shoot {
+            class 流星 {
                 constructor() {
                     const a = Math.PI * (.07 + Math.random() * .22);
                     const s = Math.random() * 11 + 8;
@@ -542,200 +542,200 @@
                     this.y = Math.random() * innerHeight * .42;
                     this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
                     this.sz = Math.random() * 11 + 5;
-                    this.c = Math.random() > .5 ? O : P;
+                    this.c = Math.random() > .5 ? 橙色 : 粉色;
                     this.r = 0; this.trail = []; this.life = 1; this.dc = .022;
                 }
-                step() {
+                步进() {
                     this.trail.push({ x: this.x, y: this.y });
                     if (this.trail.length > 22) this.trail.shift();
                     this.x += this.vx; this.y += this.vy;
                     this.r += .19; this.life -= this.dc;
                     return this.life > 0 && this.x < innerWidth + 60;
                 }
-                draw() {
+                绘制() {
                     this.trail.forEach((p, i) => {
                         const t = i / this.trail.length;
-                        dstar(p.x, p.y, this.sz * t * .75, this.r, this.c, t * this.life * .45);
+                        绘制星星(p.x, p.y, this.sz * t * .75, this.r, this.c, t * this.life * .45);
                     });
-                    drawGlow(this.x, this.y, this.sz * 1.5, this.c, this.life * 0.25);
-                    dstar(this.x, this.y, this.sz, this.r, this.c, this.life);
+                    绘制辉光(this.x, this.y, this.sz * 1.5, this.c, this.life * 0.25);
+                    绘制星星(this.x, this.y, this.sz, this.r, this.c, this.life);
                 }
             }
 
-            class Shockwave {
+            class 冲击波 {
                 constructor(px, py, maxR, col) {
                     this.x = px; this.y = py;
                     this.r = 0; this.maxR = maxR;
-                    this.c = col || (Math.random() > .5 ? O : P);
+                    this.c = col || (Math.random() > .5 ? 橙色 : 粉色);
                     this.life = 1; this.speed = maxR / 26;
                 }
-                step() { this.r += this.speed; this.life = Math.max(0, 1 - this.r / this.maxR); return this.life > 0; }
-                draw() {
-                    cx2d.save(); cx2d.globalAlpha = this.life * 0.55;
-                    cx2d.strokeStyle = this.c; cx2d.lineWidth = 2 + this.life * 6;
-                    cx2d.beginPath(); cx2d.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-                    cx2d.stroke(); cx2d.restore();
+                步进() { this.r += this.speed; this.life = Math.max(0, 1 - this.r / this.maxR); return this.life > 0; }
+                绘制() {
+                    画笔.save(); 画笔.globalAlpha = this.life * 0.55;
+                    画笔.strokeStyle = this.c; 画笔.lineWidth = 2 + this.life * 6;
+                    画笔.beginPath(); 画笔.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                    画笔.stroke(); 画笔.restore();
                 }
             }
 
-            class Sparkle {
+            class 闪烁粒子 {
                 constructor() {
                     this.x = Math.random() * innerWidth;
                     this.y = Math.random() * innerHeight;
                     this.sz = Math.random() * 7 + 2;
-                    this.c = Math.random() > .5 ? O : P;
+                    this.c = Math.random() > .5 ? 橙色 : 粉色;
                     this.phase = Math.random() * Math.PI * 2;
                     this.speed = Math.random() * 3 + 2;
                     this.life = 1; this.dc = 0.004 + Math.random() * 0.006;
                     this.r = Math.random() * Math.PI * 2;
                 }
-                step() { this.phase += 0.08; this.r += 0.015; this.life -= this.dc; return this.life > 0; }
-                draw() { dstar(this.x, this.y, this.sz, this.r, this.c, Math.abs(Math.sin(this.phase * this.speed)) * this.life); }
+                步进() { this.phase += 0.08; this.r += 0.015; this.life -= this.dc; return this.life > 0; }
+                绘制() { 绘制星星(this.x, this.y, this.sz, this.r, this.c, Math.abs(Math.sin(this.phase * this.speed)) * this.life); }
             }
 
-            class Firework {
+            class 烟花 {
                 constructor(sx, targetY) {
                     this.x = sx; this.y = innerHeight + 10;
                     this.targetY = targetY;
                     this.vy = -(Math.random() * 3 + 12);
-                    this.sz = 7; this.c = Math.random() > .5 ? O : P;
+                    this.sz = 7; this.c = Math.random() > .5 ? 橙色 : 粉色;
                     this.r = 0; this.trail = []; this.exploded = false;
                 }
-                step() {
+                步进() {
                     if (this.exploded) return false;
                     this.trail.push({ x: this.x, y: this.y });
                     if (this.trail.length > 18) this.trail.shift();
                     this.y += this.vy; this.vy += 0.12; this.r += 0.12;
                     if (this.y <= this.targetY) {
                         this.exploded = true;
-                        burst(this.x, this.y, 55, true);
-                        parts.push(new Shockwave(this.x, this.y, 180, this.c));
-                        ringBurst(this.x, this.y, 12, 6);
+                        爆裂(this.x, this.y, 55, true);
+                        粒子们.push(new 冲击波(this.x, this.y, 180, this.c));
+                        环形爆裂(this.x, this.y, 12, 6);
                         return false;
                     }
                     return true;
                 }
-                draw() {
-                    drawGlow(this.x, this.y, 22, this.c, 0.4);
+                绘制() {
+                    绘制辉光(this.x, this.y, 22, this.c, 0.4);
                     this.trail.forEach((p, i) => {
                         const t = i / this.trail.length;
-                        dstar(p.x, p.y, this.sz * t * 0.6, this.r, this.c, t * 0.5);
+                        绘制星星(p.x, p.y, this.sz * t * 0.6, this.r, this.c, t * 0.5);
                     });
-                    dstar(this.x, this.y, this.sz, this.r, this.c, 1);
+                    绘制星星(this.x, this.y, this.sz, this.r, this.c, 1);
                 }
             }
 
-            class SpeedLine {
+            class 速度线 {
                 constructor(cx, cy) {
                     const a = Math.random() * Math.PI * 2;
                     const innerR = Math.random() * 40 + 20;
                     const outerR = innerR + Math.random() * 250 + 80;
                     this.x1 = cx + Math.cos(a) * innerR; this.y1 = cy + Math.sin(a) * innerR;
                     this.x2 = cx + Math.cos(a) * outerR; this.y2 = cy + Math.sin(a) * outerR;
-                    this.c = Math.random() > .5 ? O : P;
+                    this.c = Math.random() > .5 ? 橙色 : 粉色;
                     this.life = 1; this.dc = 0.025 + Math.random() * 0.02;
                     this.lw = Math.random() * 3 + 1;
                 }
-                step() { this.life -= this.dc; return this.life > 0; }
-                draw() {
-                    cx2d.save(); cx2d.globalAlpha = this.life * 0.6;
-                    cx2d.strokeStyle = this.c; cx2d.lineWidth = this.lw * this.life;
-                    cx2d.beginPath(); cx2d.moveTo(this.x1, this.y1); cx2d.lineTo(this.x2, this.y2);
-                    cx2d.stroke(); cx2d.restore();
+                步进() { this.life -= this.dc; return this.life > 0; }
+                绘制() {
+                    画笔.save(); 画笔.globalAlpha = this.life * 0.6;
+                    画笔.strokeStyle = this.c; 画笔.lineWidth = this.lw * this.life;
+                    画笔.beginPath(); 画笔.moveTo(this.x1, this.y1); 画笔.lineTo(this.x2, this.y2);
+                    画笔.stroke(); 画笔.restore();
                 }
             }
 
-            class Confetti {
+            class 彩屑 {
                 constructor(px, py) {
                     const a = Math.random() * Math.PI * 2;
                     const s = Math.random() * 7 + 3;
                     this.x = px; this.y = py;
                     this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s - 4;
                     this.w = Math.random() * 10 + 4; this.h = Math.random() * 5 + 2;
-                    this.c = Math.random() > .5 ? O : P;
+                    this.c = Math.random() > .5 ? 橙色 : 粉色;
                     this.r = Math.random() * Math.PI * 2;
                     this.rv = (Math.random() - .5) * .2;
                     this.life = 1; this.dc = 0.006 + Math.random() * 0.006; this.g = 0.1;
                 }
-                step() { this.x += this.vx; this.y += this.vy; this.vy += this.g; this.vx *= 0.99; this.r += this.rv; this.life -= this.dc; return this.life > 0; }
-                draw() {
-                    cx2d.save(); cx2d.globalAlpha = this.life;
-                    cx2d.translate(this.x, this.y); cx2d.rotate(this.r);
-                    cx2d.fillStyle = this.c; cx2d.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
-                    cx2d.restore();
+                步进() { this.x += this.vx; this.y += this.vy; this.vy += this.g; this.vx *= 0.99; this.r += this.rv; this.life -= this.dc; return this.life > 0; }
+                绘制() {
+                    画笔.save(); 画笔.globalAlpha = this.life;
+                    画笔.translate(this.x, this.y); 画笔.rotate(this.r);
+                    画笔.fillStyle = this.c; 画笔.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
+                    画笔.restore();
                 }
             }
 
-            class GlowOrb {
+            class 辉光球 {
                 constructor(x, y, col) {
                     this.x = x; this.y = y; this.r = 10;
                     this.maxR = Math.random() * 80 + 40;
-                    this.c = col || (Math.random() > .5 ? O : P);
+                    this.c = col || (Math.random() > .5 ? 橙色 : 粉色);
                     this.life = 1; this.speed = (this.maxR - 10) / 38;
                 }
-                step() { this.r += this.speed; this.life = Math.max(0, 1 - this.r / this.maxR); return this.life > 0; }
-                draw() { drawGlow(this.x, this.y, this.r, this.c, this.life * 0.4); }
+                步进() { this.r += this.speed; this.life = Math.max(0, 1 - this.r / this.maxR); return this.life > 0; }
+                绘制() { 绘制辉光(this.x, this.y, this.r, this.c, this.life * 0.4); }
             }
 
-            /* ======== HELPERS ======== */
+            /* ======== 辅助工具 ======== */
 
-            function burst(px, py, n, big) { for (let i = 0; i < n; i++) parts.push(new Burst(px, py, big)); }
+            function 爆裂(px, py, n, big) { for (let i = 0; i < n; i++) 粒子们.push(new 爆裂粒子(px, py, big)); }
 
-            function ringBurst(cx, cy, count, speed) {
+            function 环形爆裂(cx, cy, count, speed) {
                 for (let i = 0; i < count; i++) {
                     const angle = (i / count) * Math.PI * 2;
-                    const b = new Burst(cx, cy, true);
+                    const b = new 爆裂粒子(cx, cy, true);
                     b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
-                    b.g = 0; b.dc = 0.012; parts.push(b);
+                    b.g = 0; b.dc = 0.012; 粒子们.push(b);
                 }
             }
 
-            function speedLines(cx, cy, count) { for (let i = 0; i < count; i++) parts.push(new SpeedLine(cx, cy)); }
-            function confettiBurst(cx, cy, count) { for (let i = 0; i < count; i++) parts.push(new Confetti(cx, cy)); }
-            function spawnSparkles(count) { for (let i = 0; i < count; i++) parts.push(new Sparkle()); }
+            function 速度线群(cx, cy, count) { for (let i = 0; i < count; i++) 粒子们.push(new 速度线(cx, cy)); }
+            function 彩屑爆裂(cx, cy, count) { for (let i = 0; i < count; i++) 粒子们.push(new 彩屑(cx, cy)); }
+            function 生成闪烁(count) { for (let i = 0; i < count; i++) 粒子们.push(new 闪烁粒子()); }
 
-            function drawOrbits(elapsed) {
+            function 绘制轨道(elapsed) {
                 const ocx = innerWidth / 2, ocy = innerHeight * .5;
                 [
-                    { r: 170, sp: 1.5, n: 5, cols: [O, P, O, P, O], ys: .35, szBase: 10 },
-                    { r: 235, sp: -1.0, n: 6, cols: [P, O, P, O, P, O], ys: .28, szBase: 8 },
-                    { r: 305, sp: 0.7, n: 4, cols: [O, P, O, P], ys: .22, szBase: 12 },
+                    { r: 170, sp: 1.5, n: 5, cols: [橙色, 粉色, 橙色, 粉色, 橙色], ys: .35, szBase: 10 },
+                    { r: 235, sp: -1.0, n: 6, cols: [粉色, 橙色, 粉色, 橙色, 粉色, 橙色], ys: .28, szBase: 8 },
+                    { r: 305, sp: 0.7, n: 4, cols: [橙色, 粉色, 橙色, 粉色], ys: .22, szBase: 12 },
                 ].forEach(({ r, sp, n, cols, ys, szBase }) => {
                     for (let i = 0; i < n; i++) {
                         const a = elapsed * sp + i * 2 * Math.PI / n;
                         const sz = szBase + Math.sin(elapsed * 2.5 + i * 1.3) * 3;
                         const sx = ocx + Math.cos(a) * r, sy = ocy + Math.sin(a) * r * ys;
-                        drawGlow(sx, sy, sz * 2.2, cols[i % cols.length], 0.13);
-                        dstar(sx, sy, sz, a * 2.1, cols[i % cols.length], .88);
+                        绘制辉光(sx, sy, sz * 2.2, cols[i % cols.length], 0.13);
+                        绘制星星(sx, sy, sz, a * 2.1, cols[i % cols.length], .88);
                     }
                 });
             }
 
             /* ---- char reveal ---- */
-            function revealChars(el, text, onDone) {
+            function 显现字符(el, text, onDone) {
                 el.innerHTML = [...text].map(ch => `<span class="ch-pre">${ch}</span>`).join('');
                 const spans = [...el.children];
                 spans.forEach((sp, i) => {
-                    tm(() => {
+                    延迟执行(() => {
                         sp.className = 'ch-show';
                         const rc = sp.getBoundingClientRect();
                         const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
-                        burst(cx, cy, 18, false);
-                        parts.push(new GlowOrb(cx, cy));
+                        爆裂(cx, cy, 18, false);
+                        粒子们.push(new 辉光球(cx, cy));
                         if (i === spans.length - 1) {
-                            tm(() => {
-                                burst(cx, cy, 55, true);
-                                screenShake(5, 200); flash(280);
-                                parts.push(new Shockwave(cx, cy, 200, P));
+                            延迟执行(() => {
+                                爆裂(cx, cy, 55, true);
+                                屏幕震动(5, 200); 闪白(280);
+                                粒子们.push(new 冲击波(cx, cy, 200, 粉色));
                             }, 85);
                         }
                     }, i * 170);
                 });
-                tm(onDone, spans.length * 170 + 260);
+                延迟执行(onDone, spans.length * 170 + 260);
             }
 
             /* ---- Web Animations ---- */
-            function slideFromLeft(el, onDone) {
+            function 左侧滑入(el, onDone) {
                 const rot = 'rotate(-2deg)';
                 const anim = el.animate([
                     { transform: `translate(-230%, -50%) ${rot}`, opacity: 0 },
@@ -749,16 +749,16 @@
                     anim.cancel();
                     const rc = el.getBoundingClientRect();
                     const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
-                    screenShake(10, 320);
-                    parts.push(new Shockwave(cx, cy, 240, O));
-                    parts.push(new GlowOrb(cx, cy, O));
-                    burst(cx - rc.width / 2, cy, 22, true);
-                    flash(250);
+                    屏幕震动(10, 320);
+                    粒子们.push(new 冲击波(cx, cy, 240, 橙色));
+                    粒子们.push(new 辉光球(cx, cy, 橙色));
+                    爆裂(cx - rc.width / 2, cy, 22, true);
+                    闪白(250);
                     onDone();
                 };
             }
 
-            function dropFromTop(el, onDone) {
+            function 顶部坠入(el, onDone) {
                 const rot = 'rotate(1.5deg)';
                 const anim = el.animate([
                     { transform: `translate(-50%, -900%) ${rot} scale(.45)`, opacity: 0 },
@@ -772,17 +772,17 @@
                     anim.cancel();
                     const rc = el.getBoundingClientRect();
                     const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
-                    screenShake(12, 380);
-                    parts.push(new Shockwave(cx, cy, 280, P));
-                    parts.push(new GlowOrb(cx, cy, P));
-                    burst(cx, cy + rc.height / 2, 28, true);
-                    confettiBurst(cx, cy, 30);
-                    flash(280);
+                    屏幕震动(12, 380);
+                    粒子们.push(new 冲击波(cx, cy, 280, 粉色));
+                    粒子们.push(new 辉光球(cx, cy, 粉色));
+                    爆裂(cx, cy + rc.height / 2, 28, true);
+                    彩屑爆裂(cx, cy, 30);
+                    闪白(280);
                     onDone();
                 };
             }
 
-            function startFloat(el, rotDeg) {
+            function 开始漂浮(el, rotDeg) {
                 const rot = `rotate(${rotDeg}deg)`;
                 el.animate([
                     { transform: `translate(-50%, -50%) ${rot}` },
@@ -791,171 +791,171 @@
                 ], { duration: 2400, iterations: Infinity, easing: 'ease-in-out' });
             }
 
-            /* ---- main loop ---- */
-            function loop(ts) {
-                if (!alive) return;
-                if (!loopT0) loopT0 = ts;
-                const elapsed = (ts - loopT0) / 1000;
-                cx2d.clearRect(0, 0, cv.width, cv.height);
-                parts = parts.filter(p => { const ok = p.step(); if (ok) p.draw(); return ok; });
-                if (showOrbit) drawOrbits(elapsed);
-                if (doFade) {
-                    const ft = (ts - fadeT0) / 750;
+            /* ---- 主循环 ---- */
+            function 主循环(ts) {
+                if (!运行中) return;
+                if (!循环起点) 循环起点 = ts;
+                const elapsed = (ts - 循环起点) / 1000;
+                画笔.clearRect(0, 0, 画布.width, 画布.height);
+                粒子们 = 粒子们.filter(p => { const ok = p.步进(); if (ok) p.绘制(); return ok; });
+                if (显示轨道) 绘制轨道(elapsed);
+                if (正在淡出) {
+                    const ft = (ts - 淡出起点) / 750;
                     const a = Math.max(0, 1 - ft);
-                    ov.style.opacity = a;
-                    if (a <= 0) { endAnim(); return; }
+                    遮罩.style.opacity = a;
+                    if (a <= 0) { 结束动画(); return; }
                 }
-                rafId = requestAnimationFrame(loop);
+                动画帧号 = requestAnimationFrame(主循环);
             }
 
             /* ---- play ---- */
-            function playAnim() {
-                if (alive) return;
-                alive = true; parts = []; showOrbit = false; doFade = false; loopT0 = null;
-                resize();
+            function 播放动画() {
+                if (运行中) return;
+                运行中 = true; 粒子们 = []; 显示轨道 = false; 正在淡出 = false; 循环起点 = null;
+                调整尺寸();
 
-                ov.classList.add('active');
-                ov.style.background = 'rgba(255,255,255,.96)';
-                ov.style.opacity = '0';
-                ov.style.transition = 'opacity .38s ease';
-                t1.style.opacity = '0'; t1.style.transform = '';
-                t2.style.opacity = '0'; t2.style.transform = '';
-                t1.innerHTML = ''; t2.innerHTML = '';
-                t1.classList.remove('glow'); t2.classList.remove('glow');
+                遮罩.classList.add('active');
+                遮罩.style.background = 'rgba(255,255,255,.96)';
+                遮罩.style.opacity = '0';
+                遮罩.style.transition = 'opacity .38s ease';
+                文字一.style.opacity = '0'; 文字一.style.transform = '';
+                文字二.style.opacity = '0'; 文字二.style.transform = '';
+                文字一.innerHTML = ''; 文字二.innerHTML = '';
+                文字一.classList.remove('glow'); 文字二.classList.remove('glow');
 
                 requestAnimationFrame(() => requestAnimationFrame(() => {
-                    ov.style.opacity = '1';
+                    遮罩.style.opacity = '1';
                 }));
 
                 const vcx = innerWidth / 2, vcy = innerHeight / 2;
 
-                tm(() => {
-                    flash(350);
-                    burst(vcx, vcy, 100, true);
-                    parts.push(new Shockwave(vcx, vcy, 350, O));
-                    parts.push(new Shockwave(vcx, vcy, 260, P));
-                    speedLines(vcx, vcy, 45);
-                    screenShake(12, 400);
-                    for (let i = 0; i < 5; i++) parts.push(new GlowOrb(vcx, vcy));
+                延迟执行(() => {
+                    闪白(350);
+                    爆裂(vcx, vcy, 100, true);
+                    粒子们.push(new 冲击波(vcx, vcy, 350, 橙色));
+                    粒子们.push(new 冲击波(vcx, vcy, 260, 粉色));
+                    速度线群(vcx, vcy, 45);
+                    屏幕震动(12, 400);
+                    for (let i = 0; i < 5; i++) 粒子们.push(new 辉光球(vcx, vcy));
                 }, 55);
 
-                tm(() => {
-                    burst(vcx * 0.5, vcy * 0.6, 30, true);
-                    burst(vcx * 1.5, vcy * 0.6, 30, true);
-                    parts.push(new Shockwave(vcx * 0.5, vcy * 0.6, 120, P));
-                    parts.push(new Shockwave(vcx * 1.5, vcy * 0.6, 120, O));
+                延迟执行(() => {
+                    爆裂(vcx * 0.5, vcy * 0.6, 30, true);
+                    爆裂(vcx * 1.5, vcy * 0.6, 30, true);
+                    粒子们.push(new 冲击波(vcx * 0.5, vcy * 0.6, 120, 粉色));
+                    粒子们.push(new 冲击波(vcx * 1.5, vcy * 0.6, 120, 橙色));
                 }, 300);
 
-                tm(() => iv(() => spawnSparkles(3), 200), 380);
+                延迟执行(() => 间隔执行(() => 生成闪烁(3), 200), 380);
 
-                tm(() => parts.push(new Firework(vcx * 0.35, vcy * 0.32)), 500);
+                延迟执行(() => 粒子们.push(new 烟花(vcx * 0.35, vcy * 0.32)), 500);
 
-                tm(() => {
-                    slideFromLeft(t1, () => {
-                        t1.classList.add('glow');
-                        revealChars(t1, '听我说', () => startFloat(t1, -2));
+                延迟执行(() => {
+                    左侧滑入(文字一, () => {
+                        文字一.classList.add('glow');
+                        显现字符(文字一, '听我说', () => 开始漂浮(文字一, -2));
                     });
                 }, 700);
 
-                tm(() => parts.push(new Firework(vcx * 1.65, vcy * 0.4)), 850);
+                延迟执行(() => 粒子们.push(new 烟花(vcx * 1.65, vcy * 0.4)), 850);
 
-                tm(() => iv(() => { for (let i = 0; i < 8; i++) parts.push(new Rain()); }, 150), 1000);
+                延迟执行(() => 间隔执行(() => { for (let i = 0; i < 8; i++) 粒子们.push(new 星雨()); }, 150), 1000);
 
-                tm(() => parts.push(new Firework(vcx * 0.75, vcy * 0.28)), 1600);
+                延迟执行(() => 粒子们.push(new 烟花(vcx * 0.75, vcy * 0.28)), 1600);
 
-                tm(() => {
-                    dropFromTop(t2, () => {
-                        t2.classList.add('glow');
-                        revealChars(t2, '谢谢你', () => startFloat(t2, 1.5));
+                延迟执行(() => {
+                    顶部坠入(文字二, () => {
+                        文字二.classList.add('glow');
+                        显现字符(文字二, '谢谢你', () => 开始漂浮(文字二, 1.5));
                     });
                 }, 2000);
 
-                tm(() => {
-                    showOrbit = true;
-                    iv(() => parts.push(new Shoot()), 400);
+                延迟执行(() => {
+                    显示轨道 = true;
+                    间隔执行(() => 粒子们.push(new 流星()), 400);
                 }, 2500);
 
-                tm(() => {
-                    parts.push(new Firework(vcx * 0.28, vcy * 0.22));
-                    parts.push(new Firework(vcx * 1.72, vcy * 0.28));
+                延迟执行(() => {
+                    粒子们.push(new 烟花(vcx * 0.28, vcy * 0.22));
+                    粒子们.push(new 烟花(vcx * 1.72, vcy * 0.28));
                 }, 3200);
 
-                tm(() => {
-                    confettiBurst(vcx, vcy, 60);
-                    speedLines(vcx, vcy, 30);
-                    ringBurst(vcx, vcy, 18, 8);
-                    parts.push(new Shockwave(vcx, vcy, 280, O));
+                延迟执行(() => {
+                    彩屑爆裂(vcx, vcy, 60);
+                    速度线群(vcx, vcy, 30);
+                    环形爆裂(vcx, vcy, 18, 8);
+                    粒子们.push(new 冲击波(vcx, vcy, 280, 橙色));
                 }, 3800);
 
-                /* Grand Finale */
-                tm(() => {
-                    flash(400); screenShake(15, 500);
-                    burst(vcx, vcy, 120, true);
-                    confettiBurst(vcx, vcy, 80);
-                    speedLines(vcx, vcy, 50);
-                    ringBurst(vcx, vcy, 24, 10);
-                    parts.push(new Shockwave(vcx, vcy, 450, O));
-                    parts.push(new Shockwave(vcx, vcy, 380, P));
+                /* 终场爆发 */
+                延迟执行(() => {
+                    闪白(400); 屏幕震动(15, 500);
+                    爆裂(vcx, vcy, 120, true);
+                    彩屑爆裂(vcx, vcy, 80);
+                    速度线群(vcx, vcy, 50);
+                    环形爆裂(vcx, vcy, 24, 10);
+                    粒子们.push(new 冲击波(vcx, vcy, 450, 橙色));
+                    粒子们.push(new 冲击波(vcx, vcy, 380, 粉色));
                     for (let i = 0; i < 6; i++) {
                         const a = (i / 6) * Math.PI * 2, d = 200;
-                        tm(() => {
-                            burst(vcx + Math.cos(a) * d, vcy + Math.sin(a) * d, 30, true);
-                            parts.push(new Shockwave(vcx + Math.cos(a) * d, vcy + Math.sin(a) * d, 140, i % 2 ? O : P));
+                        延迟执行(() => {
+                            爆裂(vcx + Math.cos(a) * d, vcy + Math.sin(a) * d, 30, true);
+                            粒子们.push(new 冲击波(vcx + Math.cos(a) * d, vcy + Math.sin(a) * d, 140, i % 2 ? 橙色 : 粉色));
                         }, i * 70);
                     }
                 }, 4500);
 
-                /* fade out */
-                tm(() => {
-                    clearAll();
-                    ov.style.transition = 'none';
-                    doFade = true;
-                    fadeT0 = performance.now();
+                /* 淡出 */
+                延迟执行(() => {
+                    清理计时器();
+                    遮罩.style.transition = 'none';
+                    正在淡出 = true;
+                    淡出起点 = performance.now();
                 }, 5600);
 
-                rafId = requestAnimationFrame(loop);
+                动画帧号 = requestAnimationFrame(主循环);
             }
 
             /* ---- end ---- */
-            function endAnim() {
-                alive = false; clearAll();
-                parts = []; showOrbit = false; doFade = false;
-                [t1, t2].forEach(el => {
+            function 结束动画() {
+                运行中 = false; 清理计时器();
+                粒子们 = []; 显示轨道 = false; 正在淡出 = false;
+                [文字一, 文字二].forEach(el => {
                     el.getAnimations().forEach(a => a.cancel());
                     el.innerHTML = ''; el.style.opacity = '0'; el.style.transform = '';
                     el.classList.remove('glow');
                 });
-                ov.classList.remove('active');
-                ov.style.opacity = ''; ov.style.background = '';
-                ov.style.transition = ''; ov.style.transform = '';
-                if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-                loopT0 = null;
+                遮罩.classList.remove('active');
+                遮罩.style.opacity = ''; 遮罩.style.background = '';
+                遮罩.style.transition = ''; 遮罩.style.transform = '';
+                if (动画帧号) { cancelAnimationFrame(动画帧号); 动画帧号 = null; }
+                循环起点 = null;
             }
 
             /* ========================================
              *  ★ 核心逻辑：点击 → 跳转 → 返回后播放
              * ======================================== */
 
-            btn.addEventListener('click', function (e) {
+            按钮.addEventListener('click', function (e) {
                 /* 让浏览器正常跳转（target=_blank），不阻止默认行为 */
                 /* 标记「等待用户返回」 */
-                waitingForReturn = true;
+                等待返回 = true;
             });
 
             /* 用户切回本标签页时触发 */
             document.addEventListener('visibilitychange', function () {
-                if (document.visibilityState === 'visible' && waitingForReturn) {
-                    waitingForReturn = false;
+                if (document.visibilityState === 'visible' && 等待返回) {
+                    等待返回 = false;
                     /* 给一点小延迟，让页面完全渲染好 */
-                    setTimeout(playAnim, 120);
+                    setTimeout(播放动画, 120);
                 }
             });
 
             /* 有些浏览器不触发 visibilitychange 但触发 focus */
             window.addEventListener('focus', function () {
-                if (waitingForReturn) {
-                    waitingForReturn = false;
-                    setTimeout(playAnim, 120);
+                if (等待返回) {
+                    等待返回 = false;
+                    setTimeout(播放动画, 120);
                 }
             });
 
