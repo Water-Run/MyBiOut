@@ -15,6 +15,7 @@ import sys as 系统
 import threading as 线程
 import time as 时间
 import webbrowser as 浏览器
+from contextlib import suppress as 忽略异常
 from dataclasses import dataclass as 数据类
 from dataclasses import field as 字段
 from pathlib import Path as 路径
@@ -37,6 +38,20 @@ _SPARK: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
 _MAX_PARTICLES: int = 280
 
 _BIN_DIR: 路径 = 路径(__file__).resolve().parent / "bin"
+
+
+def _配置文本输出() -> None:
+    r"""
+    避免控制台或重定向输出编码不支持装饰字符时直接中断启动。
+    """
+    for stream in (系统.stdout, 系统.stderr):
+        if stream is None:
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        with 忽略异常(TypeError, ValueError):
+            reconfigure(errors="replace")
 
 
 # ===== 环境检查 =====
@@ -195,7 +210,7 @@ def _探测端口绑定错误(port: int) -> str | None:
     :return: str | None: 可用返回 None，不可用返回错误原因
     """
     try:
-        with 套接字.套接字(套接字.AF_INET, 套接字.SOCK_STREAM) as sock:
+        with 套接字.socket(套接字.AF_INET, 套接字.SOCK_STREAM) as sock:
             sock.bind(("127.0.0.1", port))
     except OSError as e:
         detail: str = e.strerror or str(e)
@@ -1005,6 +1020,8 @@ def 主程序() -> None:
     程序主入口, 解析命令行并启动 FastAPI 服务
     :return: None: 无返回值
     """
+    _配置文本输出()
+
     default_port: int = 取端口()
 
     parser: 参数解析.ArgumentParser = 参数解析.ArgumentParser(
@@ -1086,6 +1103,7 @@ def 主程序() -> None:
 
 
 _EnvItem = _环境项
+_configure_text_output = _配置文本输出
 _check_environment = _检查环境
 _print_env_detail = _打印环境详情
 _get_startup_blockers = _取启动阻断项

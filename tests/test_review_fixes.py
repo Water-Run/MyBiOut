@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import threading
 import time
 from pathlib import Path
@@ -23,6 +24,22 @@ def test_invalid_json_body_returns_400() -> None:
 
     assert response.status_code == 400
     assert response.json()["ok"] is False
+
+
+def test_port_probe_uses_real_socket_constructor() -> None:
+    assert app_main._probe_port_bind_error(0) is None
+
+
+def test_console_output_replaces_unencodable_characters(monkeypatch) -> None:
+    buffer = io.BytesIO()
+    fake_stdout = io.TextIOWrapper(buffer, encoding="gbk", errors="strict")
+    monkeypatch.setattr(app_main.系统, "stdout", fake_stdout)
+
+    app_main._configure_text_output()
+    print("✦", file=app_main.系统.stdout)
+    app_main.系统.stdout.flush()
+
+    assert buffer.getvalue()
 
 
 def test_concurrent_setting_writes_preserve_both_changes(tmp_path: Path, monkeypatch) -> None:
