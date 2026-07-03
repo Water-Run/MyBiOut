@@ -987,6 +987,14 @@
             (function 循环() { 画笔.clearRect(0, 0, 画布.width, 画布.height); 星星组.forEach(s => { s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012; if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; } if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20; 绘制星星(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase))); }); requestAnimationFrame(循环); })();
         }
 
+        window.添加任务 = 添加任务;
+        window.取消当前 = 取消当前;
+        window.重试任务 = 重试任务;
+        window.移除任务 = 移除任务;
+        window.清空队列 = 清空队列;
+        window.清空失败 = 清空失败;
+        window.清空完成 = 清空完成;
+        window.在资源管理器中打开 = 在资源管理器中打开;
         window.addTask = 添加任务;
         window.cancelCurrent = 取消当前;
         window.retryTask = 重试任务;

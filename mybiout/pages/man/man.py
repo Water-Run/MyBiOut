@@ -8,6 +8,7 @@ ManualScript 手册页服务层, 负责手册展示和「What can I say about」
 
 import json as 数据交换
 import random as 随机
+import re as 正则
 import subprocess as 子进程
 import sys as 系统
 import threading as 线程
@@ -20,19 +21,184 @@ import httpx as 网络请求
 
 from mybiout.pages import utils as 工具
 
-_BIN_DIR: 路径 = 路径(__file__).resolve().parent.parent.parent / "bin"
-_BS_DATA_PATH: 路径 = _BIN_DIR / "BullshitGenerator" / "data.json"
-_PROJECT_ROOT: 路径 = 路径(__file__).resolve().parent.parent.parent.parent
+_程序工具目录: 路径 = 路径(__file__).resolve().parent.parent.parent / "bin"
+_胡言数据路径: 路径 = _程序工具目录 / "BullshitGenerator" / "data.json"
+_项目根目录: 路径 = 路径(__file__).resolve().parent.parent.parent.parent
 
-_POPEN_EXTRA: dict[str, int] = {}
+_子进程附加参数: dict[str, int] = {}
 if 系统.platform == "win32":
-    _POPEN_EXTRA["creationflags"] = 0x08000000
+    _子进程附加参数["creationflags"] = 0x08000000
 
-_bs_cache: dict = {}
-_context_cache: str = ""
-_context_lock: 线程.Lock = 线程.Lock()
-_logs: list[dict[str, str]] = []
-_logs_lock: 线程.Lock = 线程.Lock()
+_胡言缓存: dict = {}
+_上下文缓存: str = ""
+_上下文锁: 线程.Lock = 线程.Lock()
+_日志列表: list[dict[str, str]] = []
+_日志锁: 线程.Lock = 线程.Lock()
+_主题占位正则: 正则.Pattern = 正则.compile(r"(?<![A-Za-z0-9_])x(?![A-Za-z0-9_])")
+_空白正则: 正则.Pattern = 正则.compile(r"\s+")
+_模块术语表: dict[str, list[str]] = {
+    "LocalOut": [
+        "缓存路径",
+        "Android 缓存",
+        "ADB 会话",
+        "设备授权",
+        "包名路径",
+        "目录扫描",
+        "文件探测",
+        "m4s 分片",
+        "音视频轨道",
+        "FFmpeg 合并",
+        "卡片选择",
+        "导出目录",
+        "本地缓存",
+    ],
+    "BBDown": [
+        "视频链接",
+        "登录态",
+        "Cookie",
+        "清晰度",
+        "编码格式",
+        "分P列表",
+        "字幕轨道",
+        "弹幕文件",
+        "封面下载",
+        "命令退出码",
+    ],
+    "MdOut": [
+        "视频数据",
+        "用户数据",
+        "专栏文章",
+        "Markdown 预览",
+        "富文本渲染",
+        "字段缺失",
+        "文件命名",
+        "批量导出",
+    ],
+    "OhMyConfig": [
+        "config.ini",
+        "导出根目录",
+        "SESSDATA",
+        "API Key",
+        "模型名称",
+        "Base URL",
+        "超时设置",
+        "明文凭证",
+    ],
+    "Man": [
+        "运行时手册",
+        "帮助对话",
+        "项目上下文",
+        "大模型配置",
+        "流式响应",
+        "降级路径",
+        "Mamble 风格",
+    ],
+}
+_模块动作表: dict[str, list[str]] = {
+    "LocalOut": [
+        "确认 Android 设备已经允许 ADB 调试",
+        "把 PC 缓存、Android 缓存和自定义路径分开扫描",
+        "检查缓存目录是否真实可读",
+        "确认扫描出来的卡片已经加入导出任务",
+        "核对 m4s 分片是否完整",
+        "查看 FFmpeg 合并是否真正生成文件",
+        "把导出目录里的最终文件作为成功证据",
+    ],
+    "BBDown": [
+        "确认链接能被 BBDown 解析",
+        "检查 Cookie 和登录态是否仍然有效",
+        "把清晰度、编码、字幕和分P选项分开核对",
+        "查看外部命令的退出码和标准错误",
+    ],
+    "MdOut": [
+        "先确认接口返回了可导出的字段",
+        "把预览渲染和磁盘导出分开验证",
+        "检查文件名是否因为重复或过长被改写",
+        "把批量导出的失败项单独复现",
+    ],
+    "OhMyConfig": [
+        "先保存设置再确认下一次调用读取了新值",
+        "把敏感字段明文保存的风险说清楚",
+        "检查 Base URL、模型名称和 API Key 是否属于同一供应商",
+        "把目录选择结果和配置文件内容逐项对齐",
+    ],
+    "Man": [
+        "确认左侧手册和右侧回答都围绕运行时行为",
+        "在大模型失败时明确说明已经进入降级路径",
+        "把项目上下文是否获取成功写进判断链",
+        "让 Mamble 风格服务于事实, 不替代事实",
+    ],
+}
+_模块结构表: dict[str, list[str]] = {
+    "LocalOut": [
+        "设备连接 -> ADB 授权 -> 缓存路径 -> 卡片选择 -> FFmpeg 合并 -> 导出目录",
+        "PC 缓存 -> Android 缓存 -> 自定义路径 -> 扫描结果 -> 导出任务",
+        "路径可读 -> 分片完整 -> 任务入队 -> 最终文件出现",
+    ],
+    "BBDown": [
+        "链接解析 -> 登录态 -> 画质编码 -> 分P选择 -> 命令退出码",
+        "输入链接 -> 命令构建 -> 下载输出 -> 失败重试",
+    ],
+    "MdOut": [
+        "数据获取 -> 字段校验 -> Markdown 预览 -> 文件写盘",
+        "单项预览 -> 批量队列 -> 文件命名 -> 导出结果",
+    ],
+    "OhMyConfig": [
+        "界面填写 -> 保存设置 -> config.ini -> 下一次读取",
+        "Key -> Model -> Base URL -> 超时 -> 调用结果",
+    ],
+    "Man": [
+        "用户问题 -> 项目上下文 -> 大模型调用 -> 降级说明",
+        "左侧手册 -> 右侧对话 -> 流式输出 -> 日志记录",
+    ],
+}
+_模块句子表: dict[str, list[str]] = {
+    "LocalOut": [
+        "如果 {主题} 涉及 Android 缓存, 就先看设备授权、包名路径和缓存目录是否真的被扫描到。",
+        "LocalOut 的判断顺序应该是缓存路径可读、卡片可见、任务入队、FFmpeg 合并、导出目录出现文件。",
+        "扫描不到内容时, PC 缓存、Android 缓存和自定义路径要分开测试, 不能混成一句路径不对。",
+        "只要 m4s 分片不完整, 后面的导出提示再热闹也不能算成功。",
+    ],
+    "BBDown": [
+        "BBDown 的问题要从链接解析、登录态、画质编码、分P选择和命令退出码逐项排。",
+        "下载失败时, 先看外部命令标准错误, 再看 Cookie、清晰度和 API 模式。",
+    ],
+    "MdOut": [
+        "MdOut 的问题要拆成数据获取、Markdown 预览、文件命名和导出写盘四层。",
+        "预览正常不代表导出成功, 导出成功也不代表所有字段都被安全转义。",
+    ],
+    "OhMyConfig": [
+        "OhMyConfig 的问题要从保存动作、config.ini 内容和下一次读取结果三处对齐。",
+        "涉及 SESSDATA 或 API Key 时, 明文凭证风险必须直接说清楚。",
+    ],
+    "Man": [
+        "Man 的问题要先看项目上下文是否拿到, 再看大模型配置是否能调用。",
+        "如果进入狗屁不通生成器, 它必须像兜底一样工作, 不能冒充真正的大模型回答。",
+    ],
+}
+_关键词术语表: dict[str, list[str]] = {
+    "扫描": ["目录扫描", "文件探测", "设备授权", "ADB 会话", "缓存路径"],
+    "缓存": ["缓存路径", "Android 缓存", "本地缓存", "m4s 分片", "文件探测"],
+    "Android": ["Android 缓存", "ADB 会话", "设备授权", "包名路径", "权限边界"],
+    "导出": ["导出目录", "任务队列", "FFmpeg 合并", "最终文件", "文件命名"],
+    "下载": ["视频链接", "Cookie", "清晰度", "编码格式", "命令退出码"],
+    "Markdown": ["Markdown 预览", "富文本渲染", "字段缺失", "批量导出"],
+    "API": ["API Key", "Base URL", "模型名称", "状态码", "返回格式"],
+}
+_关键词动作表: dict[str, list[str]] = {
+    "扫描": ["重新扫描前先确认路径可读", "把自动扫描和自定义路径分开验证", "查看扫描结果是否生成卡片"],
+    "缓存": ["确认缓存文件是否仍在磁盘上", "检查缓存目录和权限", "核对 m4s 分片是否完整"],
+    "Android": ["确认设备已经授权 ADB", "检查 Android 缓存路径和包名", "把设备连接状态写进判断链"],
+    "导出": ["确认最终文件真实出现在导出目录", "检查 FFmpeg 合并结果", "把失败任务单独重试"],
+    "下载": ["确认链接解析结果", "检查登录态和命令退出码", "把画质编码选项分开核对"],
+    "Markdown": ["检查返回字段和预览渲染", "确认 Markdown 文件真实写盘", "把批量失败项单独复现"],
+    "API": ["检查 Key、Model、Base URL 和超时", "查看状态码和返回字段", "确认供应商兼容格式"],
+}
+_模块禁用词表: dict[str, list[str]] = {
+    "LocalOut": ["召回链路", "向量数据库", "嵌入模型", "重排序器", "提示词注入", "全表扫描"],
+    "BBDown": ["向量数据库", "嵌入模型", "重排序器", "提示词注入"],
+    "MdOut": ["ADB 会话", "设备授权", "m4s 分片"],
+}
 
 
 def _生成编号() -> str:
@@ -43,85 +209,364 @@ def _短时间() -> str:
     return 日期时间.now().strftime("%H:%M:%S")
 
 
-def _记录日志(level: str, msg: str) -> None:
-    with _logs_lock:
-        _logs.append({"time": _短时间(), "level": level, "msg": msg})
-        if len(_logs) > 300:
-            _logs[:] = _logs[-200:]
+def _记录日志(等级: str, 消息: str) -> None:
+    with _日志锁:
+        _日志列表.append({"time": _短时间(), "level": 等级, "msg": 消息})
+        if len(_日志列表) > 300:
+            _日志列表[:] = _日志列表[-200:]
 
 
 def _加载胡言材料() -> dict:
-    global _bs_cache
-    if not _bs_cache:
+    global _胡言缓存
+    if not _胡言缓存:
         try:
-            _bs_cache = 数据交换.loads(_BS_DATA_PATH.read_text(encoding="utf-8"))
+            _胡言缓存 = 数据交换.loads(_胡言数据路径.read_text(encoding="utf-8"))
         except Exception:
-            _bs_cache = {}
-    return _bs_cache
+            _胡言缓存 = {}
+    return _胡言缓存
 
 
-def 生成胡言(topic: str, target_length: int = 600) -> str:
-    data: dict = _加载胡言材料()
-    if not data:
-        return f"关于「{topic}」, 我实在是无话可说。（BullshitGenerator 数据加载失败）"
-    famous: list[str] = data.get("famous", [])
-    bosh: list[str] = data.get("bosh", [])
-    after_list: list[str] = data.get("after", [])
-    before_list: list[str] = data.get("before", [])
-    article: list[str] = []
-    section: str = ""
-    section_len: int = 0
-    while section_len < target_length:
-        r: float = 随机.random() * 100
-        if r < 5 and len(section) > 150:
-            if section and section[-1] == " ":
-                section = section[:-2]
-            article.append("　　" + section + "。")
-            section = ""
-        elif r < 20 and famous:
-            quote: str = 随机.choice(famous)
-            if before_list:
-                quote = quote.replace("a", 随机.choice(before_list))
-            if after_list:
-                quote = quote.replace("b", 随机.choice(after_list))
-            section += quote
-            section_len += len(quote)
-        elif bosh:
-            sentence: str = 随机.choice(bosh).replace("x", topic)
-            section += sentence
-            section_len += len(sentence)
-        else:
-            filler: str = f"{topic}确实很重要。"
-            section += filler
-            section_len += len(filler)
-    if section:
-        if section and section[-1] == " ":
-            section = section[:-2]
-        article.append("　　" + section + "。")
-    return "\n\n".join(article)
+def _取字符串列表(材料: dict, 名称: str, 默认值: list[str] | None = None) -> list[str]:
+    值 = 材料.get(名称, [])
+    if isinstance(值, list):
+        结果 = [str(条目).strip() for 条目 in 值 if str(条目).strip()]
+        if 结果:
+            return 结果
+    return list(默认值 or [])
+
+
+def _随机选择(候选列表: list[str], 默认值: str) -> str:
+    return 随机.choice(候选列表) if 候选列表 else 默认值
+
+
+def _识别模块(主题: str) -> str:
+    小写主题 = 主题.lower()
+    for 模块名 in ["LocalOut", "BBDown", "MdOut", "OhMyConfig", "Man"]:
+        if 模块名.lower() in 小写主题:
+            return 模块名
+    return "通用"
+
+
+def _取模块提示(材料: dict, 主题: str) -> list[str]:
+    提示表 = 材料.get("module_hints", {})
+    if not isinstance(提示表, dict):
+        return []
+    模块名 = _识别模块(主题)
+    模块提示 = 提示表.get(模块名, [])
+    通用提示 = 提示表.get("通用", [])
+    结果: list[str] = []
+    for 提示列表 in [模块提示, 通用提示]:
+        if isinstance(提示列表, list):
+            结果.extend(str(条目).strip() for 条目 in 提示列表 if str(条目).strip())
+    return 结果
+
+
+def _合并唯一列表(*列表组: list[str]) -> list[str]:
+    结果: list[str] = []
+    已见: set[str] = set()
+    for 列表 in 列表组:
+        for 条目 in 列表:
+            内容 = str(条目).strip()
+            if 内容 and 内容 not in 已见:
+                已见.add(内容)
+                结果.append(内容)
+    return 结果
+
+
+def _构造抽样池(优先列表: list[str], 常规列表: list[str], 权重: int = 5) -> list[str]:
+    优先唯一 = _合并唯一列表(优先列表)
+    优先集合 = set(优先唯一)
+    常规唯一 = [条目 for 条目 in _合并唯一列表(常规列表) if 条目 not in 优先集合]
+    加权优先 = [条目 for 条目 in 优先唯一 for 重复编号 in range(max(1, 权重))]
+    return 加权优先 + 常规唯一
+
+
+def _命中关键词素材(主题: str, 素材表: dict[str, list[str]]) -> list[str]:
+    小写主题 = 主题.lower()
+    结果: list[str] = []
+    for 关键词, 素材列表 in 素材表.items():
+        if 关键词.lower() in 小写主题:
+            结果.extend(素材列表)
+    return 结果
+
+
+def _过滤禁词(候选列表: list[str], 禁词列表: list[str]) -> list[str]:
+    if not 禁词列表:
+        return 候选列表
+    return [条目 for 条目 in 候选列表 if not any(禁词 in 条目 for 禁词 in 禁词列表)]
+
+
+def _取贴题素材(主题: str, 术语列表: list[str], 动作列表: list[str]) -> tuple[list[str], list[str]]:
+    模块名 = _识别模块(主题)
+    禁词列表 = _模块禁用词表.get(模块名, [])
+    优先术语 = _过滤禁词(
+        _合并唯一列表(_模块术语表.get(模块名, []), _命中关键词素材(主题, _关键词术语表)),
+        禁词列表,
+    )
+    优先动作 = _合并唯一列表(_模块动作表.get(模块名, []), _命中关键词素材(主题, _关键词动作表))
+    常规术语 = _过滤禁词(术语列表, 禁词列表)
+    if 模块名 != "通用" and 优先术语:
+        常规术语 = 优先术语
+    elif 优先术语:
+        常规术语 = _构造抽样池(优先术语, 常规术语, 8)
+    if 模块名 != "通用" and 优先动作:
+        动作列表 = 优先动作
+    elif 优先动作:
+        动作列表 = _构造抽样池(优先动作, 动作列表, 8)
+    return 常规术语 or 术语列表, 动作列表
+
+
+def _取贴题结构(主题: str, 结构表: list[str]) -> list[str]:
+    模块名 = _识别模块(主题)
+    模块结构 = _模块结构表.get(模块名, [])
+    if 模块名 != "通用" and 模块结构:
+        return 模块结构
+    return 结构表
+
+
+def _取贴题废话(主题: str, 废话素材: list[str]) -> list[str]:
+    模块名 = _识别模块(主题)
+    禁词列表 = _模块禁用词表.get(模块名, [])
+    模块句子 = _模块句子表.get(模块名, [])
+    if 模块名 != "通用" and 模块句子:
+        模块术语 = _过滤禁词(
+            _合并唯一列表(_模块术语表.get(模块名, []), _命中关键词素材(主题, _关键词术语表)),
+            禁词列表,
+        )
+        模块动作 = _合并唯一列表(_模块动作表.get(模块名, []), _命中关键词素材(主题, _关键词动作表))
+        组合句子 = [
+            f"如果 {{主题}} 涉及{术语}, 那么先{模块动作[编号 % len(模块动作)]}, 再看页面是否给出清楚反馈。"
+            for 编号, 术语 in enumerate(模块术语)
+            if 模块动作
+        ]
+        return _合并唯一列表(模块句子, 组合句子)
+    关键词列表 = _合并唯一列表(
+        _模块术语表.get(模块名, []),
+        _命中关键词素材(主题, _关键词术语表),
+        [词语 for 词语 in 正则.findall(r"[A-Za-z0-9_\-]+|[\u4e00-\u9fff]{2,}", 主题) if len(词语) > 1],
+    )
+    可用素材 = _过滤禁词(废话素材, 禁词列表)
+    贴题素材 = [
+        句子
+        for 句子 in 可用素材
+        if any(关键词 in 句子 for 关键词 in 关键词列表)
+    ]
+    return _合并唯一列表(贴题素材, 可用素材)
+
+
+def _整理句子(文本: str) -> str:
+    文本 = _空白正则.sub(" ", str(文本).strip())
+    文本 = 文本.replace(" ,", "，").replace(", ", "，").replace(",", "，")
+    文本 = 文本.replace(": ", "：").replace(":", "：")
+    文本 = 正则.sub(r"([\u4e00-\u9fff])([A-Za-z0-9][A-Za-z0-9.+#_\-]*)", r"\1 \2", 文本)
+    文本 = 正则.sub(r"([A-Za-z0-9][A-Za-z0-9.+#_\-]*)([\u4e00-\u9fff])", r"\1 \2", 文本)
+    文本 = 正则.sub(r"([\u4e00-\u9fff])\s+([\u4e00-\u9fff])", r"\1\2", 文本)
+    文本 = 正则.sub(r"\.\s*$", "。", 文本)
+    文本 = 正则.sub(r"\s+([。！？])", r"\1", 文本)
+    文本 = 正则.sub(r"[。！？]{2,}", lambda 匹配: 匹配.group(0)[0], 文本)
+    if 文本 and 文本[-1] not in "。！？":
+        文本 += "。"
+    return 文本
+
+
+def _句子指纹(文本: str) -> str:
+    return 正则.sub(r"\s+", "", 文本)
+
+
+def _填充模板(
+    模板: str,
+    主题: str,
+    角色: str,
+    术语: str,
+    动作: str,
+    前缀: str,
+    后缀: str,
+) -> str:
+    结果 = str(模板)
+    替换表 = {
+        "{主题}": 主题,
+        "{角色}": 角色,
+        "{术语}": 术语,
+        "{动作}": 动作,
+        "{前缀}": 前缀,
+        "{后缀}": 后缀,
+    }
+    for 标记, 内容 in 替换表.items():
+        结果 = 结果.replace(标记, 内容)
+
+    结果 = _主题占位正则.sub(主题, 结果)
+    结果 = 结果.replace(" a,", f" {前缀},")
+    结果 = 结果.replace(" a，", f" {前缀}，")
+    结果 = 结果.replace(" a ", f" {前缀} ")
+    结果 = 正则.sub(r"。b(?=$|\s)", f"。{后缀}", 结果)
+    结果 = 正则.sub(r" b(?=$|\s)", f" {后缀}", 结果)
+    return _整理句子(结果)
+
+
+def _生成一句(
+    候选模板: list[str],
+    主题: str,
+    角色列表: list[str],
+    术语列表: list[str],
+    动作列表: list[str],
+    前缀表: list[str],
+    后缀表: list[str],
+    已用句子: set[str],
+    固定角色: str | None = None,
+) -> str:
+    默认角色 = 固定角色 or "GPT-5"
+    if 固定角色 and 固定角色 not in 角色列表 and 角色列表:
+        默认角色 = _随机选择(角色列表, "GPT-5")
+    for _ in range(40):
+        角色 = 固定角色 or _随机选择(角色列表, 默认角色)
+        术语 = _随机选择(术语列表, "上下文窗口")
+        动作 = _随机选择(动作列表, "把问题拆成可复现步骤")
+        前缀 = _随机选择(前缀表, "曾经说过")
+        后缀 = _随机选择(后缀表, "这不禁令我深思")
+        模板 = _随机选择(候选模板, "{角色}认为, {主题}需要先看{术语}, 再{动作}。")
+        句子 = _填充模板(模板, 主题, 角色, 术语, 动作, 前缀, 后缀)
+        指纹 = _句子指纹(句子)
+        if len(句子) > 8 and 指纹 not in 已用句子:
+            已用句子.add(指纹)
+            return 句子
+    兜底句 = _整理句子(
+        f"{默认角色}认为，{主题}至少要围绕{_随机选择(术语列表, '上下文窗口')}重新检查，"
+        f"然后{_随机选择(动作列表, '把问题拆成可复现步骤')}。"
+    )
+    已用句子.add(_句子指纹(兜底句))
+    return 兜底句
+
+
+def 生成胡言(主题: str, 目标长度: int = 600) -> str:
+    材料: dict = _加载胡言材料()
+    if not 材料:
+        return f"关于「{主题}」, 我实在是无话可说。（BullshitGenerator 数据加载失败）"
+    主题 = (主题 or "这个问题").strip() or "这个问题"
+    目标长度 = max(260, int(目标长度 or 600))
+
+    名人名言 = _取字符串列表(材料, "famous")
+    废话素材 = _取字符串列表(材料, "bosh")
+    角色列表 = _取字符串列表(
+        材料,
+        "speakers",
+        ["GPT-5", "Claude", "DeepSeek", "Mimo", "LongCat", "乔布斯", "图灵", "Python"],
+    )
+    术语列表 = _取字符串列表(材料, "technical_terms", ["上下文窗口", "日志", "配置文件", "导出目录"])
+    动作列表 = _取字符串列表(材料, "actions", ["把问题拆成可复现步骤", "检查配置和日志"])
+    术语列表, 动作列表 = _取贴题素材(主题, 术语列表, 动作列表)
+    废话素材 = _取贴题废话(主题, 废话素材)
+    开场表 = _取字符串列表(材料, "openings", [f"首先, {主题}必须被拆成能复现的步骤。"])
+    转折表 = _取字符串列表(材料, "transitions", ["其次, {角色}会先检查{术语}, 然后{动作}。"])
+    推理表 = _取字符串列表(材料, "reasoning", ["进一步说, {主题}如果缺少{术语}, 判断就会变得很飘。"])
+    结构表 = _取字符串列表(材料, "structures", ["现象判断 -> 证据核验 -> 操作步骤 -> 失败兜底"])
+    结构表 = _取贴题结构(主题, 结构表)
+    后缀表 = _取字符串列表(材料, "after", ["这不禁令我深思。"])
+    前缀表 = _取字符串列表(材料, "before", ["曾经说过"])
+    模块提示 = _取模块提示(材料, 主题)
+    核心角色候选 = [
+        角色
+        for 角色 in ["GPT-5", "Claude 4 Sonnet", "DeepSeek-R1", "Mimo", "LongCat", "乔布斯", "图灵", "Python"]
+        if 角色 in 角色列表
+    ]
+    核心角色 = _随机选择(核心角色候选 or 角色列表, "GPT-5")
+    已用句子: set[str] = set()
+    文章段落: list[str] = []
+    模块名 = _识别模块(主题)
+    角色观点表 = [
+        "{角色} 看完 {主题} 后不会先讲玄学, 它会先盯住{术语}, 然后{动作}。",
+        "让 {角色} 来复盘 {主题}, 它也得先承认{术语}才是证据, {动作}才是动作。",
+        "{角色} 的名字可以很响, 但处理 {主题} 时仍然要回到{术语}和用户可见结果。",
+        "如果 {角色} 真要参与 {主题}, 最合理的姿势不是背书, 而是{动作}。",
+    ]
+    名言扩展表 = 名人名言 if 模块名 == "通用" else 角色观点表
+
+    骨架段落 = [
+        [
+            "首先, {主题}不是一句万能废话能解决的事, 它需要被拆成现象、证据和动作。",
+            *(模块提示[:1] or 开场表[:1]),
+            "{角色} {前缀}, 真正的帮助不是把话说长, 而是把失败路径说准。{后缀}",
+        ],
+        [
+            "其次, {角色}会把{术语}放在桌面中央, 因为它决定了{主题}到底有没有证据。",
+            *(模块提示[1:2] or 转折表[:1]),
+            *_随机选择([废话素材[:1], 推理表[:1]], 推理表[:1]),
+        ],
+        [
+            "进一步说, {主题}如果绕开{术语}, 后面的判断就会像没有路径的目录扫描。",
+            "{角色}看见这种场面, 也只能先要求{动作}, 再谈所谓智能化。",
+            *(废话素材[1:2] or 推理表[:1]),
+        ],
+        [
+            "最后, {主题}的收束点不是更会说, 而是让{术语}和界面反馈同时变得诚实。",
+            "处理时可以按「{术语} -> {动作} -> 用户可见反馈」推进, 不要把所有问题揉成一团。",
+            "{角色} 的名字可以很响, 但 {主题} 的结论必须落到{术语}和{动作}上。",
+        ],
+    ]
+
+    for 段落模板 in 骨架段落:
+        句子列表 = [
+            _生成一句(
+                [段落项],
+                主题,
+                角色列表,
+                术语列表,
+                动作列表,
+                前缀表,
+                后缀表,
+                已用句子,
+                核心角色,
+            )
+            for 段落项 in 段落模板
+        ]
+        文章段落.append("　　" + "".join(句子列表))
+
+    扩展来源 = [
+        转折表 + 推理表,
+        废话素材 + 名言扩展表,
+        [f"换句话说, {{主题}}可以按「{_随机选择(结构表, '现象判断 -> 证据核验 -> 操作步骤 -> 失败兜底')}」推进。"],
+        角色观点表 + 废话素材,
+    ]
+    结果 = "\n\n".join(文章段落)
+    while len(结果) < 目标长度:
+        句子列表 = [
+            _生成一句(
+                _随机选择(扩展来源, 推理表),
+                主题,
+                角色列表,
+                术语列表,
+                动作列表,
+                前缀表,
+                后缀表,
+                已用句子,
+            )
+            for _ in range(3)
+        ]
+        文章段落.insert(-1, "　　" + "".join(句子列表))
+        结果 = "\n\n".join(文章段落)
+    return 结果
 
 
 def _取项目上下文() -> str:
-    global _context_cache
-    with _context_lock:
-        if _context_cache:
-            return _context_cache
+    global _上下文缓存
+    with _上下文锁:
+        if _上下文缓存:
+            return _上下文缓存
     try:
-        result: 子进程.CompletedProcess = 子进程.run(
-            ["pmc", str(_PROJECT_ROOT)],
+        执行结果: 子进程.CompletedProcess = 子进程.run(
+            ["pmc", str(_项目根目录)],
             capture_output=True,
             text=True,
             timeout=60,
             encoding="utf-8",
             errors="replace",
-            **_POPEN_EXTRA,
+            **_子进程附加参数,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            ctx: str = result.stdout.strip()
-            with _context_lock:
-                _context_cache = ctx
-            _记录日志("info", f"pmc 打包成功 ({len(ctx)} 字符)")
-            return ctx
+        if 执行结果.returncode == 0 and 执行结果.stdout.strip():
+            上下文: str = 执行结果.stdout.strip()
+            with _上下文锁:
+                _上下文缓存 = 上下文
+            _记录日志("info", f"pmc 打包成功 ({len(上下文)} 字符)")
+            return 上下文
     except FileNotFoundError:
         _记录日志("warn", "pmc 未安装, 无法打包项目代码")
     except 子进程.TimeoutExpired:
@@ -131,13 +576,13 @@ def _取项目上下文() -> str:
     return ""
 
 
-def _构建对话地址(base_url: str) -> str:
-    b: str = (base_url or "https://api.poe.com/v1").strip().rstrip("/")
-    if b.endswith("/chat/completions"):
-        return b
-    if not b.endswith("/v1"):
-        b += "/v1"
-    return f"{b}/chat/completions"
+def _构建对话地址(接口基地址: str) -> str:
+    基地址: str = (接口基地址 or "https://api.poe.com/v1").strip().rstrip("/")
+    if 基地址.endswith("/chat/completions"):
+        return 基地址
+    if not 基地址.endswith("/v1"):
+        基地址 += "/v1"
+    return f"{基地址}/chat/completions"
 
 
 def _构建风格提示() -> str:
@@ -174,215 +619,196 @@ def _构建响应提示() -> str:
     )
 
 
-def _构建上下文提示(context: str) -> str:
+def _构建上下文提示(上下文: str) -> str:
     return (
         "【项目上下文】\n"
         "以下是通过 pmc 工具动态打包的项目源代码。回答必须优先依据这些内容:\n\n"
-        + (context if context else "(项目代码未能获取, 只能依据页面已知行为回答; 如需精确代码级判断, 提醒用户检查 pmc 是否可用。)")
+        + (上下文 if 上下文 else "(项目代码未能获取, 只能依据页面已知行为回答; 如需精确代码级判断, 提醒用户检查 pmc 是否可用。)")
     )
 
 
-def _构建消息(prompt: str, context: str) -> list[dict[str, str]]:
-    system_content: str = "\n\n".join(
+def _构建消息(提示词: str, 上下文: str) -> list[dict[str, str]]:
+    系统内容: str = "\n\n".join(
         [
             _构建风格提示(),
             _构建产品提示(),
             _构建响应提示(),
-            _构建上下文提示(context),
-            f"【本轮问题】\n用户正在询问: {prompt}\n生成回答时必须把这个问题作为中心, 不要泛泛复述手册。",
+            _构建上下文提示(上下文),
+            f"【本轮问题】\n用户正在询问: {提示词}\n生成回答时必须把这个问题作为中心, 不要泛泛复述手册。",
         ]
     )
     return [
-        {"role": "system", "content": system_content},
-        {"role": "user", "content": prompt},
+        {"role": "system", "content": 系统内容},
+        {"role": "user", "content": 提示词},
     ]
 
 
-def _调用大模型(prompt: str, context: str) -> str:
-    api_key: str = 工具.取接口密钥()
-    model: str = 工具.取接口模型() or "gpt-5.3-codex"
-    if not api_key:
+def _调用大模型(提示词: str, 上下文: str) -> str:
+    接口密钥: str = 工具.取接口密钥()
+    模型: str = 工具.取接口模型() or "gpt-5.3-codex"
+    if not 接口密钥:
         raise RuntimeError("未配置 API Key")
 
-    messages: list[dict[str, str]] = _构建消息(prompt, context)
-    headers: dict[str, str] = {
-        "Authorization": f"Bearer {api_key}",
+    消息列表: list[dict[str, str]] = _构建消息(提示词, 上下文)
+    请求头: dict[str, str] = {
+        "Authorization": f"Bearer {接口密钥}",
         "Content-Type": "application/json",
     }
-    base_url: str = 工具.取接口基地址()
-    chat_url: str = _构建对话地址(base_url)
-    timeout_seconds: float | None = 工具.取接口超时秒数()
+    接口基地址: str = 工具.取接口基地址()
+    对话地址: str = _构建对话地址(接口基地址)
+    超时秒数: float | None = 工具.取接口超时秒数()
 
-    with 网络请求.Client(timeout=timeout_seconds) as client:
-        r: 网络请求.Response = client.post(
-            chat_url,
-            headers=headers,
-            数据交换={"model": model, "messages": messages},
+    with 网络请求.Client(timeout=超时秒数) as 客户端:
+        响应: 网络请求.Response = 客户端.post(
+            对话地址,
+            headers=请求头,
+            json={"model": 模型, "messages": 消息列表},
         )
-        r.raise_for_status()
-        data: dict = r.json()
+        响应.raise_for_status()
+        数据: dict = 响应.json()
 
     # OpenAI chat completions 格式
-    choices: list = data.get("choices", [])
-    if choices:
-        return choices[0].get("message", {}).get("content", "")
+    选项列表: list = 数据.get("choices", [])
+    if 选项列表:
+        return 选项列表[0].get("message", {}).get("content", "")
 
     # Poe responses 格式兼容
-    if "output_text" in data:
-        return data["output_text"]
-    if "output" in data:
-        out = data["output"]
-        if isinstance(out, list):
-            for item in out:
-                if isinstance(item, dict) and item.get("type") == "message":
-                    return item.get("content", [{}])[0].get("text", "")
-        if isinstance(out, str):
-            return out
+    if "output_text" in 数据:
+        return 数据["output_text"]
+    if "output" in 数据:
+        输出内容 = 数据["output"]
+        if isinstance(输出内容, list):
+            for 条目 in 输出内容:
+                if isinstance(条目, dict) and 条目.get("type") == "message":
+                    return 条目.get("content", [{}])[0].get("text", "")
+        if isinstance(输出内容, str):
+            return 输出内容
 
-    return data.get("text", str(data))
+    return 数据.get("text", str(数据))
 
 
-def _流式调用大模型(prompt: str, context: str) -> 生成器[str]:
+def _流式调用大模型(提示词: str, 上下文: str) -> 生成器[str]:
     r"""
     流式调用 LLM, 逐块 yield 内容文本
     """
-    api_key: str = 工具.取接口密钥()
-    model: str = 工具.取接口模型() or "gpt-5.3-codex"
-    if not api_key:
+    接口密钥: str = 工具.取接口密钥()
+    模型: str = 工具.取接口模型() or "gpt-5.3-codex"
+    if not 接口密钥:
         raise RuntimeError("未配置 API Key")
 
-    messages: list[dict[str, str]] = _构建消息(prompt, context)
-    headers: dict[str, str] = {
-        "Authorization": f"Bearer {api_key}",
+    消息列表: list[dict[str, str]] = _构建消息(提示词, 上下文)
+    请求头: dict[str, str] = {
+        "Authorization": f"Bearer {接口密钥}",
         "Content-Type": "application/json",
     }
-    base_url: str = 工具.取接口基地址()
-    chat_url: str = _构建对话地址(base_url)
-    timeout_seconds: float | None = 工具.取接口超时秒数()
+    接口基地址: str = 工具.取接口基地址()
+    对话地址: str = _构建对话地址(接口基地址)
+    超时秒数: float | None = 工具.取接口超时秒数()
 
     with (
-        网络请求.Client(timeout=timeout_seconds) as client,
-        client.stream(
+        网络请求.Client(timeout=超时秒数) as 客户端,
+        客户端.stream(
             "POST",
-            chat_url,
-            headers=headers,
-            数据交换={"model": model, "messages": messages, "stream": True},
-        ) as response,
+            对话地址,
+            headers=请求头,
+            json={"model": 模型, "messages": 消息列表, "stream": True},
+        ) as 响应,
     ):
-        response.raise_for_status()
-        for line in response.iter_lines():
-            if not line or not line.startswith("data: "):
+        响应.raise_for_status()
+        for 行 in 响应.iter_lines():
+            if not 行 or not 行.startswith("data: "):
                 continue
-            data_str: str = line[6:].strip()
-            if data_str == "[DONE]":
+            数据文本: str = 行[6:].strip()
+            if 数据文本 == "[DONE]":
                 break
             try:
-                chunk: dict = 数据交换.loads(data_str)
-                delta: dict = chunk.get("choices", [{}])[0].get("delta", {})
-                content: str = delta.get("content", "")
-                if content:
-                    yield content
+                数据块: dict = 数据交换.loads(数据文本)
+                增量: dict = 数据块.get("choices", [{}])[0].get("delta", {})
+                内容: str = 增量.get("content", "")
+                if 内容:
+                    yield 内容
             except 数据交换.JSONDecodeError, IndexError, KeyError:
                 continue
 
 
-def 流式对话SSE(prompt: str) -> 生成器[str]:
+def 流式对话SSE(提示词: str) -> 生成器[str]:
     r"""
     SSE 格式的流式对话, 供 FastAPI StreamingResponse 使用
     """
-    prompt = prompt.strip()
-    if not prompt:
+    提示词 = 提示词.strip()
+    if not 提示词:
         yield f"data: {数据交换.dumps({'error': '请输入问题'})}\n\n"
         return
 
-    _记录日志("info", f"收到流式提问: {prompt[:50]}{'...' if len(prompt) > 50 else ''}")
+    _记录日志("info", f"收到流式提问: {提示词[:50]}{'...' if len(提示词) > 50 else ''}")
 
-    api_key: str = 工具.取接口密钥()
-    if not api_key:
+    接口密钥: str = 工具.取接口密钥()
+    if not 接口密钥:
         _记录日志("warn", "未配置 API Key, 降级为狗屁不通文章生成器")
-        reply: str = 生成胡言(prompt)
-        yield f"data: {数据交换.dumps({'content': reply, 'source': 'bullshit', 'done': True, 'note': '未配置 API Key'})}\n\n"
+        回复: str = 生成胡言(提示词)
+        yield f"data: {数据交换.dumps({'content': 回复, 'source': 'bullshit', 'done': True, 'note': '未配置 API Key'})}\n\n"
         return
 
     try:
         _记录日志("info", "正在获取项目代码上下文...")
-        context: str = _取项目上下文()
+        上下文: str = _取项目上下文()
         _记录日志("info", f"正在流式调用大模型 ({工具.取接口模型() or 'gpt-5.3-codex'})...")
 
         yield f"data: {数据交换.dumps({'status': 'streaming', 'source': 'llm'})}\n\n"
 
-        for chunk in _流式调用大模型(prompt, context):
-            yield f"data: {数据交换.dumps({'content': chunk})}\n\n"
+        for 数据块 in _流式调用大模型(提示词, 上下文):
+            yield f"data: {数据交换.dumps({'content': 数据块})}\n\n"
 
         yield f"data: {数据交换.dumps({'done': True, 'source': 'llm'})}\n\n"
         _记录日志("success", "大模型流式回复完成")
 
     except Exception as e:
         _记录日志("error", f"大模型调用失败: {e}, 降级为狗屁不通文章生成器")
-        reply = 生成胡言(prompt)
-        yield f"data: {数据交换.dumps({'content': reply, 'source': 'bullshit', 'done': True, 'note': f'API 调用失败 ({e})'})}\n\n"
+        回复 = 生成胡言(提示词)
+        yield f"data: {数据交换.dumps({'content': 回复, 'source': 'bullshit', 'done': True, 'note': f'API 调用失败 ({e})'})}\n\n"
 
 
-def 对话(prompt: str, force_bs: bool = False) -> dict:
-    prompt = prompt.strip()
-    if not prompt:
+def 对话(提示词: str, 直接说: bool = False) -> dict:
+    提示词 = 提示词.strip()
+    if not 提示词:
         return {"ok": False, "error": "请输入问题"}
 
-    _记录日志("info", f"收到提问: {prompt[:50]}{'...' if len(prompt) > 50 else ''}")
+    _记录日志("info", f"收到提问: {提示词[:50]}{'...' if len(提示词) > 50 else ''}")
 
-    if force_bs:
+    if 直接说:
         _记录日志("info", "直接说模式 → 狗屁不通文章生成器")
-        reply: str = 生成胡言(prompt)
-        return {"ok": True, "reply": reply, "source": "bullshit", "note": "「直接说」模式"}
+        回复: str = 生成胡言(提示词)
+        return {"ok": True, "reply": 回复, "source": "bullshit", "note": "「直接说」模式"}
 
-    api_key: str = 工具.取接口密钥()
-    if not api_key:
+    接口密钥: str = 工具.取接口密钥()
+    if not 接口密钥:
         _记录日志("warn", "未配置 API Key, 降级为狗屁不通文章生成器")
-        reply = 生成胡言(prompt)
+        回复 = 生成胡言(提示词)
         return {
             "ok": True,
-            "reply": reply,
+            "reply": 回复,
             "source": "bullshit",
             "note": "未配置 API Key, 已使用狗屁不通文章生成器代替",
         }
 
     try:
         _记录日志("info", "正在获取项目代码上下文...")
-        context: str = _取项目上下文()
+        上下文: str = _取项目上下文()
         _记录日志("info", f"正在调用大模型 ({工具.取接口模型() or 'gpt-5.3-codex'})...")
-        reply = _调用大模型(prompt, context)
+        回复 = _调用大模型(提示词, 上下文)
         _记录日志("success", "大模型回复成功")
-        return {"ok": True, "reply": reply, "source": "llm"}
+        return {"ok": True, "reply": 回复, "source": "llm"}
     except Exception as e:
         _记录日志("error", f"大模型调用失败: {e}, 降级为狗屁不通文章生成器")
-        reply = 生成胡言(prompt)
+        回复 = 生成胡言(提示词)
         return {
             "ok": True,
-            "reply": reply,
+            "reply": 回复,
             "source": "bullshit",
             "note": f"API 调用失败 ({e}), 已使用狗屁不通文章生成器代替",
         }
 
 
 def 取日志() -> list[dict[str, str]]:
-    with _logs_lock:
-        return list(_logs)
-
-
-_uid = _生成编号
-_ts = _短时间
-_log = _记录日志
-_load_bs_data = _加载胡言材料
-bullshit_generate = 生成胡言
-_get_project_context = _取项目上下文
-_build_chat_url = _构建对话地址
-_build_style_prompt = _构建风格提示
-_build_product_prompt = _构建产品提示
-_build_response_prompt = _构建响应提示
-_build_context_prompt = _构建上下文提示
-_build_messages = _构建消息
-_call_llm = _调用大模型
-_stream_llm = _流式调用大模型
-chat_stream_sse = 流式对话SSE
-chat = 对话
-get_logs = 取日志
+    with _日志锁:
+        return list(_日志列表)

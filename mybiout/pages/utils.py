@@ -72,16 +72,16 @@ def 取默认哔哩哔哩电脑缓存路径() -> str:
 
 def _当前配置路径() -> 路径:
     r"""
-    读取兼容别名后的配置路径, 让旧测试或外部 monkeypatch 仍然生效。
+    读取当前配置路径。
     """
-    return globals().get("_CONFIG_PATH", _配置路径)
+    return _配置路径
 
 
 def _当前保存配置函数():
     r"""
-    读取兼容别名后的保存函数, 让旧测试或外部 monkeypatch 仍然生效。
+    读取当前保存配置函数。
     """
-    return globals().get("save_config", 保存配置)
+    return 保存配置
 
 
 def 载入配置() -> 配置解析器.ConfigParser:
@@ -252,25 +252,3 @@ def 重置全部设置() -> None:
         for 分区, 键值表 in 默认设置.items():
             配置[分区] = dict(键值表)
         _当前保存配置函数()(配置)
-
-
-_CONFIG_PATH = _配置路径
-_DEFAULT_PORT = _默认端口
-_CONFIG_LOCK = _配置锁
-DEFAULTS = 默认设置
-
-get_default_bilibili_pc_cache_path = 取默认哔哩哔哩电脑缓存路径
-load_config = 载入配置
-save_config = 保存配置
-get_all_settings = 取全部设置
-get_setting = 取设置
-set_setting = 设设置
-get_export_path = 取导出路径
-get_api_key = 取接口密钥
-get_api_model = 取接口模型
-get_port = 取端口
-get_api_base_url = 取接口基地址
-get_api_timeout_seconds = 取接口超时秒数
-get_sessdata = 取会话数据
-get_crawler_fallback_timeout = 取爬虫兜底超时
-reset_all_settings = 重置全部设置

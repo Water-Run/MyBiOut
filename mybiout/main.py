@@ -24,34 +24,46 @@ import uvicorn as 服务运行器
 
 from mybiout.pages.utils import 取端口
 
-_CSI: str = "\033["
-_HIDE_CUR: str = f"{_CSI}?25l"
-_SHOW_CUR: str = f"{_CSI}?25h"
-_CLR_SCR: str = f"{_CSI}2J{_CSI}H"
-_RST: str = f"{_CSI}0m"
-_BOLD: str = f"{_CSI}1m"
 
-_BR_L: str = "⠁⠂⠄⡀⠈⠐⠠⢀"
-_BR_M: str = "⠃⠅⠆⠉⠊⠌⠑⠒⠔⡁⡂⡄⡈⡐⡠⢁⢂⢄⢈⢐⢠⣀"
-_BR_H: str = "⠿⡿⢿⣿⣾⣽⣻⣷⣯⣟⡷⡯⡟⠷⠯⠟⣶⣵⣳"
-_SPARK: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
-_MAX_PARTICLES: int = 280
+class _中文参数解析器(参数解析.ArgumentParser):
+    def format_help(自身) -> str:
+        return (
+            super()
+            .format_help()
+            .replace("usage:", "用法:")
+            .replace("options:", "选项:")
+            .replace("show this help message and exit", "显示此帮助并退出")
+        )
 
-_BIN_DIR: 路径 = 路径(__file__).resolve().parent / "bin"
+
+_控制序列引导: str = "\033["
+_隐藏光标: str = f"{_控制序列引导}?25l"
+_显示光标: str = f"{_控制序列引导}?25h"
+_清屏: str = f"{_控制序列引导}2J{_控制序列引导}H"
+_重置样式: str = f"{_控制序列引导}0m"
+_加粗样式: str = f"{_控制序列引导}1m"
+
+_盲文低密度: str = "⠁⠂⠄⡀⠈⠐⠠⢀"
+_盲文中密度: str = "⠃⠅⠆⠉⠊⠌⠑⠒⠔⡁⡂⡄⡈⡐⡠⢁⢂⢄⢈⢐⢠⣀"
+_盲文高密度: str = "⠿⡿⢿⣿⣾⣽⣻⣷⣯⣟⡷⡯⡟⠷⠯⠟⣶⣵⣳"
+_闪光字符: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
+_最大粒子数: int = 280
+
+_程序工具目录: 路径 = 路径(__file__).resolve().parent / "bin"
 
 
 def _配置文本输出() -> None:
     r"""
     避免控制台或重定向输出编码不支持装饰字符时直接中断启动。
     """
-    for stream in (系统.stdout, 系统.stderr):
-        if stream is None:
+    for 输出流 in (系统.stdout, 系统.stderr):
+        if 输出流 is None:
             continue
-        reconfigure = getattr(stream, "reconfigure", None)
-        if reconfigure is None:
+        重配函数 = getattr(输出流, "reconfigure", None)
+        if 重配函数 is None:
             continue
         with 忽略异常(TypeError, ValueError):
-            reconfigure(errors="replace")
+            重配函数(errors="replace")
 
 
 # ===== 环境检查 =====
@@ -63,34 +75,34 @@ class _环境项:
     单项环境检查结果
     """
 
-    name: str
-    available: bool
-    hint: str
+    名称: str
+    可用: bool
+    提示: str
 
 
 def _检查环境() -> list[_环境项]:
     r"""
     检查运行环境中各必需依赖项的可用性
-    :return: list[_EnvItem]: 检查结果列表
+    :return: list[_环境项]: 检查结果列表
     """
-    results: list[_环境项] = []
+    检查结果: list[_环境项] = []
 
     # ffmpeg
-    ffmpeg_found: bool = 文件工具.which("ffmpeg") is not None
-    if not ffmpeg_found:
-        for p in (
-            _BIN_DIR / "BBDown" / "ffmpeg.exe",
-            _BIN_DIR / "BBDown" / "ffmpeg",
-            _BIN_DIR / "ffmpeg.exe",
-            _BIN_DIR / "ffmpeg",
+    找到FFmpeg: bool = 文件工具.which("ffmpeg") is not None
+    if not 找到FFmpeg:
+        for 候选路径 in (
+            _程序工具目录 / "BBDown" / "ffmpeg.exe",
+            _程序工具目录 / "BBDown" / "ffmpeg",
+            _程序工具目录 / "ffmpeg.exe",
+            _程序工具目录 / "ffmpeg",
         ):
-            if p.exists():
-                ffmpeg_found = True
+            if 候选路径.exists():
+                找到FFmpeg = True
                 break
-    results.append(
+    检查结果.append(
         _环境项(
             "ffmpeg",
-            ffmpeg_found,
+            找到FFmpeg,
             "下载: https://ffmpeg.org/download.html\n"
             "      下载后将 ffmpeg.exe 所在目录添加至系统 PATH 环境变量\n"
             "      或将 ffmpeg.exe 放入 mybiout/bin/ 目录下",
@@ -98,65 +110,65 @@ def _检查环境() -> list[_环境项]:
     )
 
     # BBDown
-    bbdown_found: bool = 文件工具.which("BBDown") is not None or 文件工具.which("bbdown") is not None
-    if not bbdown_found:
-        for p in (
-            _BIN_DIR / "BBDown" / "BBDown.exe",
-            _BIN_DIR / "BBDown" / "BBDown",
-            _BIN_DIR / "BBDown.exe",
-            _BIN_DIR / "BBDown",
+    找到BBDown: bool = 文件工具.which("BBDown") is not None or 文件工具.which("bbdown") is not None
+    if not 找到BBDown:
+        for 候选路径 in (
+            _程序工具目录 / "BBDown" / "BBDown.exe",
+            _程序工具目录 / "BBDown" / "BBDown",
+            _程序工具目录 / "BBDown.exe",
+            _程序工具目录 / "BBDown",
         ):
-            if p.exists():
-                bbdown_found = True
+            if 候选路径.exists():
+                找到BBDown = True
                 break
-    results.append(
+    检查结果.append(
         _环境项(
             "BBDown",
-            bbdown_found,
+            找到BBDown,
             "下载: https://github.com/nilaoda/BBDown/releases\n"
             "      将 BBDown 可执行文件放入系统 PATH 或 mybiout/bin/BBDown/ 目录下",
         )
     )
 
     # biliffm4s
-    biliffm4s_found: bool = False
+    找到biliffm4s: bool = False
     try:
         import biliffm4s  # noqa: F401
 
-        biliffm4s_found = True
+        找到biliffm4s = True
     except ImportError:
         ...
-    results.append(
+    检查结果.append(
         _环境项(
             "biliffm4s",
-            biliffm4s_found,
+            找到biliffm4s,
             "安装: pip install biliffm4s\n      仓库: https://github.com/Water-Run/-m4s-Python-biliffm4s",
         )
     )
 
-    return results
+    return 检查结果
 
 
-def _打印环境详情(checks: list[_环境项]) -> None:
+def _打印环境详情(检查列表: list[_环境项]) -> None:
     r"""
     在终端打印环境检查详细报告
-    :param checks: 检查结果列表
+    :param 检查列表: 检查结果列表
     """
     print()
     print("  ── 环境检查 ──")
-    for c in checks:
-        icon: str = "✅" if c.available else "❌"
-        status: str = "就绪" if c.available else "未找到"
-        print(f"  {icon} {c.name:<12} {status}")
-        if not c.available:
-            for hint_line in c.hint.split("\n"):
-                print(f"      {hint_line.strip()}")
+    for 检查项 in 检查列表:
+        图标: str = "✅" if 检查项.可用 else "❌"
+        状态: str = "就绪" if 检查项.可用 else "未找到"
+        print(f"  {图标} {检查项.名称:<12} {状态}")
+        if not 检查项.可用:
+            for 提示行 in 检查项.提示.split("\n"):
+                print(f"      {提示行.strip()}")
     print()
     print("  请安装全部缺失组件后重新启动 MyBiOut!")
     print()
 
 
-def _取启动阻断项(_checks: list[_环境项]) -> list[_环境项]:
+def _取启动阻断项(_检查列表: list[_环境项]) -> list[_环境项]:
     r"""
     返回会阻止 Web 服务启动的环境问题。
 
@@ -175,194 +187,194 @@ class _服务启动状态:
     Uvicorn 后台启动状态
     """
 
-    started: 线程.Event = 字段(default_factory=线程.Event)
-    failed: 线程.Event = 字段(default_factory=线程.Event)
-    reason: str = ""
-    lock: 线程.Lock = 字段(default_factory=线程.Lock)
-    server: 服务运行器.Server | None = None
-    thread: 线程.Thread | None = None
+    已启动: 线程.Event = 字段(default_factory=线程.Event)
+    已失败: 线程.Event = 字段(default_factory=线程.Event)
+    原因: str = ""
+    锁: 线程.Lock = 字段(default_factory=线程.Lock)
+    服务: 服务运行器.Server | None = None
+    线程对象: 线程.Thread | None = None
 
-    def mark_started(self) -> None:
+    def 标记已启动(自身) -> None:
         r"""
         标记服务已启动
         """
-        with self.lock:
-            if self.failed.is_set():
+        with 自身.锁:
+            if 自身.已失败.is_set():
                 return
-            self.started.set()
+            自身.已启动.set()
 
-    def mark_failed(self, reason: str) -> None:
+    def 标记失败(自身, 原因: str) -> None:
         r"""
         标记服务启动失败
-        :param reason: 失败原因
+        :param 原因: 失败原因
         """
-        with self.lock:
-            if self.started.is_set() or self.failed.is_set():
+        with 自身.锁:
+            if 自身.已启动.is_set() or 自身.已失败.is_set():
                 return
-            self.reason = reason
-            self.failed.set()
+            自身.原因 = 原因
+            自身.已失败.set()
 
 
-def _探测端口绑定错误(port: int) -> str | None:
+def _探测端口绑定错误(端口: int) -> str | None:
     r"""
     预探测端口是否可绑定
-    :param port: 端口号
+    :param 端口: 端口号
     :return: str | None: 可用返回 None，不可用返回错误原因
     """
     try:
-        with 套接字.socket(套接字.AF_INET, 套接字.SOCK_STREAM) as sock:
-            sock.bind(("127.0.0.1", port))
+        with 套接字.socket(套接字.AF_INET, 套接字.SOCK_STREAM) as 套接字对象:
+            套接字对象.bind(("127.0.0.1", 端口))
     except OSError as e:
-        detail: str = e.strerror or str(e)
-        return f"端口 {port} 不可用: {detail}"
+        详细原因: str = e.strerror or str(e)
+        return f"端口 {端口} 不可用: {详细原因}"
     return None
 
 
-def _后台启动服务(port: int) -> _服务启动状态:
+def _后台启动服务(端口: int) -> _服务启动状态:
     r"""
     后台启动 Uvicorn，并异步监控启动结果
-    :param port: 服务端口号
-    :return: _ServerStartupState: 启动状态对象
+    :param 端口: 服务端口号
+    :return: _服务启动状态: 启动状态对象
     """
-    state: _服务启动状态 = _服务启动状态()
+    状态: _服务启动状态 = _服务启动状态()
 
-    if err := _探测端口绑定错误(port):
-        state.mark_failed(err)
-        return state
+    if 端口错误 := _探测端口绑定错误(端口):
+        状态.标记失败(端口错误)
+        return 状态
 
-    config: 服务运行器.Config = 服务运行器.Config(
-        "mybiout.pages.apis:app",
+    配置: 服务运行器.Config = 服务运行器.Config(
+        "mybiout.pages.apis:应用",
         host="127.0.0.1",
-        port=port,
+        port=端口,
         log_level="warning",
     )
-    server: 服务运行器.Server = 服务运行器.Server(config)
-    state.server = server
+    服务: 服务运行器.Server = 服务运行器.Server(配置)
+    状态.服务 = 服务
 
-    def _run() -> None:
+    def _运行服务() -> None:
         r"""
         后台线程执行 server.run()
         """
         try:
-            server.run()
+            服务.run()
         except Exception as e:
-            state.mark_failed(f"Uvicorn 启动异常: {e}")
+            状态.标记失败(f"Uvicorn 启动异常: {e}")
 
-    t: 线程.Thread = 线程.Thread(target=_run, daemon=True)
-    state.thread = t
-    t.start()
+    后台线程: 线程.Thread = 线程.Thread(target=_运行服务, daemon=True)
+    状态.线程对象 = 后台线程
+    后台线程.start()
 
-    def _watch_startup() -> None:
+    def _监控启动() -> None:
         r"""
         监控 server.started 与线程生命周期，判定启动成功/失败
         """
-        deadline: float = 时间.monotonic() + 20.0
-        while 时间.monotonic() < deadline:
-            if state.failed.is_set():
+        截止时间: float = 时间.monotonic() + 20.0
+        while 时间.monotonic() < 截止时间:
+            if 状态.已失败.is_set():
                 return
-            if server.started:
-                state.mark_started()
+            if 服务.started:
+                状态.标记已启动()
                 return
-            if not t.is_alive():
-                state.mark_failed("服务线程提前退出（可能端口占用或应用初始化失败）")
+            if not 后台线程.is_alive():
+                状态.标记失败("服务线程提前退出（可能端口占用或应用初始化失败）")
                 return
             时间.sleep(0.03)
 
-        if server.started:
-            state.mark_started()
+        if 服务.started:
+            状态.标记已启动()
             return
 
-        state.mark_failed("服务启动超时")
-        server.should_exit = True
+        状态.标记失败("服务启动超时")
+        服务.should_exit = True
 
-    线程.Thread(target=_watch_startup, daemon=True).start()
-    return state
+    线程.Thread(target=_监控启动, daemon=True).start()
+    return 状态
 
 
-def _等待服务启动(state: _服务启动状态, timeout: float = 25.0) -> bool:
+def _等待服务启动(状态: _服务启动状态, 超时: float = 25.0) -> bool:
     r"""
     等待服务启动成功或失败
-    :param state: 启动状态对象
-    :param timeout: 最大等待秒数
+    :param 状态: 启动状态对象
+    :param 超时: 最大等待秒数
     :return: bool: True=成功, False=失败或超时
     """
-    deadline: float = 时间.monotonic() + timeout
-    while 时间.monotonic() < deadline:
-        if state.started.is_set():
+    截止时间: float = 时间.monotonic() + 超时
+    while 时间.monotonic() < 截止时间:
+        if 状态.已启动.is_set():
             return True
-        if state.failed.is_set():
+        if 状态.已失败.is_set():
             return False
         时间.sleep(0.05)
-    return state.started.is_set()
+    return 状态.已启动.is_set()
 
 
 # ===== 终端动画工具 =====
 
 
-def _定位(row: int, col: int) -> str:
+def _定位(行: int, 列: int) -> str:
     r"""
     生成终端光标定位控制序列
-    :param row: 行号, 1-based
-    :param col: 列号, 1-based
+    :param 行: 行号, 1-based
+    :param 列: 列号, 1-based
     :return: str: ANSI 控制序列
     """
-    return f"{_CSI}{row};{col}H"
+    return f"{_控制序列引导}{行};{列}H"
 
 
-def _前景色(r: int, g: int, b: int) -> str:
+def _前景色(红: int, 绿: int, 蓝: int) -> str:
     r"""
     生成 24-bit 真彩前景色 ANSI 控制序列
-    :param r: 红色分量
-    :param g: 绿色分量
-    :param b: 蓝色分量
+    :param 红: 红色分量
+    :param 绿: 绿色分量
+    :param 蓝: 蓝色分量
     :return: str: ANSI 控制序列
     """
-    return f"{_CSI}38;2;{r};{g};{b}m"
+    return f"{_控制序列引导}38;2;{红};{绿};{蓝}m"
 
 
-def _线性插值(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+def _线性插值(起值: tuple[int, int, int], 止值: tuple[int, int, int], 比例: float) -> tuple[int, int, int]:
     r"""
     对 RGB 颜色做线性插值
-    :param a: 起始颜色
-    :param b: 结束颜色
-    :param t: 插值比例, 自动钳制到 [0.0, 1.0]
+    :param 起值: 起始颜色
+    :param 止值: 结束颜色
+    :param 比例: 插值比例, 自动钳制到 [0.0, 1.0]
     :return: tuple[int, int, int]: 插值后的颜色
     """
-    t_clamped: float = max(0.0, min(1.0, t))
+    钳制比例: float = max(0.0, min(1.0, 比例))
     return (
-        int(a[0] + (b[0] - a[0]) * t_clamped),
-        int(a[1] + (b[1] - a[1]) * t_clamped),
-        int(a[2] + (b[2] - a[2]) * t_clamped),
+        int(起值[0] + (止值[0] - 起值[0]) * 钳制比例),
+        int(起值[1] + (止值[1] - 起值[1]) * 钳制比例),
+        int(起值[2] + (止值[2] - 起值[2]) * 钳制比例),
     )
 
 
-def _淡化(c: tuple[int, int, int], alpha: float) -> tuple[int, int, int]:
+def _淡化(颜色值: tuple[int, int, int], 透明度: float) -> tuple[int, int, int]:
     r"""
     将颜色按比例淡化到黑色
-    :param c: 原始颜色
-    :param alpha: 强度比例, 自动钳制到 [0.0, 1.0]
+    :param 颜色值: 原始颜色
+    :param 透明度: 强度比例, 自动钳制到 [0.0, 1.0]
     :return: tuple[int, int, int]: 淡化后的颜色
     """
-    a: float = max(0.0, min(1.0, alpha))
-    return int(c[0] * a), int(c[1] * a), int(c[2] * a)
+    强度: float = max(0.0, min(1.0, 透明度))
+    return int(颜色值[0] * 强度), int(颜色值[1] * 强度), int(颜色值[2] * 强度)
 
 
-def _中日韩宽度(text: str) -> int:
+def _中日韩宽度(文本: str) -> int:
     r"""
     估算字符串在终端中的显示宽度, CJK 字符按 2 列计
-    :param text: 输入文本
+    :param 文本: 输入文本
     :return: int: 显示宽度
     """
     return sum(
         2
         if (
-            0x2E80 <= ord(ch) <= 0x9FFF
-            or 0xF900 <= ord(ch) <= 0xFAFF
-            or 0xFF00 <= ord(ch) <= 0xFF60
-            or 0x20000 <= ord(ch) <= 0x2FA1F
+            0x2E80 <= ord(字符) <= 0x9FFF
+            or 0xF900 <= ord(字符) <= 0xFAFF
+            or 0xFF00 <= ord(字符) <= 0xFF60
+            or 0x20000 <= ord(字符) <= 0x2FA1F
         )
         else 1
-        for ch in text
+        for 字符 in 文本
     )
 
 
@@ -372,14 +384,14 @@ class _主题:
     动画配色主题
     """
 
-    ga: tuple[int, int, int]
-    gb: tuple[int, int, int]
-    acc: tuple[tuple[int, int, int], ...]
-    heli: tuple[int, int, int]
-    stars: tuple[tuple[int, int, int], ...]
+    渐变甲: tuple[int, int, int]
+    渐变乙: tuple[int, int, int]
+    辅色组: tuple[tuple[int, int, int], ...]
+    直升机色: tuple[int, int, int]
+    星空色组: tuple[tuple[int, int, int], ...]
 
 
-_THEMES: tuple[_主题, ...] = (
+_主题表: tuple[_主题, ...] = (
     _主题(
         (0, 255, 255),
         (255, 0, 255),
@@ -451,10 +463,10 @@ _机身帧: tuple[str, ...] = (
     "       ╰──┬───┬──╯       ",
     "          ╰─╯ ╰─╯        ",
 )
-_HELI_W: int = max(*(len(s) for s in _旋翼帧), *(len(s) for s in _机身帧))
-_HELI_H: int = 1 + len(_机身帧)
+_直升机宽度: int = max(*(len(帧行) for 帧行 in _旋翼帧), *(len(帧行) for 帧行 in _机身帧))
+_直升机高度: int = 1 + len(_机身帧)
 
-_TITLE: tuple[str, ...] = (
+_标题字形: tuple[str, ...] = (
     r"  __  __       ____  _  ___        _   _ ",
     r" |  \/  |_   _| __ )(_)/ _ \ _   _| |_| |",
     r" | |\/| | | | |  _ \| | | | | | | | __| |",
@@ -462,7 +474,7 @@ _TITLE: tuple[str, ...] = (
     r" |_|  |_|\__, |____/|_|\___/ \__,_|\__(_)",
     r"         |___/                          ! ",
 )
-_TITLE_W: int = max(len(s) for s in _TITLE)
+_标题宽度: int = max(len(标题行) for 标题行 in _标题字形)
 
 
 @数据类(slots=True)
@@ -471,541 +483,541 @@ class _粒子:
     粒子对象, 用于盲文特效
     """
 
-    x: float
-    y: float
-    vx: float
-    vy: float
-    life: float
-    max_life: float
-    color: tuple[int, int, int]
+    横坐标: float
+    纵坐标: float
+    横速度: float
+    纵速度: float
+    寿命: float
+    最大寿命: float
+    颜色: tuple[int, int, int]
 
-    def step(self, dt: float) -> bool:
+    def 步进(自身, 步长: float) -> bool:
         r"""
         推进粒子物理状态
-        :param dt: 时间步长
+        :param 步长: 时间步长
         :return: bool: 是否仍存活
         """
-        self.x += self.vx * dt
-        self.y += self.vy * dt
-        self.vy += 3.5 * dt
-        self.life -= dt
-        return self.life > 0
+        自身.横坐标 += 自身.横速度 * 步长
+        自身.纵坐标 += 自身.纵速度 * 步长
+        自身.纵速度 += 3.5 * 步长
+        自身.寿命 -= 步长
+        return 自身.寿命 > 0
 
     @property
-    def ch(self) -> str:
+    def 字符(自身) -> str:
         r"""
         获取当前寿命对应的盲文字符密度
         :return: str: 单字符
         """
-        ratio: float = self.life / self.max_life if self.max_life > 0 else 0.0
-        if ratio > 0.6:
-            return 随机.choice(_BR_H)
-        if ratio > 0.25:
-            return 随机.choice(_BR_M)
-        return 随机.choice(_BR_L)
+        比例值: float = 自身.寿命 / 自身.最大寿命 if 自身.最大寿命 > 0 else 0.0
+        if 比例值 > 0.6:
+            return 随机.choice(_盲文高密度)
+        if 比例值 > 0.25:
+            return 随机.choice(_盲文中密度)
+        return 随机.choice(_盲文低密度)
 
     @property
-    def visible_color(self) -> tuple[int, int, int]:
+    def 可见颜色(自身) -> tuple[int, int, int]:
         r"""
         获取当前可见颜色
         :return: tuple[int, int, int]: RGB 颜色
         """
-        ratio: float = self.life / self.max_life if self.max_life > 0 else 0.0
-        return _淡化(self.color, ratio)
+        比例值: float = 自身.寿命 / 自身.最大寿命 if 自身.最大寿命 > 0 else 0.0
+        return _淡化(自身.颜色, 比例值)
 
 
 def _爆发粒子(
-    pool: list[_粒子],
-    x: float,
-    y: float,
-    count: int,
-    colors: tuple[tuple[int, int, int], ...],
+    粒子池: list[_粒子],
+    横坐标: float,
+    纵坐标: float,
+    数量: int,
+    颜色组: tuple[tuple[int, int, int], ...],
     *,
-    speed: float = 5.0,
-    life: tuple[float, float] = (0.4, 1.2),
-    spread: float = 1.0,
+    速度: float = 5.0,
+    寿命: tuple[float, float] = (0.4, 1.2),
+    散布: float = 1.0,
 ) -> None:
     r"""
     在指定位置生成爆发粒子
-    :param pool: 粒子池
-    :param x: 爆发中心 x
-    :param y: 爆发中心 y
-    :param count: 粒子数量
-    :param colors: 颜色集合
-    :param speed: 初速度上限
-    :param life: 生命周期范围
-    :param spread: 初始位置离散半径
+    :param 粒子池: 粒子池
+    :param 横坐标: 爆发中心横坐标
+    :param 纵坐标: 爆发中心纵坐标
+    :param 数量: 粒子数量
+    :param 颜色组: 颜色集合
+    :param 速度: 初速度上限
+    :param 寿命: 生命周期范围
+    :param 散布: 初始位置离散半径
     """
-    for _ in range(count):
-        angle: float = 随机.uniform(0.0, 数学.tau)
-        v_abs: float = 随机.uniform(speed * 0.3, speed)
-        ttl: float = 随机.uniform(*life)
-        pool.append(
+    for _ in range(数量):
+        角度: float = 随机.uniform(0.0, 数学.tau)
+        速度绝对值: float = 随机.uniform(速度 * 0.3, 速度)
+        存活时间: float = 随机.uniform(*寿命)
+        粒子池.append(
             _粒子(
-                x=x + 随机.uniform(-spread, spread),
-                y=y + 随机.uniform(-spread * 0.3, spread * 0.3),
-                vx=数学.cos(angle) * v_abs,
-                vy=数学.sin(angle) * v_abs * 0.4,
-                life=ttl,
-                max_life=ttl,
-                color=随机.choice(colors),
+                横坐标=横坐标 + 随机.uniform(-散布, 散布),
+                纵坐标=纵坐标 + 随机.uniform(-散布 * 0.3, 散布 * 0.3),
+                横速度=数学.cos(角度) * 速度绝对值,
+                纵速度=数学.sin(角度) * 速度绝对值 * 0.4,
+                寿命=存活时间,
+                最大寿命=存活时间,
+                颜色=随机.choice(颜色组),
             ),
         )
-    if len(pool) > _MAX_PARTICLES:
-        del pool[: len(pool) - _MAX_PARTICLES]
+    if len(粒子池) > _最大粒子数:
+        del 粒子池[: len(粒子池) - _最大粒子数]
 
 
-def _播放动画(port: int, startup_state: _服务启动状态 | None = None) -> None:
+def _播放动画(端口: int, 启动状态: _服务启动状态 | None = None) -> None:
     r"""
     播放启动动画序列
-    :param port: 服务端口号
-    :param startup_state: 服务启动状态对象（可选）
+    :param 端口: 服务端口号
+    :param 启动状态: 服务启动状态对象（可选）
     :raise RuntimeError: 终端尺寸过小时抛出
     """
-    width, height = 文件工具.get_terminal_size((80, 24))
-    if width < 52 or height < 18:
+    宽度, 高度 = 文件工具.get_terminal_size((80, 24))
+    if 宽度 < 52 or 高度 < 18:
         raise RuntimeError("终端尺寸过小, 跳过动画")
 
-    theme: _主题 = 随机.choice(_THEMES)
-    rng: 随机.Random = 随机.Random()
-    buffer: list[str] = []
+    主题: _主题 = 随机.choice(_主题表)
+    随机源: 随机.Random = 随机.Random()
+    输出缓冲: list[str] = []
 
-    def w(text: str) -> None:
+    def 写入(文本: str) -> None:
         r"""
         向输出缓冲写入字符串
         """
-        buffer.append(text)
+        输出缓冲.append(文本)
 
-    def flush() -> None:
+    def 刷新输出() -> None:
         r"""
         刷新输出缓冲到终端
         """
-        系统.stdout.write("".join(buffer))
+        系统.stdout.write("".join(输出缓冲))
         系统.stdout.flush()
-        buffer.clear()
+        输出缓冲.clear()
 
-    def put(
-        row: int,
-        col: int,
-        text: str,
-        color: tuple[int, int, int] | None = None,
-        bold: bool = False,
+    def 绘制(
+        行: int,
+        列: int,
+        文本: str,
+        颜色: tuple[int, int, int] | None = None,
+        加粗: bool = False,
     ) -> None:
         r"""
         在终端指定位置绘制文本
-        :param row: 行号, 1-based
-        :param col: 列号, 1-based
-        :param text: 输出文本
-        :param color: RGB 颜色
-        :param bold: 是否加粗
+        :param 行: 行号, 1-based
+        :param 列: 列号, 1-based
+        :param 文本: 输出文本
+        :param 颜色: RGB 颜色
+        :param 加粗: 是否加粗
         """
-        if row < 1 or row > height or col > width:
+        if 行 < 1 or 行 > 高度 or 列 > 宽度:
             return
-        clipped: str = text[: width - col + 1]
-        if not clipped:
+        裁剪文本: str = 文本[: 宽度 - 列 + 1]
+        if not 裁剪文本:
             return
-        payload: str = _定位(row, col)
-        if bold:
-            payload += _BOLD
-        if color is not None:
-            payload += _前景色(*color)
-        w(payload + clipped + _RST)
+        负载: str = _定位(行, 列)
+        if 加粗:
+            负载 += _加粗样式
+        if 颜色 is not None:
+            负载 += _前景色(*颜色)
+        写入(负载 + 裁剪文本 + _重置样式)
 
-    def clear_row(row: int, c1: int = 1, c2: int | None = None) -> None:
+    def 清行(行: int, 起列: int = 1, 止列: int | None = None) -> None:
         r"""
         清空指定行区间
-        :param row: 行号
-        :param c1: 起始列
-        :param c2: 结束列, 为空时到行尾
+        :param 行: 行号
+        :param 起列: 起始列
+        :param 止列: 结束列, 为空时到行尾
         """
-        if row < 1 or row > height:
+        if 行 < 1 or 行 > 高度:
             return
-        end_col: int = min(c2 or width, width)
-        length: int = end_col - c1 + 1
-        if length > 0:
-            w(_定位(row, max(1, c1)) + " " * length)
+        结束列: int = min(止列 or 宽度, 宽度)
+        长度: int = 结束列 - 起列 + 1
+        if 长度 > 0:
+            写入(_定位(行, max(1, 起列)) + " " * 长度)
 
-    w(_HIDE_CUR + _CLR_SCR)
-    flush()
+    写入(_隐藏光标 + _清屏)
+    刷新输出()
 
-    star_count: int = rng.randint(width * height // 35, width * height // 16)
-    stars: list[tuple[int, int, str, tuple[int, int, int]]] = [
+    星点数量: int = 随机源.randint(宽度 * 高度 // 35, 宽度 * 高度 // 16)
+    星空色组: list[tuple[int, int, str, tuple[int, int, int]]] = [
         (
-            rng.randint(1, height),
-            rng.randint(1, width),
-            rng.choice(_BR_L + "·.˙"),
-            rng.choice(theme.stars),
+            随机源.randint(1, 高度),
+            随机源.randint(1, 宽度),
+            随机源.choice(_盲文低密度 + "·.˙"),
+            随机源.choice(主题.星空色组),
         )
-        for _ in range(star_count)
+        for _ in range(星点数量)
     ]
-    rng.shuffle(stars)
-    batch: int = max(1, len(stars) // 8)
-    for idx in range(0, len(stars), batch):
-        for sr, sc, sch, sco in stars[idx : idx + batch]:
-            put(sr, sc, sch, color=sco)
-        flush()
+    随机源.shuffle(星空色组)
+    批量: int = max(1, len(星空色组) // 8)
+    for 索引 in range(0, len(星空色组), 批量):
+        for 星行, 星列, 星字符, 星颜色 in 星空色组[索引 : 索引 + 批量]:
+            绘制(星行, 星列, 星字符, 颜色=星颜色)
+        刷新输出()
         时间.sleep(0.02)
 
-    base_y: int = max(3, height // 4)
-    wave_amp: float = rng.uniform(0.3, 1.8)
-    wave_freq: float = rng.uniform(1.0, 3.0)
-    frame_count: int = 58 + rng.randint(-8, 10)
-    dt: float = 0.032
-    particles: list[_粒子] = []
-    prev_r: int = base_y
-    prev_c: int = width + 6
-    bili_row: int = min(base_y + _HELI_H + 2, height - 2)
-    bili_burst_done: bool = False
+    基准行: int = max(3, 高度 // 4)
+    波幅: float = 随机源.uniform(0.3, 1.8)
+    波频: float = 随机源.uniform(1.0, 3.0)
+    帧数: int = 58 + 随机源.randint(-8, 10)
+    步长: float = 0.032
+    粒子列表: list[_粒子] = []
+    前行: int = 基准行
+    前列: int = 宽度 + 6
+    哔哩行: int = min(基准行 + _直升机高度 + 2, 高度 - 2)
+    已哔哩爆发: bool = False
 
-    def _crash_sequence(heli_x: int, heli_y: int, reason: str) -> None:
+    def _坠机动画(直升机列: int, 直升机行: int, 原因文本: str) -> None:
         r"""
         启动失败时的坠机动画
-        :param heli_x: 当前直升机 x
-        :param heli_y: 当前直升机 y
-        :param reason: 失败原因
+        :param 直升机列: 当前直升机列
+        :param 直升机行: 当前直升机行
+        :param 原因文本: 失败原因
         """
-        crash_colors: tuple[tuple[int, int, int], ...] = ((255, 200, 80), (255, 120, 60), (255, 70, 70))
-        cx: int = heli_x
-        cy: int = heli_y
-        local_prev_r: int = heli_y
-        local_prev_c: int = heli_x
+        坠毁色组: tuple[tuple[int, int, int], ...] = ((255, 200, 80), (255, 120, 60), (255, 70, 70))
+        当前列: int = 直升机列
+        当前行: int = 直升机行
+        本轮前行: int = 直升机行
+        本轮前列: int = 直升机列
 
-        for step in range(18):
-            for dr in range(_HELI_H):
-                clear_row(local_prev_r + dr, max(1, local_prev_c), min(width, local_prev_c + _HELI_W + 3))
+        for 步进 in range(18):
+            for 行偏移 in range(_直升机高度):
+                清行(本轮前行 + 行偏移, max(1, 本轮前列), min(宽度, 本轮前列 + _直升机宽度 + 3))
 
-            cx = min(width - _HELI_W, cx + 1 + (1 if step > 10 else 0))
-            cy = min(height - _HELI_H - 1, cy + 1)
+            当前列 = min(宽度 - _直升机宽度, 当前列 + 1 + (1 if 步进 > 10 else 0))
+            当前行 = min(高度 - _直升机高度 - 1, 当前行 + 1)
 
             _爆发粒子(
-                particles,
-                cx + _HELI_W * 0.45,
-                cy + _HELI_H * 0.75,
-                10 + step // 2,
-                crash_colors,
-                speed=8.0,
-                life=(0.25, 0.9),
-                spread=1.5,
+                粒子列表,
+                当前列 + _直升机宽度 * 0.45,
+                当前行 + _直升机高度 * 0.75,
+                10 + 步进 // 2,
+                坠毁色组,
+                速度=8.0,
+                寿命=(0.25, 0.9),
+                散布=1.5,
             )
 
-            particles[:] = [p for p in particles if p.step(0.045)]
-            for p in particles:
-                px: int = int(p.x)
-                py: int = int(p.y)
-                if 1 <= py <= height and 1 <= px <= width:
-                    put(py, px, p.ch, color=p.visible_color)
+            粒子列表[:] = [粒子 for 粒子 in 粒子列表 if 粒子.步进(0.045)]
+            for 粒子 in 粒子列表:
+                粒子列: int = int(粒子.横坐标)
+                粒子行: int = int(粒子.纵坐标)
+                if 1 <= 粒子行 <= 高度 and 1 <= 粒子列 <= 宽度:
+                    绘制(粒子行, 粒子列, 粒子.字符, 颜色=粒子.可见颜色)
 
-            rotor: str = _旋翼帧[step % len(_旋翼帧)]
-            for ci, ch in enumerate(rotor):
-                col: int = cx + ci
-                if ch != " ":
-                    put(cy, col, ch, color=(255, 120, 80), bold=True)
+            旋翼: str = _旋翼帧[步进 % len(_旋翼帧)]
+            for 列索引, 字符 in enumerate(旋翼):
+                列: int = 当前列 + 列索引
+                if 字符 != " ":
+                    绘制(当前行, 列, 字符, 颜色=(255, 120, 80), 加粗=True)
 
-            for bi, line in enumerate(_机身帧):
-                row: int = cy + 1 + bi
-                for ci, ch in enumerate(line):
-                    col: int = cx + ci
-                    if ch != " ":
-                        put(row, col, ch, color=(255, 90, 90), bold=True)
+            for 机身行索引, 行文本 in enumerate(_机身帧):
+                行: int = 当前行 + 1 + 机身行索引
+                for 列索引, 字符 in enumerate(行文本):
+                    列: int = 当前列 + 列索引
+                    if 字符 != " ":
+                        绘制(行, 列, 字符, 颜色=(255, 90, 90), 加粗=True)
 
-            local_prev_r, local_prev_c = cy, cx
-            flush()
+            本轮前行, 本轮前列 = 当前行, 当前列
+            刷新输出()
             时间.sleep(0.03)
 
         _爆发粒子(
-            particles,
-            cx + _HELI_W * 0.5,
-            cy + _HELI_H * 0.8,
+            粒子列表,
+            当前列 + _直升机宽度 * 0.5,
+            当前行 + _直升机高度 * 0.8,
             85,
             ((255, 230, 120), (255, 150, 80), (255, 80, 80)),
-            speed=10.0,
-            life=(0.3, 1.3),
-            spread=2.5,
+            速度=10.0,
+            寿命=(0.3, 1.3),
+            散布=2.5,
         )
 
         for _ in range(22):
-            particles[:] = [p for p in particles if p.step(0.05)]
-            for p in particles:
-                px: int = int(p.x)
-                py: int = int(p.y)
-                if 1 <= py <= height and 1 <= px <= width:
-                    put(py, px, p.ch, color=p.visible_color)
-            flush()
+            粒子列表[:] = [粒子 for 粒子 in 粒子列表 if 粒子.步进(0.05)]
+            for 粒子 in 粒子列表:
+                粒子列: int = int(粒子.横坐标)
+                粒子行: int = int(粒子.纵坐标)
+                if 1 <= 粒子行 <= 高度 and 1 <= 粒子列 <= 宽度:
+                    绘制(粒子行, 粒子列, 粒子.字符, 颜色=粒子.可见颜色)
+            刷新输出()
             时间.sleep(0.025)
 
-        title: str = "✖ Man!"
-        reason_line: str = f"孩子: {reason or '未知错误'}"
-        if len(reason_line) > max(12, width - 4):
-            reason_line = reason_line[: max(9, width - 7)] + "..."
+        标题: str = "✖ Man!"
+        原因行: str = f"孩子: {原因文本 or '未知错误'}"
+        if len(原因行) > max(12, 宽度 - 4):
+            原因行 = 原因行[: max(9, 宽度 - 7)] + "..."
 
-        tr: int = max(2, height // 2 - 1)
-        clear_row(tr, 1, width)
-        clear_row(tr + 1, 1, width)
-        put(tr, max(1, (width - len(title)) // 2), title, color=(255, 90, 90), bold=True)
-        put(tr + 1, max(1, (width - len(reason_line)) // 2), reason_line, color=(255, 200, 120), bold=True)
-        flush()
+        标题行: int = max(2, 高度 // 2 - 1)
+        清行(标题行, 1, 宽度)
+        清行(标题行 + 1, 1, 宽度)
+        绘制(标题行, max(1, (宽度 - len(标题)) // 2), 标题, 颜色=(255, 90, 90), 加粗=True)
+        绘制(标题行 + 1, max(1, (宽度 - len(原因行)) // 2), 原因行, 颜色=(255, 200, 120), 加粗=True)
+        刷新输出()
         时间.sleep(0.35)
 
-    for frame in range(frame_count):
-        t: float = frame / frame_count
-        heli_x: int = int((width + 6) + ((-_HELI_W - 6) - (width + 6)) * t)
-        heli_y: int = int(base_y + wave_amp * 数学.sin(wave_freq * t * 数学.tau))
+    for 帧 in range(帧数):
+        比例: float = 帧 / 帧数
+        直升机列: int = int((宽度 + 6) + ((-_直升机宽度 - 6) - (宽度 + 6)) * 比例)
+        直升机行: int = int(基准行 + 波幅 * 数学.sin(波频 * 比例 * 数学.tau))
 
-        if startup_state is not None and startup_state.failed.is_set():
-            _crash_sequence(heli_x, heli_y, startup_state.reason)
-            raise RuntimeError(startup_state.reason or "服务启动失败")
+        if 启动状态 is not None and 启动状态.已失败.is_set():
+            _坠机动画(直升机列, 直升机行, 启动状态.原因)
+            raise RuntimeError(启动状态.原因 or "服务启动失败")
 
-        for dr in range(_HELI_H):
-            clear_row(prev_r + dr, max(1, prev_c), min(width, prev_c + _HELI_W + 2))
+        for 行偏移 in range(_直升机高度):
+            清行(前行 + 行偏移, max(1, 前列), min(宽度, 前列 + _直升机宽度 + 2))
 
-        particles = [p for p in particles if p.step(dt)]
-        for p in particles:
-            px: int = int(p.x)
-            py: int = int(p.y)
-            if 1 <= py <= height and 1 <= px <= width:
-                put(py, px, p.ch, color=p.visible_color)
+        粒子列表 = [粒子 for 粒子 in 粒子列表 if 粒子.步进(步长)]
+        for 粒子 in 粒子列表:
+            粒子列: int = int(粒子.横坐标)
+            粒子行: int = int(粒子.纵坐标)
+            if 1 <= 粒子行 <= 高度 and 1 <= 粒子列 <= 宽度:
+                绘制(粒子行, 粒子列, 粒子.字符, 颜色=粒子.可见颜色)
 
-        exhaust_x: float = float(heli_x + _HELI_W - 2)
-        exhaust_y: float = float(heli_y + 3)
-        for _ in range(rng.randint(4, 9)):
-            ttl: float = rng.uniform(0.3, 1.1)
-            particles.append(
+        尾焰列: float = float(直升机列 + _直升机宽度 - 2)
+        尾焰行: float = float(直升机行 + 3)
+        for _ in range(随机源.randint(4, 9)):
+            存活时间: float = 随机源.uniform(0.3, 1.1)
+            粒子列表.append(
                 _粒子(
-                    x=exhaust_x + rng.uniform(0.0, 2.4),
-                    y=exhaust_y + rng.uniform(-0.6, 0.6),
-                    vx=rng.uniform(1.2, 6.5),
-                    vy=rng.uniform(-1.0, 1.0),
-                    life=ttl,
-                    max_life=ttl,
-                    color=rng.choice(theme.acc),
+                    横坐标=尾焰列 + 随机源.uniform(0.0, 2.4),
+                    纵坐标=尾焰行 + 随机源.uniform(-0.6, 0.6),
+                    横速度=随机源.uniform(1.2, 6.5),
+                    纵速度=随机源.uniform(-1.0, 1.0),
+                    寿命=存活时间,
+                    最大寿命=存活时间,
+                    颜色=随机源.choice(主题.辅色组),
                 ),
             )
-        if len(particles) > _MAX_PARTICLES:
-            del particles[: len(particles) - _MAX_PARTICLES]
+        if len(粒子列表) > _最大粒子数:
+            del 粒子列表[: len(粒子列表) - _最大粒子数]
 
-        rotor: str = _旋翼帧[frame % len(_旋翼帧)]
-        for ci, ch in enumerate(rotor):
-            col: int = heli_x + ci
-            if 1 <= col <= width and 1 <= heli_y <= height and ch != " ":
-                put(heli_y, col, ch, color=theme.heli, bold=True)
+        旋翼: str = _旋翼帧[帧 % len(_旋翼帧)]
+        for 列索引, 字符 in enumerate(旋翼):
+            列: int = 直升机列 + 列索引
+            if 1 <= 列 <= 宽度 and 1 <= 直升机行 <= 高度 and 字符 != " ":
+                绘制(直升机行, 列, 字符, 颜色=主题.直升机色, 加粗=True)
 
-        for bi, line in enumerate(_机身帧):
-            row: int = heli_y + 1 + bi
-            for ci, ch in enumerate(line):
-                col: int = heli_x + ci
-                if 1 <= col <= width and 1 <= row <= height and ch != " ":
-                    put(row, col, ch, color=theme.heli, bold=True)
+        for 机身行索引, 行文本 in enumerate(_机身帧):
+            行: int = 直升机行 + 1 + 机身行索引
+            for 列索引, 字符 in enumerate(行文本):
+                列: int = 直升机列 + 列索引
+                if 1 <= 列 <= 宽度 and 1 <= 行 <= 高度 and 字符 != " ":
+                    绘制(行, 列, 字符, 颜色=主题.直升机色, 加粗=True)
 
-        if not bili_burst_done and abs(heli_x + _HELI_W // 2 - width // 2) < 8:
-            bili_burst_done = True
+        if not 已哔哩爆发 and abs(直升机列 + _直升机宽度 // 2 - 宽度 // 2) < 8:
+            已哔哩爆发 = True
             _爆发粒子(
-                particles,
-                width / 2,
-                bili_row,
+                粒子列表,
+                宽度 / 2,
+                哔哩行,
                 42,
-                theme.acc,
-                speed=9.0,
-                life=(0.5, 2.0),
-                spread=5.0,
+                主题.辅色组,
+                速度=9.0,
+                寿命=(0.5, 2.0),
+                散布=5.0,
             )
 
-        prev_r, prev_c = heli_y, heli_x
-        flush()
-        时间.sleep(dt)
+        前行, 前列 = 直升机行, 直升机列
+        刷新输出()
+        时间.sleep(步长)
 
     for _ in range(16):
-        particles = [p for p in particles if p.step(0.06)]
-        for p in particles:
-            px: int = int(p.x)
-            py: int = int(p.y)
-            if 1 <= py <= height and 1 <= px <= width:
-                put(py, px, p.ch, color=p.visible_color)
-        flush()
+        粒子列表 = [粒子 for 粒子 in 粒子列表 if 粒子.步进(0.06)]
+        for 粒子 in 粒子列表:
+            粒子列: int = int(粒子.横坐标)
+            粒子行: int = int(粒子.纵坐标)
+            if 1 <= 粒子行 <= 高度 and 1 <= 粒子列 <= 宽度:
+                绘制(粒子行, 粒子列, 粒子.字符, 颜色=粒子.可见颜色)
+        刷新输出()
         时间.sleep(0.032)
 
-    bili_text: str = "哔 哩 哔 哩"
-    if 1 <= bili_row <= height:
-        text_width: int = _中日韩宽度(bili_text)
-        start_col: int = max(1, (width - text_width) // 2)
-        cur_col: int = start_col
-        for ch in bili_text:
-            ch_width: int = 2 if ord(ch) > 0x7F else 1
-            if ch != " " and cur_col + ch_width - 1 <= width:
+    哔哩文本: str = "哔 哩 哔 哩"
+    if 1 <= 哔哩行 <= 高度:
+        文本宽度: int = _中日韩宽度(哔哩文本)
+        起始列: int = max(1, (宽度 - 文本宽度) // 2)
+        当前文本列: int = 起始列
+        for 字符 in 哔哩文本:
+            字符宽度: int = 2 if ord(字符) > 0x7F else 1
+            if 字符 != " " and 当前文本列 + 字符宽度 - 1 <= 宽度:
                 for _ in range(3):
-                    put(bili_row, cur_col, rng.choice(_BR_H), color=rng.choice(theme.acc), bold=True)
-                    flush()
+                    绘制(哔哩行, 当前文本列, 随机源.choice(_盲文高密度), 颜色=随机源.choice(主题.辅色组), 加粗=True)
+                    刷新输出()
                     时间.sleep(0.016)
-                put(bili_row, cur_col, ch, color=rng.choice(theme.acc), bold=True)
-                flush()
+                绘制(哔哩行, 当前文本列, 字符, 颜色=随机源.choice(主题.辅色组), 加粗=True)
+                刷新输出()
                 时间.sleep(0.035)
-            cur_col += ch_width
+            当前文本列 += 字符宽度
 
     时间.sleep(0.24)
 
-    wipe_mode: str = rng.choice(("down", "up", "center", "split"))
-    row_order: list[int] = list(range(1, height + 1))
-    match wipe_mode:
+    擦除模式: str = 随机源.choice(("down", "up", "center", "split"))
+    行顺序: list[int] = list(range(1, 高度 + 1))
+    match 擦除模式:
         case "up":
-            row_order.reverse()
+            行顺序.reverse()
         case "center":
-            middle: int = height // 2
-            row_order.sort(key=lambda r: abs(r - middle))
+            中线: int = 高度 // 2
+            行顺序.sort(key=lambda 红: abs(红 - 中线))
         case "split":
-            top: list[int] = list(range(1, height // 2 + 1))
-            bottom: list[int] = list(range(height, height // 2, -1))
-            row_order = [r for pair in zip(top, bottom, strict=False) for r in pair]
-            row_order += top[len(bottom) :] or bottom[len(top) :]
+            上半部: list[int] = list(range(1, 高度 // 2 + 1))
+            下半部: list[int] = list(range(高度, 高度 // 2, -1))
+            行顺序 = [红 for 成对行 in zip(上半部, 下半部, strict=False) for 红 in 成对行]
+            行顺序 += 上半部[len(下半部) :] or 下半部[len(上半部) :]
         case _:
             ...
 
-    for row in row_order:
-        line: str = "".join(rng.choice(_BR_M) for _ in range(width))
-        put(row, 1, line, color=_线性插值(theme.ga, theme.gb, row / height))
-        if row % 2 == 0:
-            flush()
+    for 行 in 行顺序:
+        行文本: str = "".join(随机源.choice(_盲文中密度) for _ in range(宽度))
+        绘制(行, 1, 行文本, 颜色=_线性插值(主题.渐变甲, 主题.渐变乙, 行 / 高度))
+        if 行 % 2 == 0:
+            刷新输出()
             时间.sleep(0.005)
-    flush()
+    刷新输出()
     时间.sleep(0.06)
 
-    for row in row_order:
-        clear_row(row)
-        if row % 3 == 0:
-            flush()
+    for 行 in 行顺序:
+        清行(行)
+        if 行 % 3 == 0:
+            刷新输出()
             时间.sleep(0.0025)
-    flush()
+    刷新输出()
 
-    title_top: int = max(2, height // 2 - len(_TITLE) // 2 - 4)
-    title_left: int = max(1, (width - _TITLE_W) // 2)
+    标题上边: int = max(2, 高度 // 2 - len(_标题字形) // 2 - 4)
+    标题左边: int = max(1, (宽度 - _标题宽度) // 2)
 
-    for i, line in enumerate(_TITLE):
-        row: int = title_top + i
-        if row > height:
+    for 序号, 行文本 in enumerate(_标题字形):
+        行: int = 标题上边 + 序号
+        if 行 > 高度:
             break
-        for ci, ch in enumerate(line):
-            col: int = title_left + ci
-            if ch != " " and 1 <= col <= width:
-                put(row, col, rng.choice(_BR_H), color=_线性插值(theme.ga, theme.gb, ci / _TITLE_W))
-    flush()
+        for 列索引, 字符 in enumerate(行文本):
+            列: int = 标题左边 + 列索引
+            if 字符 != " " and 1 <= 列 <= 宽度:
+                绘制(行, 列, 随机源.choice(_盲文高密度), 颜色=_线性插值(主题.渐变甲, 主题.渐变乙, 列索引 / _标题宽度))
+    刷新输出()
     时间.sleep(0.18)
 
-    reveal_cols: list[int] = list(range(_TITLE_W))
-    reveal_mode: str = rng.choice(("ltr", "rtl", "center", "random", "wave"))
-    match reveal_mode:
+    显现列: list[int] = list(range(_标题宽度))
+    显现模式: str = 随机源.choice(("ltr", "rtl", "center", "random", "wave"))
+    match 显现模式:
         case "rtl":
-            reveal_cols.reverse()
+            显现列.reverse()
         case "center":
-            mid: int = _TITLE_W // 2
-            reveal_cols.sort(key=lambda c: abs(c - mid))
+            中列: int = _标题宽度 // 2
+            显现列.sort(key=lambda 颜色值: abs(颜色值 - 中列))
         case "random":
-            rng.shuffle(reveal_cols)
+            随机源.shuffle(显现列)
         case "wave":
-            reveal_cols.sort(key=lambda c: 数学.sin(c * 0.23) * 12 + c)
+            显现列.sort(key=lambda 颜色值: 数学.sin(颜色值 * 0.23) * 12 + 颜色值)
         case _:
             ...
 
-    batch_reveal: int = max(1, _TITLE_W // 24)
-    for block_start in range(0, len(reveal_cols), batch_reveal):
-        for ci in reveal_cols[block_start : block_start + batch_reveal]:
-            for i, line in enumerate(_TITLE):
-                row: int = title_top + i
-                if row > height or ci >= len(line):
+    显现批量: int = max(1, _标题宽度 // 24)
+    for 块起点 in range(0, len(显现列), 显现批量):
+        for 列索引 in 显现列[块起点 : 块起点 + 显现批量]:
+            for 序号, 行文本 in enumerate(_标题字形):
+                行: int = 标题上边 + 序号
+                if 行 > 高度 or 列索引 >= len(行文本):
                     continue
-                col: int = title_left + ci
-                if 1 <= col <= width:
-                    put(row, col, line[ci], color=_线性插值(theme.ga, theme.gb, ci / _TITLE_W), bold=True)
-        flush()
+                列: int = 标题左边 + 列索引
+                if 1 <= 列 <= 宽度:
+                    绘制(行, 列, 行文本[列索引], 颜色=_线性插值(主题.渐变甲, 主题.渐变乙, 列索引 / _标题宽度), 加粗=True)
+        刷新输出()
         时间.sleep(0.015)
 
-    sub_text: str = "✦ 导出我的哔哩哔哩 ✦"
-    sub_row: int = title_top + len(_TITLE) + 1
-    if sub_row <= height:
-        sub_w: int = _中日韩宽度(sub_text)
-        sub_left: int = max(1, (width - sub_w) // 2)
-        cur_col = sub_left
-        for idx, ch in enumerate(sub_text):
-            ch_w: int = 2 if ord(ch) > 0x7F else 1
-            if ch != " " and cur_col + ch_w - 1 <= width:
-                put(sub_row, cur_col, rng.choice(_SPARK), color=rng.choice(theme.acc), bold=True)
-                flush()
+    副标题文本: str = "✦ 导出我的哔哩哔哩 ✦"
+    副标题行: int = 标题上边 + len(_标题字形) + 1
+    if 副标题行 <= 高度:
+        副标题宽度: int = _中日韩宽度(副标题文本)
+        副标题左边: int = max(1, (宽度 - 副标题宽度) // 2)
+        当前文本列 = 副标题左边
+        for 索引, 字符 in enumerate(副标题文本):
+            字符列宽: int = 2 if ord(字符) > 0x7F else 1
+            if 字符 != " " and 当前文本列 + 字符列宽 - 1 <= 宽度:
+                绘制(副标题行, 当前文本列, 随机源.choice(_闪光字符), 颜色=随机源.choice(主题.辅色组), 加粗=True)
+                刷新输出()
                 时间.sleep(0.02)
-                t_ratio: float = idx / max(len(sub_text) - 1, 1)
-                put(sub_row, cur_col, ch, color=_线性插值(theme.ga, theme.gb, t_ratio), bold=True)
-                flush()
+                字符比例: float = 索引 / max(len(副标题文本) - 1, 1)
+                绘制(副标题行, 当前文本列, 字符, 颜色=_线性插值(主题.渐变甲, 主题.渐变乙, 字符比例), 加粗=True)
+                刷新输出()
                 时间.sleep(0.015)
-            cur_col += ch_w
+            当前文本列 += 字符列宽
 
-    sep_row: int = sub_row + 1 if sub_row <= height else title_top + len(_TITLE) + 1
-    if sep_row <= height:
-        sep_w: int = min(48, width - 4)
-        sep_left: int = max(1, (width - sep_w) // 2)
-        for i in range(sep_w):
-            put(sep_row, sep_left + i, rng.choice("═━─"), color=_线性插值(theme.ga, theme.gb, i / sep_w))
-        flush()
+    分隔行: int = 副标题行 + 1 if 副标题行 <= 高度 else 标题上边 + len(_标题字形) + 1
+    if 分隔行 <= 高度:
+        分隔宽度: int = min(48, 宽度 - 4)
+        分隔左边: int = max(1, (宽度 - 分隔宽度) // 2)
+        for 序号 in range(分隔宽度):
+            绘制(分隔行, 分隔左边 + 序号, 随机源.choice("═━─"), 颜色=_线性插值(主题.渐变甲, 主题.渐变乙, 序号 / 分隔宽度))
+        刷新输出()
         时间.sleep(0.08)
 
-    startup_hint: str = (
+    启动提示: str = (
         "  ✦ 服务已就绪, 浏览器即将自动打开"
-        if startup_state is not None and startup_state.started.is_set()
+        if 启动状态 is not None and 启动状态.已启动.is_set()
         else "  ✦ 服务启动中..."
     )
 
-    info_top: int = sep_row + 2
-    info_left: int = max(1, (width - 58) // 2)
-    info_lines: list[tuple[str, tuple[int, int, int]]] = [
-        (f"  ✦ 端口   │ {port}", theme.acc[0]),
-        (f"  ✦ 访问   │ http://localhost:{port}", theme.acc[1 % len(theme.acc)]),
+    信息上边: int = 分隔行 + 2
+    信息左边: int = max(1, (宽度 - 58) // 2)
+    信息行列表: list[tuple[str, tuple[int, int, int]]] = [
+        (f"  ✦ 端口   │ {端口}", 主题.辅色组[0]),
+        (f"  ✦ 访问   │ http://localhost:{端口}", 主题.辅色组[1 % len(主题.辅色组)]),
         ("", (0, 0, 0)),
-        ("  ✦ GitHub │ https://github.com/Water-Run/MyBiOut", theme.ga),
-        ("  ✦ Author │ WaterRun", theme.gb),
+        ("  ✦ 仓库   │ https://github.com/Water-Run/MyBiOut", 主题.渐变甲),
+        ("  ✦ 作者   │ WaterRun", 主题.渐变乙),
         ("", (0, 0, 0)),
-        (startup_hint, _线性插值(theme.ga, theme.gb, 0.5)),
+        (启动提示, _线性插值(主题.渐变甲, 主题.渐变乙, 0.5)),
     ]
-    for idx, (line, color) in enumerate(info_lines):
-        row: int = info_top + idx
-        if row > height or not line:
+    for 索引, (行文本, 颜色) in enumerate(信息行列表):
+        行: int = 信息上边 + 索引
+        if 行 > 高度 or not 行文本:
             continue
-        cur_col = info_left
-        for char_idx, ch in enumerate(line):
-            if cur_col > width:
+        当前文本列 = 信息左边
+        for 字符序号, 字符 in enumerate(行文本):
+            if 当前文本列 > 宽度:
                 break
-            ch_w: int = 2 if ord(ch) > 0x7F else 1
-            put(row, cur_col, ch, color=color)
-            cur_col += ch_w
-            if char_idx % 5 == 0:
-                flush()
+            字符列宽: int = 2 if ord(字符) > 0x7F else 1
+            绘制(行, 当前文本列, 字符, 颜色=颜色)
+            当前文本列 += 字符列宽
+            if 字符序号 % 5 == 0:
+                刷新输出()
                 时间.sleep(0.0045)
-        flush()
+        刷新输出()
         时间.sleep(0.02)
 
-    fireworks: list[_粒子] = []
-    for _ in range(rng.randint(3, 6)):
-        cx: float = rng.uniform(width * 0.15, width * 0.85)
-        cy: float = rng.uniform(2.0, max(3.0, float(title_top - 1)))
-        _爆发粒子(fireworks, cx, cy, rng.randint(15, 32), theme.acc, speed=7.0, life=(0.3, 1.2), spread=1.0)
+    烟花粒子: list[_粒子] = []
+    for _ in range(随机源.randint(3, 6)):
+        当前列: float = 随机源.uniform(宽度 * 0.15, 宽度 * 0.85)
+        当前行: float = 随机源.uniform(2.0, max(3.0, float(标题上边 - 1)))
+        _爆发粒子(烟花粒子, 当前列, 当前行, 随机源.randint(15, 32), 主题.辅色组, 速度=7.0, 寿命=(0.3, 1.2), 散布=1.0)
 
     for _ in range(22):
-        fireworks = [p for p in fireworks if p.step(0.05)]
-        for p in fireworks:
-            px: int = int(p.x)
-            py: int = int(p.y)
-            if 1 <= py <= height and 1 <= px <= width:
-                put(py, px, p.ch, color=p.visible_color)
-        flush()
+        烟花粒子 = [粒子 for 粒子 in 烟花粒子 if 粒子.步进(0.05)]
+        for 粒子 in 烟花粒子:
+            粒子列: int = int(粒子.横坐标)
+            粒子行: int = int(粒子.纵坐标)
+            if 1 <= 粒子行 <= 高度 and 1 <= 粒子列 <= 宽度:
+                绘制(粒子行, 粒子列, 粒子.字符, 颜色=粒子.可见颜色)
+        刷新输出()
         时间.sleep(0.03)
 
-    for _ in range(rng.randint(12, 28)):
-        sr: int = rng.randint(1, height)
-        sc: int = rng.randint(1, width)
-        put(sr, sc, rng.choice(_SPARK), color=rng.choice(theme.acc))
-    flush()
+    for _ in range(随机源.randint(12, 28)):
+        星行: int = 随机源.randint(1, 高度)
+        星列: int = 随机源.randint(1, 宽度)
+        绘制(星行, 星列, 随机源.choice(_闪光字符), 颜色=随机源.choice(主题.辅色组))
+    刷新输出()
     时间.sleep(0.2)
 
-    final_row: int = min(height, info_top + len(info_lines) + 1)
-    w(_定位(final_row, 1) + _SHOW_CUR + _RST)
-    flush()
+    收尾行: int = min(高度, 信息上边 + len(信息行列表) + 1)
+    写入(_定位(收尾行, 1) + _显示光标 + _重置样式)
+    刷新输出()
 
 
-_BANNER_FALLBACK: str = r"""
+_备用标题: str = r"""
   __  __       ____  _  ___        _   _
  |  \/  |_   _| __ )(_)/ _ \ _   _| |_| |
  | |\/| | | | |  _ \| | | | | | | | __| |
@@ -1022,107 +1034,85 @@ def 主程序() -> None:
     """
     _配置文本输出()
 
-    default_port: int = 取端口()
+    默认端口: int = 取端口()
 
-    parser: 参数解析.ArgumentParser = 参数解析.ArgumentParser(
+    解析器: 参数解析.ArgumentParser = _中文参数解析器(
         prog="MyBiOut!",
         description="MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集",
     )
-    parser.add_argument(
+    解析器.add_argument(
         "--port",
         type=int,
-        default=default_port,
-        help=f"指定服务端口号 (默认: {default_port})",
+        default=默认端口,
+        help=f"指定服务端口号 (默认: {默认端口})",
     )
-    args: 参数解析.Namespace = parser.parse_args()
-    port: int = args.port
+    参数: 参数解析.Namespace = 解析器.parse_args()
+    端口: int = 参数.port
 
     # ===== 环境检查 =====
-    env_checks: list[_环境项] = _检查环境()
-    env_missing: list[_环境项] = _取启动阻断项(env_checks)
+    环境检查列表: list[_环境项] = _检查环境()
+    缺失环境项: list[_环境项] = _取启动阻断项(环境检查列表)
 
-    if env_missing:
+    if 缺失环境项:
         # 环境缺失 → 创建预失败状态 → 动画将坠机
-        missing_names: str = ", ".join(c.name for c in env_missing)
-        startup_state: _服务启动状态 = _服务启动状态()
-        startup_state.mark_failed(f"缺少必需组件: {missing_names}")
+        缺失名称: str = ", ".join(检查项.名称 for 检查项 in 缺失环境项)
+        启动状态: _服务启动状态 = _服务启动状态()
+        启动状态.标记失败(f"缺少必需组件: {缺失名称}")
     else:
-        startup_state = _后台启动服务(port)
+        启动状态 = _后台启动服务(端口)
 
-    animation_error: Exception | None = None
+    动画错误: Exception | None = None
 
     try:
-        _播放动画(port, startup_state)
+        _播放动画(端口, 启动状态)
     except Exception as e:
-        animation_error = e
+        动画错误 = e
 
-    if startup_state.failed.is_set():
-        print(_BANNER_FALLBACK)
-        print(f"  ✦ 端口: {port}")
-        print(f"  ✦ 启动失败: {startup_state.reason or '未知原因'}")
-        if env_missing:
-            _打印环境详情(env_checks)
+    if 启动状态.已失败.is_set():
+        print(_备用标题)
+        print(f"  ✦ 端口: {端口}")
+        print(f"  ✦ 启动失败: {启动状态.原因 or '未知原因'}")
+        if 缺失环境项:
+            _打印环境详情(环境检查列表)
         else:
             print("  ✦ 请检查端口占用/配置后重试")
             print()
         return
 
-    if animation_error is not None:
-        print(_BANNER_FALLBACK)
-        print(f"  ✦ 端口: {port}")
-        print(f"  ✦ 访问: http://localhost:{port}")
-        print("  ✦ GitHub: https://github.com/Water-Run/MyBiOut")
-        print("  ✦ Author: WaterRun")
+    if 动画错误 is not None:
+        print(_备用标题)
+        print(f"  ✦ 端口: {端口}")
+        print(f"  ✦ 访问: http://localhost:{端口}")
+        print("  ✦ 仓库: https://github.com/Water-Run/MyBiOut")
+        print("  ✦ 作者: WaterRun")
         print()
 
-    if not _等待服务启动(startup_state, timeout=25.0):
-        print(_BANNER_FALLBACK)
-        print(f"  ✦ 端口: {port}")
-        print(f"  ✦ 启动失败: {startup_state.reason or '服务启动超时'}")
+    if not _等待服务启动(启动状态, 超时=25.0):
+        print(_备用标题)
+        print(f"  ✦ 端口: {端口}")
+        print(f"  ✦ 启动失败: {启动状态.原因 or '服务启动超时'}")
         print()
         return
 
-    def _open_browser() -> None:
+    def _打开浏览器() -> None:
         r"""
         延迟后自动打开浏览器访问地址
         :return: None: 无返回值
         """
         时间.sleep(0.35)
-        浏览器.open(f"http://localhost:{port}")
+        浏览器.open(f"http://localhost:{端口}")
 
-    线程.Thread(target=_open_browser, daemon=True).start()
+    线程.Thread(target=_打开浏览器, daemon=True).start()
 
     try:
-        while startup_state.thread is not None and startup_state.thread.is_alive():
+        while 启动状态.线程对象 is not None and 启动状态.线程对象.is_alive():
             时间.sleep(0.2)
     except KeyboardInterrupt:
-        if startup_state.server is not None:
-            startup_state.server.should_exit = True
-        if startup_state.thread is not None:
-            startup_state.thread.join(timeout=5.0)
+        if 启动状态.服务 is not None:
+            启动状态.服务.should_exit = True
+        if 启动状态.线程对象 is not None:
+            启动状态.线程对象.join(timeout=5.0)
 
-
-_EnvItem = _环境项
-_configure_text_output = _配置文本输出
-_check_environment = _检查环境
-_print_env_detail = _打印环境详情
-_get_startup_blockers = _取启动阻断项
-_ServerStartupState = _服务启动状态
-_probe_port_bind_error = _探测端口绑定错误
-_start_server_in_background = _后台启动服务
-_wait_server_startup = _等待服务启动
-_at = _定位
-_fg = _前景色
-_lerp = _线性插值
-_fade = _淡化
-_cjk_len = _中日韩宽度
-_Theme = _主题
-_Particle = _粒子
-_burst = _爆发粒子
-_play_animation = _播放动画
-_ROTORS = _旋翼帧
-_BODY = _机身帧
-main = 主程序
 
 if __name__ == "__main__":
     主程序()

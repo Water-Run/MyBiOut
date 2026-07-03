@@ -42,7 +42,7 @@ dependencies = [
 dev = ["pytest>=8.0.0", "ruff>=0.1.0"]
 
 [project.scripts]
-"MyBiOut!" = "mybiout.main:main"
+"MyBiOut!" = "mybiout.main:主程序"
 
 [project.urls]
 Homepage = "https://github.com/Water-Run/MyBiOut"

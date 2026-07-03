@@ -6,9 +6,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from mybiout.pages.apis import app
+from mybiout.pages.apis import 应用
 
 ROOT = Path(__file__).resolve().parent.parent
+
+_内联事件函数正则 = re.compile(
+    r"\b(?:onclick|ondblclick|onchange|oninput|onblur|onkeydown)=\"[^\"]*?([\w\u4e00-\u9fff]+)\s*\("
+)
+_允许英文定义名 = {"format_help"}
 
 
 def _树(path: str) -> ast.Module:
@@ -36,6 +41,73 @@ def _函数名(path: str) -> set[str]:
     }
 
 
+def _英文标识符(path: Path) -> list[tuple[int, str, str]]:
+    语法树 = ast.parse(path.read_text(encoding="utf-8"))
+    结果: list[tuple[int, str, str]] = []
+    for 节点 in ast.walk(语法树):
+        if (
+            isinstance(节点, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+            and 节点.name.isascii()
+            and any(字符.isalpha() for 字符 in 节点.name)
+            and not (节点.name.startswith("__") and 节点.name.endswith("__"))
+            and 节点.name not in _允许英文定义名
+        ):
+            结果.append((节点.lineno, "定义", 节点.name))
+        elif (
+            isinstance(节点, ast.Name)
+            and isinstance(节点.ctx, ast.Store | ast.Param)
+            and 节点.id.isascii()
+            and any(字符.isalpha() for 字符 in 节点.id)
+            and not (节点.id.startswith("__") and 节点.id.endswith("__"))
+        ):
+            结果.append((节点.lineno, "名称", 节点.id))
+        elif (
+            isinstance(节点, ast.arg)
+            and 节点.arg.isascii()
+            and any(字符.isalpha() for 字符 in 节点.arg)
+            and not (节点.arg.startswith("__") and 节点.arg.endswith("__"))
+        ):
+            结果.append((节点.lineno, "参数", 节点.arg))
+    return 结果
+
+
+def _中文内联事件函数(html: str) -> set[str]:
+    return {name for name in _内联事件函数正则.findall(html) if re.search(r"[\u4e00-\u9fff]", name)}
+
+
+def test_mybiout_python_identifiers_are_chinese() -> None:
+    残留: dict[str, list[tuple[int, str, str]]] = {}
+    for 路径对象 in sorted((ROOT / "mybiout").rglob("*.py")):
+        if "__pycache__" in 路径对象.parts:
+            continue
+        当前残留 = _英文标识符(路径对象)
+        if 当前残留:
+            残留[str(路径对象.relative_to(ROOT))] = 当前残留
+
+    assert 残留 == {}
+
+
+def test_chinese_inline_event_handlers_are_exported_to_window() -> None:
+    pages = [
+        "mybiout/pages/bbdown/bbdown.html",
+        "mybiout/pages/localout/localout.html",
+        "mybiout/pages/man/man.html",
+        "mybiout/pages/mdout/mdout.html",
+        "mybiout/pages/ohmyconfig/ohmyconfig.html",
+    ]
+
+    missing_by_page: dict[str, list[str]] = {}
+    for path in pages:
+        html = (ROOT / path).read_text(encoding="utf-8")
+        missing = sorted(
+            name for name in _中文内联事件函数(html) if f"window.{name} =" not in html
+        )
+        if missing:
+            missing_by_page[path] = missing
+
+    assert missing_by_page == {}
+
+
 def test_python_core_modules_use_chinese_import_aliases() -> None:
     expected = {
         "mybiout/__init__.py": {"sys": "系统"},
@@ -52,6 +124,7 @@ def test_python_core_modules_use_chinese_import_aliases() -> None:
             "pathlib.Path": "路径",
             "typing.Any": "任意",
             "fastapi.FastAPI": "快速应用",
+            "fastapi.Path": "路径参数",
             "fastapi.Request": "请求",
             "fastapi.Response": "响应",
             "fastapi.responses.HTMLResponse": "网页响应",
@@ -66,20 +139,20 @@ def test_python_core_modules_use_chinese_import_aliases() -> None:
             assert actual.get(imported) == chinese_alias, f"{path}: {imported}"
 
 
-def test_core_business_names_are_chinese_with_english_compatibility_aliases() -> None:
+def test_core_business_names_are_chinese() -> None:
     from mybiout import main as 主入口
     from mybiout.pages import utils as 工具
     from mybiout.pages.ohmyconfig import ohmyconfig as 设置页
 
-    assert 工具.get_setting is 工具.取设置
-    assert 工具.set_setting is 工具.设设置
-    assert 工具.get_all_settings is 工具.取全部设置
-    assert 设置页.validate_and_save is 设置页.校验并保存
-    assert 设置页.get_settings is 设置页.取设置
-    assert 主入口.main is 主入口.主程序
-    assert 主入口._EnvItem is 主入口._环境项
-    assert 主入口._get_startup_blockers is 主入口._取启动阻断项
-    assert 主入口._ROTORS is 主入口._旋翼帧
+    assert callable(工具.取设置)
+    assert callable(工具.设设置)
+    assert callable(工具.取全部设置)
+    assert callable(设置页.校验并保存)
+    assert callable(设置页.取设置)
+    assert callable(主入口.主程序)
+    assert 主入口._环境项("ffmpeg", True, "").可用 is True
+    assert 主入口._取启动阻断项([]) == []
+    assert 主入口._旋翼帧
 
     assert {"取设置", "设设置", "重置全部设置"} <= _函数名("mybiout/pages/utils.py")
     assert {"校验并保存", "浏览文件夹", "自动获取会话数据"} <= _函数名(
@@ -89,22 +162,68 @@ def test_core_business_names_are_chinese_with_english_compatibility_aliases() ->
     assert {"_环境项", "_服务启动状态", "_播放动画", "主程序"} <= _函数名("mybiout/main.py")
 
 
-def test_feature_modules_use_chinese_service_names_with_compatibility_aliases() -> None:
+def test_main_startup_internals_keep_chinese_names() -> None:
+    source = (ROOT / "mybiout/main.py").read_text(encoding="utf-8")
+
+    forbidden = [
+        "_BIN_DIR",
+        "_CSI",
+        "_HIDE_CUR",
+        "_SHOW_CUR",
+        "_CLR_SCR",
+        "_RST",
+        "_BOLD",
+        "_BR_L",
+        "_BR_M",
+        "_BR_H",
+        "_SPARK",
+        "_MAX_PARTICLES",
+        "ffmpeg_found",
+        "bbdown_found",
+        "biliffm4s_found",
+        "for c in checks",
+    ]
+    for name in forbidden:
+        assert name not in source, name
+
+    expected = [
+        "_程序工具目录",
+        "_控制序列引导",
+        "_隐藏光标",
+        "_显示光标",
+        "_清屏",
+        "_重置样式",
+        "_加粗样式",
+        "_盲文低密度",
+        "_盲文中密度",
+        "_盲文高密度",
+        "_闪光字符",
+        "_最大粒子数",
+        "找到FFmpeg",
+        "找到BBDown",
+        "找到biliffm4s",
+        "for 检查项 in 检查列表",
+    ]
+    for name in expected:
+        assert name in source, name
+
+
+def test_feature_modules_use_chinese_service_names() -> None:
     from mybiout.pages.bbdown import bbdown as 下载页
     from mybiout.pages.localout import localout as 本地页
     from mybiout.pages.man import man as 手册页
     from mybiout.pages.mdout import mdout as 文档页
 
-    assert 本地页.VideoCard is 本地页.视频卡片
-    assert 本地页.get_state is 本地页.取状态
-    assert 本地页.add_source is 本地页.添加来源
-    assert 下载页.BBDownTask is 下载页.下载任务
-    assert 下载页.get_state is 下载页.取状态
-    assert 下载页.add_task is 下载页.添加任务
-    assert 文档页.MdCard is 文档页.文档卡片
-    assert 文档页.add_and_fetch is 文档页.添加并获取
-    assert 手册页.chat is 手册页.对话
-    assert 手册页._build_messages is 手册页._构建消息
+    assert 本地页.视频卡片
+    assert callable(本地页.取状态)
+    assert callable(本地页.添加来源)
+    assert 下载页.下载任务
+    assert callable(下载页.取状态)
+    assert callable(下载页.添加任务)
+    assert 文档页.文档卡片
+    assert callable(文档页.添加并获取)
+    assert callable(手册页.对话)
+    assert callable(手册页._构建消息)
 
     assert {"视频卡片", "_本地状态", "_扫描ADB设备", "添加来源", "开始导出"} <= _函数名(
         "mybiout/pages/localout/localout.py"
@@ -121,7 +240,7 @@ def test_feature_modules_use_chinese_service_names_with_compatibility_aliases() 
 
 
 def test_external_http_contract_remains_unchanged() -> None:
-    client = TestClient(app, raise_server_exceptions=False)
+    client = TestClient(应用, raise_server_exceptions=False)
 
     for path in ["/", "/localout", "/bbdown", "/mdout", "/ohmyconfig", "/man"]:
         response = client.get(path)
@@ -140,6 +259,9 @@ def test_external_http_contract_remains_unchanged() -> None:
     invalid = client.post("/api/setting", content="{bad json", headers={"content-type": "application/json"})
     assert invalid.status_code == 400
     assert invalid.json() == {"ok": False, "error": "请求体不是合法 JSON"}
+
+    missing_cover = client.get("/api/localout/cover/not-found")
+    assert missing_cover.status_code == 404
 
 
 def test_api_routes_import_chinese_implementations_without_renaming_paths() -> None:
@@ -161,6 +283,17 @@ def test_api_routes_import_chinese_implementations_without_renaming_paths() -> N
     assert "import add_task" not in source
     assert "import chat_stream_sse" not in source
     assert not re.search(r"from mybiout\.pages\..* import [A-Za-z_]+$", source, flags=re.MULTILINE)
+
+
+def test_fastapi_path_parameter_names_are_framework_safe() -> None:
+    不安全路径: list[str] = []
+    for 路由 in 应用.routes:
+        路径文本 = getattr(路由, "path", "")
+        for 参数名 in re.findall(r"{([^}]+)}", 路径文本):
+            if not 参数名.isascii():
+                不安全路径.append(路径文本)
+
+    assert 不安全路径 == []
 
 
 def test_entry_animation_internal_script_names_are_chinese() -> None:

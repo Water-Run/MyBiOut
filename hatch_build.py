@@ -28,6 +28,3 @@ class 平台检查钩子(BuildHookInterface):
         if self.target_name == "wheel":
             构建数据["pure_python"] = False
             构建数据["tag"] = "py3-none-win_amd64"
-
-
-PlatformCheckHook = 平台检查钩子

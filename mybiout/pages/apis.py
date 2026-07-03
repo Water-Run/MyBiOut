@@ -10,6 +10,7 @@ from pathlib import Path as 路径
 from typing import Any as 任意
 
 from fastapi import FastAPI as 快速应用
+from fastapi import Path as 路径参数
 from fastapi import Request as 请求
 from fastapi import Response as 响应
 from fastapi.responses import HTMLResponse as 网页响应
@@ -21,7 +22,6 @@ _资源目录: 路径 = _页面目录.parent / "assets"
 
 应用: 快速应用 = 快速应用(title="MyBiOut!", version="0.1.0")
 应用.mount("/assets", 静态文件(directory=str(_资源目录)), name="assets")
-app = 应用
 
 
 class _无效JSON请求体(ValueError):
@@ -29,56 +29,56 @@ class _无效JSON请求体(ValueError):
 
 
 @应用.exception_handler(_无效JSON请求体)
-async def _无效JSON处理器(_request: 请求, _exc: _无效JSON请求体) -> 数据响应:
+async def _无效JSON处理器(_请求: 请求, _异常: _无效JSON请求体) -> 数据响应:
     return 数据响应(status_code=400, content={"ok": False, "error": "请求体不是合法 JSON"})
 
 
-def _读取网页(relative_path: str) -> 网页响应:
+def _读取网页(相对路径: str) -> 网页响应:
     r"""
     读取 HTML 文件并返回 HTMLResponse
-    :param: relative_path: 相对于 pages 目录的路径
+    :param: 相对路径: 相对于 pages 目录的路径
     :return: HTMLResponse: 页面内容
     """
-    html_path: 路径 = _页面目录 / relative_path
-    html_text: str = html_path.read_text(encoding="utf-8")
-    return 网页响应(html_text)
+    网页路径: 路径 = _页面目录 / 相对路径
+    网页文本: str = 网页路径.read_text(encoding="utf-8")
+    return 网页响应(网页文本)
 
 
-async def _读取数据字典(request: 请求) -> dict[str, 任意]:
+async def _读取数据字典(请求对象: 请求) -> dict[str, 任意]:
     r"""
     将请求体读取为 JSON 对象字典
-    :param: request: FastAPI 请求对象
+    :param: 请求对象: FastAPI 请求对象
     :return: dict[str, Any]: JSON 字典, 若非对象则返回空字典
     """
     try:
-        payload: 任意 = await request.json()
+        载荷: 任意 = await 请求对象.json()
     except Exception as e:
         raise _无效JSON请求体 from e
-    return payload if isinstance(payload, dict) else {}
+    return 载荷 if isinstance(载荷, dict) else {}
 
 
-def _转字符串(value: 任意) -> str:
+def _转字符串(值: 任意) -> str:
     r"""
     将任意值安全转换为字符串
-    :param: value: 任意输入值
+    :param: 值: 任意输入值
     :return: str: 转换后的字符串
     """
-    if isinstance(value, str):
-        return value
-    if value is None:
+    if isinstance(值, str):
+        return 值
+    if 值 is None:
         return ""
-    return str(value)
+    return str(值)
 
 
-def _转字符串列表(value: 任意) -> list[str]:
+def _转字符串列表(值: 任意) -> list[str]:
     r"""
     将任意值安全转换为字符串列表
-    :param: value: 任意输入值
+    :param: 值: 任意输入值
     :return: list[str]: 字符串列表
     """
-    if not isinstance(value, list):
+    if not isinstance(值, list):
         return []
-    return [_转字符串(item) for item in value]
+    return [_转字符串(项) for 项 in 值]
 
 
 @应用.get("/", response_class=网页响应)
@@ -147,22 +147,22 @@ async def 取设置接口() -> dict[str, dict[str, str]]:
 
 
 @应用.post("/api/setting")
-async def 保存设置接口(request: 请求) -> 响应:
+async def 保存设置接口(请求对象: 请求) -> 响应:
     r"""
     保存单项设置
-    :param: request: 请求对象, body 包含 section/key/value
+    :param: 请求对象: 请求对象, body 包含 section/key/value
     :return: Response: JSON 响应, 成功 200, 失败 400
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    section: str = _转字符串(body.get("section", ""))
-    key: str = _转字符串(body.get("key", ""))
-    value: str = _转字符串(body.get("value", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    分区: str = _转字符串(请求体.get("section", ""))
+    键: str = _转字符串(请求体.get("key", ""))
+    值: str = _转字符串(请求体.get("value", ""))
 
     from mybiout.pages.ohmyconfig.ohmyconfig import 校验并保存
 
-    result: dict[str, bool | str] = 校验并保存(section, key, value)
-    status_code: int = 200 if bool(result.get("ok")) else 400
-    return 数据响应(status_code=status_code, content=result)
+    结果: dict[str, bool | str] = 校验并保存(分区, 键, 值)
+    状态码: int = 200 if bool(结果.get("ok")) else 400
+    return 数据响应(status_code=状态码, content=结果)
 
 
 @应用.post("/api/browse-folder")
@@ -173,8 +173,8 @@ def 浏览文件夹接口() -> dict[str, bool | str]:
     """
     from mybiout.pages.ohmyconfig.ohmyconfig import 浏览文件夹
 
-    path: str | None = 浏览文件夹()
-    return {"ok": True, "path": path} if path else {"ok": False}
+    目录路径: str | None = 浏览文件夹()
+    return {"ok": True, "path": 目录路径} if 目录路径 else {"ok": False}
 
 
 @应用.get("/api/desktop-path")
@@ -240,27 +240,27 @@ def 本地导出浏览本地() -> dict[str, bool | str]:
     """
     from mybiout.pages.localout.localout import 浏览本地
 
-    path: str | None = 浏览本地()
-    return {"ok": True, "path": path} if path else {"ok": False}
+    目录路径: str | None = 浏览本地()
+    return {"ok": True, "path": 目录路径} if 目录路径 else {"ok": False}
 
 
 @应用.post("/api/localout/add-source")
-async def 本地导出添加来源(request: 请求) -> dict[str, 任意]:
+async def 本地导出添加来源(请求对象: 请求) -> dict[str, 任意]:
     r"""
     添加扫描源
-    :param: request: 请求对象, body 包含 source_type/path/label/serial/package
+    :param: 请求对象: 请求对象, body 包含 source_type/path/label/serial/package
     :return: dict[str, Any]: 添加结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
 
     from mybiout.pages.localout.localout import 添加来源
 
     return 添加来源(
-        source_type=_转字符串(body.get("source_type", "")),
-        path=_转字符串(body.get("path", "")),
-        label=_转字符串(body.get("label", "")),
-        serial=_转字符串(body.get("serial", "")),
-        package=_转字符串(body.get("package", "")),
+        来源类型=_转字符串(请求体.get("source_type", "")),
+        路径文本=_转字符串(请求体.get("path", "")),
+        标签=_转字符串(请求体.get("label", "")),
+        序列号=_转字符串(请求体.get("serial", "")),
+        包名=_转字符串(请求体.get("package", "")),
     )
 
 
@@ -301,49 +301,49 @@ async def 本地导出取消扫描() -> dict[str, bool]:
 
 
 @应用.post("/api/localout/add-to-tasks")
-async def 本地导出加入任务(request: 请求) -> dict[str, 任意]:
+async def 本地导出加入任务(请求对象: 请求) -> dict[str, 任意]:
     r"""
     将源卡片添加到任务栏
-    :param: request: 请求对象, body 包含 card_ids
+    :param: 请求对象: 请求对象, body 包含 card_ids
     :return: dict[str, Any]: 添加结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    card_ids: list[str] = _转字符串列表(body.get("card_ids", []))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    卡片编号列表: list[str] = _转字符串列表(请求体.get("card_ids", []))
 
     from mybiout.pages.localout.localout import 加入任务
 
-    return 加入任务(card_ids)
+    return 加入任务(卡片编号列表)
 
 
 @应用.post("/api/localout/remove-source")
-async def 本地导出移除来源(request: 请求) -> dict[str, bool]:
+async def 本地导出移除来源(请求对象: 请求) -> dict[str, bool]:
     r"""
     移除指定源卡片
-    :param: request: 请求对象, body 包含 card_ids
+    :param: 请求对象: 请求对象, body 包含 card_ids
     :return: dict[str, bool]: 操作结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    card_ids: list[str] = _转字符串列表(body.get("card_ids", []))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    卡片编号列表: list[str] = _转字符串列表(请求体.get("card_ids", []))
 
     from mybiout.pages.localout.localout import 移除来源卡片
 
-    移除来源卡片(card_ids)
+    移除来源卡片(卡片编号列表)
     return {"ok": True}
 
 
 @应用.post("/api/localout/remove-tasks")
-async def 本地导出移除任务(request: 请求) -> dict[str, bool]:
+async def 本地导出移除任务(请求对象: 请求) -> dict[str, bool]:
     r"""
     移除指定任务卡片
-    :param: request: 请求对象, body 包含 card_ids
+    :param: 请求对象: 请求对象, body 包含 card_ids
     :return: dict[str, bool]: 操作结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    card_ids: list[str] = _转字符串列表(body.get("card_ids", []))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    卡片编号列表: list[str] = _转字符串列表(请求体.get("card_ids", []))
 
     from mybiout.pages.localout.localout import 移除任务卡片
 
-    移除任务卡片(card_ids)
+    移除任务卡片(卡片编号列表)
     return {"ok": True}
 
 
@@ -384,30 +384,30 @@ async def 本地导出清空完成() -> dict[str, bool]:
 
 
 @应用.post("/api/localout/start-export")
-async def 本地导出开始导出(request: 请求) -> dict[str, 任意]:
+async def 本地导出开始导出(请求对象: 请求) -> dict[str, 任意]:
     r"""
     开始导出任务
-    :param: request: 请求对象, body 包含 card_ids
+    :param: 请求对象: 请求对象, body 包含 card_ids
     :return: dict[str, Any]: 导出结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    card_ids: list[str] = _转字符串列表(body.get("card_ids", []))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    卡片编号列表: list[str] = _转字符串列表(请求体.get("card_ids", []))
 
     from mybiout.pages.localout.localout import 开始导出
 
-    return 开始导出(card_ids)
+    return 开始导出(卡片编号列表)
 
 
 @应用.get("/api/localout/cover/{card_id}")
-async def 本地导出封面(card_id: str) -> 响应:
+async def 本地导出封面(卡片编号: str = 路径参数(alias="card_id")) -> 响应:
     r"""
     返回指定卡片的封面图片
     """
     from mybiout.pages.localout.localout import 取封面字节
 
-    if result := 取封面字节(card_id):
-        data, ct = result
-        return 响应(content=data, media_type=ct, headers={"Cache-Control": "max-age=300"})
+    if 结果 := 取封面字节(卡片编号):
+        数据, 内容类型 = 结果
+        return 响应(content=数据, media_type=内容类型, headers={"Cache-Control": "max-age=300"})
     return 响应(status_code=404)
 
 
@@ -446,21 +446,21 @@ async def 下载环境检查() -> dict[str, 任意]:
 
 
 @应用.post("/api/bbdown/add")
-async def 下载添加任务(request: 请求) -> 响应:
+async def 下载添加任务(请求对象: 请求) -> 响应:
     r"""
     添加 BBDown 下载任务
-    :param: request: 请求对象, body 包含 url/options
+    :param: 请求对象: 请求对象, body 包含 url/options
     :return: Response: JSON 响应, 成功 200, 失败 400
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    url: str = _转字符串(body.get("url", ""))
-    options: 任意 = body.get("options")
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    链接: str = _转字符串(请求体.get("url", ""))
+    选项: 任意 = 请求体.get("options")
 
     from mybiout.pages.bbdown.bbdown import 添加任务
 
-    result: dict[str, 任意] = 添加任务(url, options)
-    status_code: int = 200 if bool(result.get("ok")) else 400
-    return 数据响应(status_code=status_code, content=result)
+    结果: dict[str, 任意] = 添加任务(链接, 选项)
+    状态码: int = 200 if bool(结果.get("ok")) else 400
+    return 数据响应(status_code=状态码, content=结果)
 
 
 @应用.post("/api/bbdown/cancel")
@@ -476,33 +476,33 @@ async def 下载取消当前() -> dict[str, bool]:
 
 
 @应用.post("/api/bbdown/retry")
-async def 下载重试任务(request: 请求) -> dict[str, 任意]:
+async def 下载重试任务(请求对象: 请求) -> dict[str, 任意]:
     r"""
     重试失败的 BBDown 任务
-    :param: request: 请求对象, body 包含 task_id
+    :param: 请求对象: 请求对象, body 包含 task_id
     :return: dict[str, Any]: 操作结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    task_id: str = _转字符串(body.get("task_id", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    任务编号: str = _转字符串(请求体.get("task_id", ""))
 
     from mybiout.pages.bbdown.bbdown import 重试任务
 
-    return 重试任务(task_id)
+    return 重试任务(任务编号)
 
 
 @应用.post("/api/bbdown/remove")
-async def 下载移除任务(request: 请求) -> dict[str, bool]:
+async def 下载移除任务(请求对象: 请求) -> dict[str, bool]:
     r"""
     移除 BBDown 任务
-    :param: request: 请求对象, body 包含 task_id
+    :param: 请求对象: 请求对象, body 包含 task_id
     :return: dict[str, bool]: 操作结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    task_id: str = _转字符串(body.get("task_id", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    任务编号: str = _转字符串(请求体.get("task_id", ""))
 
     from mybiout.pages.bbdown.bbdown import 移除任务
 
-    移除任务(task_id)
+    移除任务(任务编号)
     return {"ok": True}
 
 
@@ -554,66 +554,66 @@ async def 文档导出状态() -> dict[str, 任意]:
 
 
 @应用.post("/api/mdout/parse")
-async def 文档导出解析(request: 请求) -> dict[str, 任意]:
+async def 文档导出解析(请求对象: 请求) -> dict[str, 任意]:
     r"""
     解析输入文本识别类型
-    :param: request: 请求对象, body 包含 text
+    :param: 请求对象: 请求对象, body 包含 text
     :return: dict[str, Any]: 解析结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    text: str = _转字符串(body.get("text", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    文本: str = _转字符串(请求体.get("text", ""))
 
     from mybiout.pages.mdout.mdout import 执行解析
 
-    return 执行解析(text)
+    return 执行解析(文本)
 
 
 @应用.post("/api/mdout/add")
-async def 文档导出添加(request: 请求) -> 响应:
+async def 文档导出添加(请求对象: 请求) -> 响应:
     r"""
     添加 MdOut 获取任务
-    :param: request: 请求对象, body 包含 text
+    :param: 请求对象: 请求对象, body 包含 text
     :return: Response: JSON 响应, 成功 200, 失败 400
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    text: str = _转字符串(body.get("text", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    文本: str = _转字符串(请求体.get("text", ""))
 
     from mybiout.pages.mdout.mdout import 添加并获取
 
-    result: dict[str, 任意] = 添加并获取(text)
-    status_code: int = 200 if bool(result.get("ok")) else 400
-    return 数据响应(status_code=status_code, content=result)
+    结果: dict[str, 任意] = 添加并获取(文本)
+    状态码: int = 200 if bool(结果.get("ok")) else 400
+    return 数据响应(status_code=状态码, content=结果)
 
 
 @应用.post("/api/mdout/select")
-async def 文档导出选择(request: 请求) -> dict[str, bool]:
+async def 文档导出选择(请求对象: 请求) -> dict[str, bool]:
     r"""
     选中 MdOut 卡片以预览
-    :param: request: 请求对象, body 包含 card_id
+    :param: 请求对象: 请求对象, body 包含 card_id
     :return: dict[str, bool]: 操作结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    card_id: str = _转字符串(body.get("card_id", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    卡片编号: str = _转字符串(请求体.get("card_id", ""))
 
     from mybiout.pages.mdout.mdout import 选择卡片
 
-    选择卡片(card_id)
+    选择卡片(卡片编号)
     return {"ok": True}
 
 
 @应用.post("/api/mdout/export")
-async def 文档导出执行(request: 请求) -> dict[str, 任意]:
+async def 文档导出执行(请求对象: 请求) -> dict[str, 任意]:
     r"""
     导出指定 MdOut 卡片
-    :param: request: 请求对象, body 包含 card_ids
+    :param: 请求对象: 请求对象, body 包含 card_ids
     :return: dict[str, Any]: 导出结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    card_ids: list[str] = _转字符串列表(body.get("card_ids", []))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    卡片编号列表: list[str] = _转字符串列表(请求体.get("card_ids", []))
 
     from mybiout.pages.mdout.mdout import 导出卡片
 
-    return 导出卡片(card_ids)
+    return 导出卡片(卡片编号列表)
 
 
 @应用.post("/api/mdout/export-all")
@@ -628,18 +628,18 @@ async def 文档导出全部() -> dict[str, 任意]:
 
 
 @应用.post("/api/mdout/remove")
-async def 文档导出移除(request: 请求) -> dict[str, bool]:
+async def 文档导出移除(请求对象: 请求) -> dict[str, bool]:
     r"""
     移除指定 MdOut 卡片
-    :param: request: 请求对象, body 包含 card_ids
+    :param: 请求对象: 请求对象, body 包含 card_ids
     :return: dict[str, bool]: 操作结果
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    card_ids: list[str] = _转字符串列表(body.get("card_ids", []))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    卡片编号列表: list[str] = _转字符串列表(请求体.get("card_ids", []))
 
     from mybiout.pages.mdout.mdout import 移除卡片
 
-    移除卡片(card_ids)
+    移除卡片(卡片编号列表)
     return {"ok": True}
 
 
@@ -668,51 +668,51 @@ async def 文档导出清空完成() -> dict[str, bool]:
 
 
 @应用.post("/api/man/chat")
-async def 手册对话(request: 请求) -> dict[str, 任意]:
+async def 手册对话(请求对象: 请求) -> dict[str, 任意]:
     r"""
     Man 页面 AI 对话接口
-    :param: request: 请求对象, body 包含 prompt 和可选 force_bs
+    :param: 请求对象: 请求对象, body 包含 prompt 和可选 force_bs
     :return: dict[str, Any]: 对话结果, 包含 reply/source/note
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    prompt: str = _转字符串(body.get("prompt", ""))
-    force_bs: bool = bool(body.get("force_bs", False))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    提示词: str = _转字符串(请求体.get("prompt", ""))
+    直接说: bool = bool(请求体.get("force_bs", False))
 
     from mybiout.pages.man.man import 对话
 
-    return 对话(prompt, force_bs=force_bs)
+    return 对话(提示词, 直接说=直接说)
 
 
 @应用.post("/api/open-explorer")
-async def 打开资源管理器接口(request: 请求) -> dict[str, bool | str]:
+async def 打开资源管理器接口(请求对象: 请求) -> dict[str, bool | str]:
     r"""
     在资源管理器中定位文件
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    path: str = _转字符串(body.get("path", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    路径文本: str = _转字符串(请求体.get("path", ""))
 
     from mybiout.pages.bbdown.bbdown import 在资源管理器中打开
 
-    return 在资源管理器中打开(path)
+    return 在资源管理器中打开(路径文本)
 
 
 @应用.post("/api/auto-sessdata")
-async def 自动会话数据接口(request: 请求) -> dict[str, 任意]:
+async def 自动会话数据接口(请求对象: 请求) -> dict[str, 任意]:
     r"""
     通过扫码登录获取 SESSDATA:
     action: "launch_login"
     """
-    body: dict[str, 任意] = await _读取数据字典(request)
-    action: str = _转字符串(body.get("action", "launch_login"))
-    user_agent = request.headers.get("user-agent", "")
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    动作: str = _转字符串(请求体.get("action", "launch_login"))
+    用户代理 = 请求对象.headers.get("user-agent", "")
 
     from mybiout.pages.ohmyconfig import ohmyconfig as 设置模块
 
-    if action == "launch_login":
-        取会话数据 = 设置模块._auto_get_sessdata_via_login
-        result = 取会话数据(user_agent, timeout_sec=180)
-        if result:
-            return {"status": "success", "sessdata": result}
+    if 动作 == "launch_login":
+        取会话数据 = 设置模块.通过登录自动取会话数据
+        结果 = 取会话数据(用户代理, 超时秒数=180)
+        if 结果:
+            return {"status": "success", "sessdata": 结果}
         return {"status": "failed", "error": "扫码登录超时或窗口被关闭"}
 
     return {"status": "failed", "error": "已移除浏览器 Cookie 自动提取能力，请使用扫码登录"}
@@ -740,82 +740,19 @@ async def 文档导出打开目录() -> dict[str, bool | str]:
 
 
 @应用.post("/api/man/chat-stream")
-async def 手册流式对话(request: 请求):
+async def 手册流式对话(请求对象: 请求):
     r"""
     Man 页面 AI 流式对话接口 (SSE)
     """
     from fastapi.responses import StreamingResponse
 
-    body: dict[str, 任意] = await _读取数据字典(request)
-    prompt: str = _转字符串(body.get("prompt", ""))
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    提示词: str = _转字符串(请求体.get("prompt", ""))
 
     from mybiout.pages.man.man import 流式对话SSE
 
     return StreamingResponse(
-        流式对话SSE(prompt),
+        流式对话SSE(提示词),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-
-
-_PAGES_DIR = _页面目录
-_ASSETS_DIR = _资源目录
-_InvalidJsonBody = _无效JSON请求体
-_invalid_json_handler = _无效JSON处理器
-_read_html = _读取网页
-_read_json_dict = _读取数据字典
-_as_str = _转字符串
-_as_str_list = _转字符串列表
-
-index = 首页
-ohmyconfig_page = 设置页面
-localout_page = 本地导出页面
-bbdown_page = 下载页面
-mdout_page = 文档导出页面
-man_page = 手册页面
-api_get_settings = 取设置接口
-api_save_setting = 保存设置接口
-api_browse_folder = 浏览文件夹接口
-api_desktop_path = 桌面路径接口
-api_default_bili_pc_cache_path = 默认缓存路径接口
-localout_state = 本地导出状态
-localout_env_status = 本地导出环境状态
-localout_available_sources = 本地导出可用来源
-localout_browse_local = 本地导出浏览本地
-localout_add_source = 本地导出添加来源
-localout_pause_scan = 本地导出暂停扫描
-localout_resume_scan = 本地导出继续扫描
-localout_cancel_scan = 本地导出取消扫描
-localout_add_to_tasks = 本地导出加入任务
-localout_remove_source = 本地导出移除来源
-localout_remove_tasks = 本地导出移除任务
-localout_clear_source = 本地导出清空来源
-localout_clear_tasks = 本地导出清空任务
-localout_clear_completed = 本地导出清空完成
-localout_start_export = 本地导出开始导出
-localout_cover = 本地导出封面
-localout_cancel_export = 本地导出取消导出
-bbdown_state = 下载状态
-bbdown_env_check = 下载环境检查
-bbdown_add = 下载添加任务
-bbdown_cancel = 下载取消当前
-bbdown_retry = 下载重试任务
-bbdown_remove = 下载移除任务
-bbdown_clear_completed = 下载清空完成
-bbdown_clear_failed = 下载清空失败
-bbdown_clear_queue = 下载清空队列
-mdout_state = 文档导出状态
-mdout_parse = 文档导出解析
-mdout_add = 文档导出添加
-mdout_select = 文档导出选择
-mdout_export = 文档导出执行
-mdout_export_all = 文档导出全部
-mdout_remove = 文档导出移除
-mdout_clear = 文档导出清空
-mdout_clear_completed = 文档导出清空完成
-man_chat = 手册对话
-api_open_explorer = 打开资源管理器接口
-api_auto_sessdata = 自动会话数据接口
-api_reset_all_settings = 重置全部设置接口
-mdout_open_folder = 文档导出打开目录
-man_chat_stream = 手册流式对话

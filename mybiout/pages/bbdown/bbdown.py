@@ -20,13 +20,13 @@ from pathlib import Path as 路径
 
 from mybiout.pages import utils as 工具
 
-_BIN_DIR: 路径 = 路径(__file__).resolve().parent.parent.parent / "bin"
-_ANSI_RE: 正则.Pattern[str] = 正则.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
-_POPEN_EXTRA: dict[str, int] = {}
+_程序工具目录: 路径 = 路径(__file__).resolve().parent.parent.parent / "bin"
+_控制码正则: 正则.Pattern[str] = 正则.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+_子进程附加参数: dict[str, int] = {}
 if 系统.platform == "win32":
-    _POPEN_EXTRA["creationflags"] = 0x08000000
+    _子进程附加参数["creationflags"] = 0x08000000
 
-_CONSOLE_ENC: str = "gbk" if 系统.platform == "win32" else "utf-8"
+_控制台编码: str = "gbk" if 系统.platform == "win32" else "utf-8"
 
 
 def _寻找BBDown() -> str | None:
@@ -34,15 +34,15 @@ def _寻找BBDown() -> str | None:
     查找 BBDown 可执行文件
     :return: str | None: 可执行文件路径, 未找到返回 None
     """
-    candidates: list[路径] = [
-        _BIN_DIR / "BBDown" / "BBDown.exe",
-        _BIN_DIR / "BBDown" / "BBDown",
-        _BIN_DIR / "BBDown.exe",
-        _BIN_DIR / "BBDown",
+    候选路径列表: list[路径] = [
+        _程序工具目录 / "BBDown" / "BBDown.exe",
+        _程序工具目录 / "BBDown" / "BBDown",
+        _程序工具目录 / "BBDown.exe",
+        _程序工具目录 / "BBDown",
     ]
-    for p in candidates:
-        if p.exists():
-            return str(p)
+    for 候选路径 in 候选路径列表:
+        if 候选路径.exists():
+            return str(候选路径)
     return 文件工具.which("BBDown") or 文件工具.which("bbdown")
 
 
@@ -51,15 +51,15 @@ def _寻找FFmpeg() -> str | None:
     查找 ffmpeg 可执行文件
     :return: str | None: 可执行文件路径, 未找到返回 None
     """
-    candidates: list[路径] = [
-        _BIN_DIR / "BBDown" / "ffmpeg.exe",
-        _BIN_DIR / "BBDown" / "ffmpeg",
-        _BIN_DIR / "ffmpeg.exe",
-        _BIN_DIR / "ffmpeg",
+    候选路径列表: list[路径] = [
+        _程序工具目录 / "BBDown" / "ffmpeg.exe",
+        _程序工具目录 / "BBDown" / "ffmpeg",
+        _程序工具目录 / "ffmpeg.exe",
+        _程序工具目录 / "ffmpeg",
     ]
-    for p in candidates:
-        if p.exists():
-            return str(p)
+    for 候选路径 in 候选路径列表:
+        if 候选路径.exists():
+            return str(候选路径)
     return 文件工具.which("ffmpeg")
 
 
@@ -75,8 +75,8 @@ def _完整时间() -> str:
     return 日期时间.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _清理文本(line: str) -> str:
-    return _ANSI_RE.sub("", line).strip()
+def _清理文本(行: str) -> str:
+    return _控制码正则.sub("", 行).strip()
 
 
 @数据类(slots=True)
@@ -85,59 +85,59 @@ class 下载任务:
     BBDown 下载任务数据模型
     """
 
-    id: str = 字段(default_factory=_生成编号)
-    url: str = ""
-    title: str = ""
-    status: str = "queued"
-    progress: float = 0.0
-    speed: str = ""
-    error: str = ""
-    options: dict = 字段(default_factory=dict)
-    output_file: str = ""
-    output_dir: str = ""
-    cover_url: str = ""
-    created_at: str = 字段(default_factory=_完整时间)
+    编号: str = 字段(default_factory=_生成编号)
+    链接: str = ""
+    标题: str = ""
+    状态名: str = "queued"
+    进度: float = 0.0
+    速度: str = ""
+    错误: str = ""
+    选项: dict = 字段(default_factory=dict)
+    输出文件: str = ""
+    输出目录: str = ""
+    封面地址: str = ""
+    创建时间: str = 字段(default_factory=_完整时间)
 
-    def to_dict(self) -> dict:
+    def 转字典(自身) -> dict:
         return {
-            "id": self.id,
-            "url": self.url,
-            "title": self.title or self.url,
-            "status": self.status,
-            "progress": round(self.progress, 3),
-            "speed": self.speed,
-            "error": self.error,
-            "options": self.options,
-            "output_file": self.output_file,
-            "output_dir": self.output_dir,
-            "cover_url": self.cover_url,
-            "created_at": self.created_at,
+            "id": 自身.编号,
+            "url": 自身.链接,
+            "title": 自身.标题 or 自身.链接,
+            "status": 自身.状态名,
+            "progress": round(自身.进度, 3),
+            "speed": 自身.速度,
+            "error": 自身.错误,
+            "options": 自身.选项,
+            "output_file": 自身.输出文件,
+            "output_dir": 自身.输出目录,
+            "cover_url": 自身.封面地址,
+            "created_at": 自身.创建时间,
         }
 
 
 class _下载状态:
-    def __init__(self) -> None:
-        self.lock: 线程.RLock = 线程.RLock()
-        self.tasks: list[下载任务] = []
-        self.completed: list[下载任务] = []
-        self.logs: list[dict] = []
-        self._worker: 线程.Thread | None = None
-        self._cancel: 线程.Event = 线程.Event()
-        self._process: 子进程.Popen | None = None
+    def __init__(自身) -> None:
+        自身.锁: 线程.RLock = 线程.RLock()
+        自身.任务列表: list[下载任务] = []
+        自身.完成列表: list[下载任务] = []
+        自身.日志列表: list[dict] = []
+        自身._工作线程: 线程.Thread | None = None
+        自身._取消标记: 线程.Event = 线程.Event()
+        自身._进程: 子进程.Popen | None = None
 
-    def log(self, level: str, msg: str) -> None:
-        with self.lock:
-            self.logs.append({"time": _短时间(), "level": level, "msg": msg})
-            if len(self.logs) > 500:
-                self.logs = self.logs[-300:]
+    def 记录日志(自身, 等级: str, 消息: str) -> None:
+        with 自身.锁:
+            自身.日志列表.append({"time": _短时间(), "level": 等级, "msg": 消息})
+            if len(自身.日志列表) > 500:
+                自身.日志列表 = 自身.日志列表[-300:]
 
-    def snapshot(self) -> dict:
-        with self.lock:
+    def 快照(自身) -> dict:
+        with 自身.锁:
             return {
-                "tasks": [t.to_dict() for t in self.tasks],
-                "completed": [t.to_dict() for t in self.completed],
-                "logs": list(self.logs),
-                "is_downloading": any(t.status == "downloading" for t in self.tasks),
+                "tasks": [任务项.转字典() for 任务项 in 自身.任务列表],
+                "completed": [任务项.转字典() for 任务项 in 自身.完成列表],
+                "logs": list(自身.日志列表),
+                "is_downloading": any(任务项.状态名 == "downloading" for 任务项 in 自身.任务列表),
             }
 
 
@@ -145,405 +145,375 @@ class _下载状态:
 
 
 def _取工作目录() -> 路径:
-    work_dir: 路径 = 工具.取导出路径() / 工具.取设置("bbdown", "folder")
-    work_dir.mkdir(parents=True, exist_ok=True)
-    return work_dir
+    工作目录: 路径 = 工具.取导出路径() / 工具.取设置("bbdown", "folder")
+    工作目录.mkdir(parents=True, exist_ok=True)
+    return 工作目录
 
 
-def _构建命令(task: 下载任务) -> list[str]:
-    bbdown: str | None = _寻找BBDown()
-    if not bbdown:
+def _构建命令(任务: 下载任务) -> list[str]:
+    下载器: str | None = _寻找BBDown()
+    if not 下载器:
         raise RuntimeError("BBDown 可执行文件未找到")
 
-    cmd: list[str] = [bbdown]
-    opts: dict = task.options or {}
+    命令: list[str] = [下载器]
+    选项表: dict = 任务.选项 or {}
 
-    sessdata: str = 工具.取会话数据().strip()
-    if sessdata:
-        cmd.extend(["-c", f"SESSDATA={sessdata}"])
+    会话数据: str = 工具.取会话数据().strip()
+    if 会话数据:
+        命令.extend(["-c", f"SESSDATA={会话数据}"])
 
-    match opts.get("api_mode", "default"):
+    match 选项表.get("api_mode", "default"):
         case "tv":
-            cmd.append("-tv")
+            命令.append("-tv")
         case "app":
-            cmd.append("-app")
+            命令.append("-app")
         case "intl":
-            cmd.append("-intl")
+            命令.append("-intl")
 
-    quality: str = (opts.get("quality", "") or 工具.取设置("bbdown", "quality_priority")).strip()
-    if quality:
-        cmd.extend(["-q", quality])
+    画质: str = (选项表.get("quality", "") or 工具.取设置("bbdown", "quality_priority")).strip()
+    if 画质:
+        命令.extend(["-q", 画质])
 
-    encoding: str = (opts.get("encoding", "") or 工具.取设置("bbdown", "encoding_priority")).strip()
-    if encoding:
-        cmd.extend(["-e", encoding])
+    编码: str = (选项表.get("encoding", "") or 工具.取设置("bbdown", "encoding_priority")).strip()
+    if 编码:
+        命令.extend(["-e", 编码])
 
-    content: str = opts.get("content", "default")
-    match content:
+    内容: str = 选项表.get("content", "default")
+    match 内容:
         case "audio_only":
-            cmd.append("--audio-only")
+            命令.append("--audio-only")
         case "video_only":
-            cmd.append("--video-only")
+            命令.append("--video-only")
         case "danmaku_only":
-            cmd.append("--danmaku-only")
+            命令.append("--danmaku-only")
         case "sub_only":
-            cmd.append("--sub-only")
+            命令.append("--sub-only")
         case "cover_only":
-            cmd.append("--cover-only")
+            命令.append("--cover-only")
 
-    want_danmaku: bool = (
-        opts.get("download_danmaku", False) or 工具.取设置("bbdown", "download_danmaku") == "true"
+    要弹幕: bool = (
+        选项表.get("download_danmaku", False) or 工具.取设置("bbdown", "download_danmaku") == "true"
     )
-    if want_danmaku and content == "default":
-        cmd.append("-dd")
+    if 要弹幕 and 内容 == "default":
+        命令.append("-dd")
 
-    want_skip_sub: bool = opts.get("skip_subtitle", False) or 工具.取设置("bbdown", "skip_subtitle") == "true"
-    if want_skip_sub:
-        cmd.append("--skip-subtitle")
+    要跳过字幕: bool = 选项表.get("skip_subtitle", False) or 工具.取设置("bbdown", "skip_subtitle") == "true"
+    if 要跳过字幕:
+        命令.append("--skip-subtitle")
 
-    want_skip_cover: bool = opts.get("skip_cover", False) or 工具.取设置("bbdown", "skip_cover") == "true"
-    if want_skip_cover:
-        cmd.append("--skip-cover")
+    要跳过封面: bool = 选项表.get("skip_cover", False) or 工具.取设置("bbdown", "skip_cover") == "true"
+    if 要跳过封面:
+        命令.append("--skip-cover")
 
-    page: str = opts.get("page", "").strip()
-    if page:
-        cmd.extend(["-p", page])
+    分P: str = 选项表.get("page", "").strip()
+    if 分P:
+        命令.extend(["-p", 分P])
 
-    file_pattern: str = 工具.取设置("bbdown", "file_pattern").strip()
-    if file_pattern:
-        cmd.extend(["-F", file_pattern])
+    文件命名: str = 工具.取设置("bbdown", "file_pattern").strip()
+    if 文件命名:
+        命令.extend(["-F", 文件命名])
 
-    multi_file_pattern: str = 工具.取设置("bbdown", "multi_file_pattern").strip()
-    if multi_file_pattern:
-        cmd.extend(["-M", multi_file_pattern])
+    多文件命名: str = 工具.取设置("bbdown", "multi_file_pattern").strip()
+    if 多文件命名:
+        命令.extend(["-M", 多文件命名])
 
-    work_dir: 路径 = _取工作目录()
-    cmd.extend(["--work-dir", str(work_dir)])
+    工作目录: 路径 = _取工作目录()
+    命令.extend(["--work-dir", str(工作目录)])
 
     if 工具.取设置("bbdown", "use_aria2c") == "true":
-        cmd.append("--use-aria2c")
+        命令.append("--use-aria2c")
 
-    if ffmpeg := _寻找FFmpeg():
-        cmd.extend(["--ffmpeg-path", ffmpeg])
+    if 转码器 := _寻找FFmpeg():
+        命令.extend(["--ffmpeg-path", 转码器])
 
-    cmd.append(task.url)
-    return cmd
-
-
-def _解析进度(line: str) -> tuple[float | None, str | None]:
-    prog: float | None = None
-    speed: str | None = None
-    if m := 正则.search(r"(\d+\.?\d*)%", line):
-        prog = min(float(m.group(1)) / 100.0, 1.0)
-    if m := 正则.search(r"(\d+\.?\d*\s*[KMG]?i?B/s)", line, 正则.I):
-        speed = m.group(1)
-    return prog, speed
+    命令.append(任务.链接)
+    return 命令
 
 
-def _解析标题(line: str) -> str | None:
-    for pattern in (r"视频标题[：:]\s*(.+)", r"标题[：:]\s*(.+)", r"Title[：:]\s*(.+)"):
-        if m := 正则.search(pattern, line):
-            return m.group(1).strip()
+def _解析进度(行: str) -> tuple[float | None, str | None]:
+    进度值: float | None = None
+    速度: str | None = None
+    if 匹配 := 正则.search(r"(\d+\.?\d*)%", 行):
+        进度值 = min(float(匹配.group(1)) / 100.0, 1.0)
+    if 匹配 := 正则.search(r"(\d+\.?\d*\s*[KMG]?i?B/s)", 行, 正则.I):
+        速度 = 匹配.group(1)
+    return 进度值, 速度
+
+
+def _解析标题(行: str) -> str | None:
+    for 模式 in (r"视频标题[：:]\s*(.+)", r"标题[：:]\s*(.+)", r"Title[：:]\s*(.+)"):
+        if 匹配 := 正则.search(模式, 行):
+            return 匹配.group(1).strip()
     return None
 
 
-def _解析封面地址(line: str) -> str | None:
-    if m := 正则.search(r"(https?://[^\s]+\.(?:jpg|jpeg|png|webp))", line, 正则.I):
-        return m.group(1)
+def _解析封面地址(行: str) -> str | None:
+    if 匹配 := 正则.search(r"(https?://[^\s]+\.(?:jpg|jpeg|png|webp))", 行, 正则.I):
+        return 匹配.group(1)
     return None
 
 
-def _寻找最新输出(work_dir: 路径, before_ts: float) -> str:
+def _寻找最新输出(工作目录: 路径, 开始时间戳: float) -> str:
     r"""
     在工作目录找到下载后最新创建/修改的媒体文件
     """
-    best: 路径 | None = None
-    best_mtime: float = before_ts
-    media_exts: set[str] = {".mp4", ".mkv", ".flv", ".m4a", ".mp3", ".aac", ".xml", ".ass", ".srt"}
+    最佳路径: 路径 | None = None
+    最佳时间: float = 开始时间戳
+    媒体后缀: set[str] = {".mp4", ".mkv", ".flv", ".m4a", ".mp3", ".aac", ".xml", ".ass", ".srt"}
     try:
-        for f in work_dir.rglob("*"):
-            if f.is_file() and f.suffix.lower() in media_exts:
-                mt: float = f.stat().st_mtime
-                if mt > best_mtime:
-                    best_mtime = mt
-                    best = f
+        for 候选文件 in 工作目录.rglob("*"):
+            if 候选文件.is_file() and 候选文件.suffix.lower() in 媒体后缀:
+                修改时间: float = 候选文件.stat().st_mtime
+                if 修改时间 > 最佳时间:
+                    最佳时间 = 修改时间
+                    最佳路径 = 候选文件
     except Exception:
         pass
-    return str(best) if best else ""
+    return str(最佳路径) if 最佳路径 else ""
 
 
-def _读取原始行(process: 子进程.Popen):
+def _读取原始行(进程: 子进程.Popen):
     r"""
     逐字节读取子进程输出, 按 \\r 和 \\n 分行, 使用系统编码解码
     """
-    line_buf: bytearray = bytearray()
+    行缓存: bytearray = bytearray()
     while True:
-        b: bytes = process.stdout.read(1)
-        if not b:
-            if process.poll() is not None:
+        字节块: bytes = 进程.stdout.read(1)
+        if not 字节块:
+            if 进程.poll() is not None:
                 break
             continue
-        if b == b"\n" or b == b"\r":
-            if line_buf:
+        if 字节块 == b"\n" or 字节块 == b"\r":
+            if 行缓存:
                 try:
-                    text: str = bytes(line_buf).decode(_CONSOLE_ENC, errors="replace")
+                    文本: str = bytes(行缓存).decode(_控制台编码, errors="replace")
                 except Exception:
-                    text = bytes(line_buf).decode("utf-8", errors="replace")
-                line_buf.clear()
-                yield text
+                    文本 = bytes(行缓存).decode("utf-8", errors="replace")
+                行缓存.clear()
+                yield 文本
             continue
-        line_buf.extend(b)
+        行缓存.extend(字节块)
     # 残留内容
-    if line_buf:
+    if 行缓存:
         try:
-            yield bytes(line_buf).decode(_CONSOLE_ENC, errors="replace")
+            yield bytes(行缓存).decode(_控制台编码, errors="replace")
         except Exception:
-            yield bytes(line_buf).decode("utf-8", errors="replace")
+            yield bytes(行缓存).decode("utf-8", errors="replace")
 
 
 def _工作线程函数() -> None:
     while True:
-        task: 下载任务 | None = None
-        with 状态.lock:
-            if 状态._cancel.is_set():
-                状态._worker = None
-                状态._cancel.clear()
+        任务: 下载任务 | None = None
+        with 状态.锁:
+            if 状态._取消标记.is_set():
+                状态._工作线程 = None
+                状态._取消标记.clear()
                 return
-            for t in 状态.tasks:
-                if t.status == "queued":
-                    task = t
+            for 任务项 in 状态.任务列表:
+                if 任务项.状态名 == "queued":
+                    任务 = 任务项
                     break
-            if not task:
-                状态._worker = None
+            if not 任务:
+                状态._工作线程 = None
                 return
-            task.status = "downloading"
-            task.progress = 0.0
-            task.speed = ""
+            任务.状态名 = "downloading"
+            任务.进度 = 0.0
+            任务.速度 = ""
 
-        状态.log("info", f"开始下载: {task.url}")
+        状态.记录日志("info", f"开始下载: {任务.链接}")
 
         try:
-            cmd: list[str] = _构建命令(task)
-            状态.log("info", f"执行命令 ({len(cmd)} 个参数)")
+            命令: list[str] = _构建命令(任务)
+            状态.记录日志("info", f"执行命令 ({len(命令)} 个参数)")
 
-            work_dir: 路径 = _取工作目录()
-            before_ts: float = 日期时间.now().timestamp()
+            工作目录: 路径 = _取工作目录()
+            开始时间戳: float = 日期时间.now().timestamp()
 
-            with 状态.lock:
-                task.output_dir = str(work_dir)
+            with 状态.锁:
+                任务.输出目录 = str(工作目录)
 
-            process: 子进程.Popen = 子进程.Popen(
-                cmd,
+            进程: 子进程.Popen = 子进程.Popen(
+                命令,
                 stdout=子进程.PIPE,
                 stderr=子进程.STDOUT,
                 bufsize=0,
-                **_POPEN_EXTRA,
+                **_子进程附加参数,
             )
 
-            with 状态.lock:
-                状态._process = process
+            with 状态.锁:
+                状态._进程 = 进程
 
-            for raw_line in _读取原始行(process):
-                clean_line: str = _清理文本(raw_line)
-                if not clean_line:
+            for 原始行 in _读取原始行(进程):
+                干净行: str = _清理文本(原始行)
+                if not 干净行:
                     continue
 
-                if 状态._cancel.is_set():
-                    process.kill()
+                if 状态._取消标记.is_set():
+                    进程.kill()
                     break
 
-                prog, spd = _解析进度(clean_line)
-                if prog is not None:
-                    with 状态.lock:
-                        task.progress = prog
-                        if spd:
-                            task.speed = spd
+                进度值, 速度文本 = _解析进度(干净行)
+                if 进度值 is not None:
+                    with 状态.锁:
+                        任务.进度 = 进度值
+                        if 速度文本:
+                            任务.速度 = 速度文本
                     # 进度行不写入日志避免刷屏
                     continue
 
-                状态.log("info", clean_line)
+                状态.记录日志("info", 干净行)
 
-                if title := _解析标题(clean_line):
-                    with 状态.lock:
-                        task.title = title
+                if 标题 := _解析标题(干净行):
+                    with 状态.锁:
+                        任务.标题 = 标题
 
-                if cover := _解析封面地址(clean_line):
-                    with 状态.lock:
-                        task.cover_url = cover
+                if 封面 := _解析封面地址(干净行):
+                    with 状态.锁:
+                        任务.封面地址 = 封面
 
-            process.wait()
+            进程.wait()
 
-            with 状态.lock:
-                状态._process = None
+            with 状态.锁:
+                状态._进程 = None
 
-            if 状态._cancel.is_set():
-                with 状态.lock:
-                    task.status = "cancelled"
-                状态.log("warn", f"已取消: {task.title or task.url}")
-                状态._cancel.clear()
-                with 状态.lock:
-                    状态._worker = None
+            if 状态._取消标记.is_set():
+                with 状态.锁:
+                    任务.状态名 = "cancelled"
+                状态.记录日志("warn", f"已取消: {任务.标题 or 任务.链接}")
+                状态._取消标记.clear()
+                with 状态.锁:
+                    状态._工作线程 = None
                 return
 
-            if process.returncode == 0:
-                output_file: str = _寻找最新输出(work_dir, before_ts)
-                with 状态.lock:
-                    task.status = "success"
-                    task.progress = 1.0
-                    task.output_file = output_file
-                    状态.tasks = [t for t in 状态.tasks if t.id != task.id]
-                    状态.completed.append(task)
-                状态.log("success", f"下载完成: {task.title or task.url}")
+            if 进程.returncode == 0:
+                输出文件: str = _寻找最新输出(工作目录, 开始时间戳)
+                with 状态.锁:
+                    任务.状态名 = "success"
+                    任务.进度 = 1.0
+                    任务.输出文件 = 输出文件
+                    状态.任务列表 = [任务项 for 任务项 in 状态.任务列表 if 任务项.编号 != 任务.编号]
+                    状态.完成列表.append(任务)
+                状态.记录日志("success", f"下载完成: {任务.标题 or 任务.链接}")
             else:
-                with 状态.lock:
-                    task.status = "failed"
-                    task.error = f"退出码 {process.returncode}"
-                状态.log("error", f"下载失败: {task.title or task.url} (退出码 {process.returncode})")
+                with 状态.锁:
+                    任务.状态名 = "failed"
+                    任务.错误 = f"退出码 {进程.returncode}"
+                状态.记录日志("error", f"下载失败: {任务.标题 or 任务.链接} (退出码 {进程.returncode})")
 
         except Exception as e:
-            with 状态.lock:
-                task.status = "failed"
-                task.error = str(e)
-                状态._process = None
-            状态.log("error", f"下载异常: {task.url} — {e}")
+            with 状态.锁:
+                任务.状态名 = "failed"
+                任务.错误 = str(e)
+                状态._进程 = None
+            状态.记录日志("error", f"下载异常: {任务.链接} — {e}")
 
-    with 状态.lock:
-        状态._worker = None
+    with 状态.锁:
+        状态._工作线程 = None
 
 
 def _确保工作线程() -> None:
-    with 状态.lock:
-        if 状态._worker is None or not 状态._worker.is_alive():
-            状态._cancel.clear()
-            t: 线程.Thread = 线程.Thread(target=_工作线程函数, daemon=True)
-            状态._worker = t
-            t.start()
+    with 状态.锁:
+        if 状态._工作线程 is None or not 状态._工作线程.is_alive():
+            状态._取消标记.clear()
+            任务项: 线程.Thread = 线程.Thread(target=_工作线程函数, daemon=True)
+            状态._工作线程 = 任务项
+            任务项.start()
 
 
 def 取状态() -> dict:
-    return 状态.snapshot()
+    return 状态.快照()
 
 
 def 环境检查() -> dict[str, bool | str]:
-    bbdown_path: str | None = _寻找BBDown()
-    ffmpeg_path: str | None = _寻找FFmpeg()
+    BBDown路径: str | None = _寻找BBDown()
+    FFmpeg路径: str | None = _寻找FFmpeg()
     return {
-        "bbdown_available": bbdown_path is not None,
-        "bbdown_path": bbdown_path or "",
-        "ffmpeg_available": ffmpeg_path is not None,
-        "ffmpeg_path": ffmpeg_path or "",
+        "bbdown_available": BBDown路径 is not None,
+        "bbdown_path": BBDown路径 or "",
+        "ffmpeg_available": FFmpeg路径 is not None,
+        "ffmpeg_path": FFmpeg路径 or "",
         "has_sessdata": bool(工具.取会话数据().strip()),
     }
 
 
-def 添加任务(url: str, options: dict | None = None) -> dict:
-    url = url.strip()
-    if not url:
+def 添加任务(链接: str, 选项: dict | None = None) -> dict:
+    链接 = 链接.strip()
+    if not 链接:
         return {"ok": False, "error": "URL 不能为空"}
     if not _寻找BBDown():
         return {"ok": False, "error": "BBDown 未找到"}
 
-    task: 下载任务 = 下载任务(url=url, options=options or {})
-    with 状态.lock:
-        状态.tasks.append(task)
-    状态.log("info", f"已添加任务: {url}")
+    任务: 下载任务 = 下载任务(链接=链接, 选项=选项 or {})
+    with 状态.锁:
+        状态.任务列表.append(任务)
+    状态.记录日志("info", f"已添加任务: {链接}")
     _确保工作线程()
-    return {"ok": True, "task_id": task.id}
+    return {"ok": True, "task_id": 任务.编号}
 
 
 def 取消当前() -> None:
-    状态._cancel.set()
-    with 状态.lock:
-        if 状态._process:
+    状态._取消标记.set()
+    with 状态.锁:
+        if 状态._进程:
             with 忽略异常(Exception):
-                状态._process.kill()
-    状态.log("info", "正在取消当前下载...")
+                状态._进程.kill()
+    状态.记录日志("info", "正在取消当前下载...")
 
 
-def 移除任务(task_id: str) -> None:
-    with 状态.lock:
-        状态.tasks = [t for t in 状态.tasks if not (t.id == task_id and t.status in ("queued", "failed", "cancelled"))]
+def 移除任务(任务编号: str) -> None:
+    with 状态.锁:
+        状态.任务列表 = [任务项 for 任务项 in 状态.任务列表 if not (任务项.编号 == 任务编号 and 任务项.状态名 in ("queued", "failed", "cancelled"))]
 
 
-def 重试任务(task_id: str) -> dict:
-    with 状态.lock:
-        for t in 状态.tasks:
-            if t.id == task_id and t.status in ("failed", "cancelled"):
-                t.status = "queued"
-                t.progress = 0.0
-                t.speed = ""
-                t.error = ""
+def 重试任务(任务编号: str) -> dict:
+    with 状态.锁:
+        for 任务项 in 状态.任务列表:
+            if 任务项.编号 == 任务编号 and 任务项.状态名 in ("failed", "cancelled"):
+                任务项.状态名 = "queued"
+                任务项.进度 = 0.0
+                任务项.速度 = ""
+                任务项.错误 = ""
                 _确保工作线程()
                 return {"ok": True}
     return {"ok": False, "error": "未找到可重试的任务"}
 
 
 def 清空完成() -> None:
-    with 状态.lock:
-        状态.completed.clear()
-    状态.log("info", "已清空完成列表")
+    with 状态.锁:
+        状态.完成列表.clear()
+    状态.记录日志("info", "已清空完成列表")
 
 
 def 清空失败() -> None:
-    with 状态.lock:
-        状态.tasks = [t for t in 状态.tasks if t.status not in ("failed", "cancelled")]
-    状态.log("info", "已清空失败任务")
+    with 状态.锁:
+        状态.任务列表 = [任务项 for 任务项 in 状态.任务列表 if 任务项.状态名 not in ("failed", "cancelled")]
+    状态.记录日志("info", "已清空失败任务")
 
 
 def 清空队列() -> None:
-    with 状态.lock:
-        状态.tasks = [t for t in 状态.tasks if t.status != "queued"]
-    状态.log("info", "已清空排队任务")
+    with 状态.锁:
+        状态.任务列表 = [任务项 for 任务项 in 状态.任务列表 if 任务项.状态名 != "queued"]
+    状态.记录日志("info", "已清空排队任务")
 
 
-def 在资源管理器中打开(file_path: str) -> dict[str, bool | str]:
+def 在资源管理器中打开(文件路径: str) -> dict[str, bool | str]:
     r"""
     在资源管理器中定位文件或打开目录
     """
-    if not file_path:
+    if not 文件路径:
         return {"ok": False, "error": "路径为空"}
-    p: 路径 = 路径(file_path)
+    候选路径: 路径 = 路径(文件路径)
     try:
-        if p.is_file():
-            子进程.Popen(["explorer", "/select,", str(p)], **_POPEN_EXTRA)
-        elif p.is_dir():
-            子进程.Popen(["explorer", str(p)], **_POPEN_EXTRA)
+        if 候选路径.is_file():
+            子进程.Popen(["explorer", "/select,", str(候选路径)], **_子进程附加参数)
+        elif 候选路径.is_dir():
+            子进程.Popen(["explorer", str(候选路径)], **_子进程附加参数)
         else:
-            parent = p.parent
-            if parent.is_dir():
-                子进程.Popen(["explorer", str(parent)], **_POPEN_EXTRA)
+            父目录 = 候选路径.父目录
+            if 父目录.is_dir():
+                子进程.Popen(["explorer", str(父目录)], **_子进程附加参数)
             else:
                 return {"ok": False, "error": "路径不存在"}
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
-
-
-_find_bbdown = _寻找BBDown
-_find_ffmpeg = _寻找FFmpeg
-_uid = _生成编号
-_ts = _短时间
-_ts_full = _完整时间
-_clean = _清理文本
-BBDownTask = 下载任务
-_State = _下载状态
-S = 状态
-_get_work_dir = _取工作目录
-_build_command = _构建命令
-_parse_progress = _解析进度
-_parse_title = _解析标题
-_parse_cover_url = _解析封面地址
-_find_newest_output = _寻找最新输出
-_read_raw_lines = _读取原始行
-_worker_fn = _工作线程函数
-_ensure_worker = _确保工作线程
-get_state = 取状态
-env_check = 环境检查
-add_task = 添加任务
-cancel_current = 取消当前
-remove_task = 移除任务
-retry_task = 重试任务
-clear_completed = 清空完成
-clear_failed = 清空失败
-clear_queue = 清空队列
-open_in_explorer = 在资源管理器中打开

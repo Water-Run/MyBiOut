@@ -338,31 +338,3 @@ def 自动获取会话数据(用户代理: str | None = None) -> str | None:
     打开可视化登录窗口引导用户登录后获取 SESSDATA。
     """
     return 通过登录自动取会话数据(用户代理=用户代理, 超时秒数=180)
-
-
-SettingResult = 设置结果
-_ALLOWED_BOOL = _允许布尔值
-_ALLOWED_INCOMPLETE_TITLE_ACTION = _允许缺失标题处理
-_ALLOWED_NAME_PARTS = _允许命名部件
-_ALLOWED_FAVORITE_DETAIL = _允许收藏夹详情
-_ALLOWED_REQUEST_DELAY = _允许请求间隔
-_ALLOWED_API_TIMEOUT = _允许接口超时
-
-get_settings = 取设置
-validate_and_save = 校验并保存
-_save_bool = _保存布尔
-_validate_folder = _校验文件夹
-browse_folder = 浏览文件夹
-get_desktop_path = 取桌面路径
-get_default_bili_pc_cache_path = 取默认哔哩电脑缓存路径
-_ok = _成功
-_err = _失败
-reset_all = 重置全部
-
-
-def _auto_get_sessdata_via_login(user_agent: str | None = None, timeout_sec: int = 180) -> str | None:
-    return 通过登录自动取会话数据(用户代理=user_agent, 超时秒数=timeout_sec)
-
-
-def auto_get_sessdata(user_agent: str | None = None) -> str | None:
-    return 自动获取会话数据(用户代理=user_agent)
