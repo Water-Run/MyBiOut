@@ -57,7 +57,6 @@ path = "hatch_build.py"
 [tool.hatch.build.targets.wheel]
 packages = ["mybiout"]
 pure-python = false
-pure_python = false
 [tool.hatch.build.targets.wheel.hooks.custom]
 path = "hatch_build.py"
 

@@ -23,7 +23,7 @@ from mybiout.pages import utils as 工具
 
 _程序工具目录: 路径 = 路径(__file__).resolve().parent.parent.parent / "bin"
 _胡言数据路径: 路径 = _程序工具目录 / "BullshitGenerator" / "data.json"
-_项目根目录: 路径 = 路径(__file__).resolve().parent.parent.parent.parent
+_项目根目录: 路径 = 路径(__file__).resolve().parent.parent.parent
 
 _子进程附加参数: dict[str, int] = {}
 if 系统.platform == "win32":
@@ -727,7 +727,7 @@ def _流式调用大模型(提示词: str, 上下文: str) -> 生成器[str]:
                 内容: str = 增量.get("content", "")
                 if 内容:
                     yield 内容
-            except 数据交换.JSONDecodeError, IndexError, KeyError:
+            except (数据交换.JSONDecodeError, IndexError, KeyError):
                 continue
 
 

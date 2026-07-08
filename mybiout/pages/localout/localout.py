@@ -563,7 +563,7 @@ def _解析索引JSON(路径文本: 路径) -> tuple[str, str, int]:
         try:
             文件: float = float(帧率值)
             帧率 = f"{文件:.0f}fps" if 文件 == int(文件) else f"{文件:.1f}fps"
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             pass
     return 分辨率, 帧率, int(视频项.get("bandwidth", 0) or 0)
 
