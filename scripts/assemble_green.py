@@ -51,7 +51,7 @@ MyBiOut.exe --browser --no-animation
 
 ## 协议
 
-HTTP/API 与网页版完全一致, 开发者仍可用 `pip install mybiout` 源码模式运行。
+HTTP/API 与页面路由保持稳定。发行形态仅为绿色版 (解压双击 MyBiOut.exe)。
 
 仓库: https://github.com/Water-Run/MyBiOut
 """
@@ -87,7 +87,7 @@ def 主流程() -> int:
 
     (目标输出 / "使用说明.txt").write_text(说明模板, encoding="utf-8")
     print(f"绿色包已组装: {目标输出}")
-    print("可将该目录打包为 zip 分发。")
+    print("请运行 scripts/pack_rar.py 或 打包.bat 生成发布 .rar")
     return 0
 
 

@@ -10,6 +10,7 @@ env.bak/
 venv.bak/
 build/
 dist/
+*.rar
 eggs/
 .eggs/
 *.egg-info/

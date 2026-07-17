@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "mybiout"
 version = "60717.0"
-description = "MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集 (绿色双击版)"
+description = "MyBiOut! 绿色版哔哩哔哩导出工具集 (解压双击运行)"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "WaterRun", email = "linzhuangrun49@gmail.com" }]
@@ -43,8 +43,7 @@ dependencies = [
 dev = ["pytest>=8.0.0", "ruff>=0.1.0"]
 green = ["pyinstaller>=6.0.0"]
 
-[project.scripts]
-"MyBiOut!" = "mybiout.main:主程序"
+# 发行形态仅为绿色 exe; 开发调试使用: python -m mybiout
 
 [project.urls]
 Homepage = "https://github.com/Water-Run/MyBiOut"

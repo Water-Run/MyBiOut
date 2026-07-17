@@ -14,5 +14,10 @@ python -m PyInstaller --noconfirm --clean packaging/MyBiOut.spec
 Write-Host "==> 组装绿色目录..."
 python scripts/assemble_green.py
 
-Write-Host "==> 完成: dist/MyBiOut-green/"
-Write-Host "可将 dist/MyBiOut-green 压缩为 zip 作为 Release 资产。"
+Write-Host "==> 打包发布 RAR..."
+python scripts/pack_rar.py
+
+Write-Host "==> 完成"
+Write-Host "  绿色目录: dist/MyBiOut-green/"
+Write-Host "  发布包:   dist/release/MyBiOut-<版本>.rar"
+Write-Host "也可直接双击仓库根目录 打包.bat"
