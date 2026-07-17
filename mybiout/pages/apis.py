@@ -17,12 +17,13 @@ from fastapi.responses import HTMLResponse as 网页响应
 from fastapi.responses import JSONResponse as 数据响应
 from fastapi.staticfiles import StaticFiles as 静态文件
 
+from mybiout import 取版本号
 from mybiout.pages import utils as 工具
 
 _页面目录: 路径 = 工具.取页面目录()
 _资源目录: 路径 = 工具.取静态资源目录()
 
-应用: 快速应用 = 快速应用(title="MyBiOut!", version="0.1.0")
+应用: 快速应用 = 快速应用(title="MyBiOut!", version=取版本号())
 应用.mount("/assets", 静态文件(directory=str(_资源目录)), name="assets")
 
 
@@ -135,6 +136,15 @@ async def 手册页面() -> 网页响应:
     :return: HTMLResponse: Man 页 HTML
     """
     return _读取网页("man/man.html")
+
+
+@应用.get("/api/version")
+async def 取版本接口() -> dict[str, str]:
+    r"""
+    动态读取 version.txt 中的版本号 (YY.MM.DD.序号)
+    :return: dict[str, str]: {"version": "..."}
+    """
+    return {"version": 取版本号()}
 
 
 @应用.get("/api/settings")

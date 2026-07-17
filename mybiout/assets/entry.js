@@ -1,4 +1,33 @@
 (function () {
+    // 页脚版本: 动态请求 /api/version (源文件 mybiout/version.txt, 打包脚本写入)
+    function 挂载版本号() {
+        if (!document.body) {
+            return;
+        }
+        let 节点 = document.querySelector(".mybiout-version");
+        if (!节点) {
+            节点 = document.createElement("div");
+            节点.className = "mybiout-version";
+            节点.setAttribute("aria-hidden", "true");
+            document.body.appendChild(节点);
+        }
+        fetch("/api/version")
+            .then(function (响应) {
+                return 响应.json();
+            })
+            .then(function (数据) {
+                if (数据 && 数据.version) {
+                    节点.textContent = "v" + 数据.version;
+                }
+            })
+            .catch(function () {});
+    }
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", 挂载版本号);
+    } else {
+        挂载版本号();
+    }
+
     const 粉 = "#E85B8A";
     const 橙 = "#F5A623";
     const 蓝 = "#00AEEC";
