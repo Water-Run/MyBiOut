@@ -17,8 +17,10 @@ from fastapi.responses import HTMLResponse as 网页响应
 from fastapi.responses import JSONResponse as 数据响应
 from fastapi.staticfiles import StaticFiles as 静态文件
 
-_页面目录: 路径 = 路径(__file__).resolve().parent
-_资源目录: 路径 = _页面目录.parent / "assets"
+from mybiout.pages import utils as 工具
+
+_页面目录: 路径 = 工具.取页面目录()
+_资源目录: 路径 = 工具.取静态资源目录()
 
 应用: 快速应用 = 快速应用(title="MyBiOut!", version="0.1.0")
 应用.mount("/assets", 静态文件(directory=str(_资源目录)), name="assets")

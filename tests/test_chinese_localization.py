@@ -187,7 +187,7 @@ def test_main_startup_internals_keep_chinese_names() -> None:
         assert name not in source, name
 
     expected = [
-        "_程序工具目录",
+        "_取程序工具目录",
         "_控制序列引导",
         "_隐藏光标",
         "_显示光标",

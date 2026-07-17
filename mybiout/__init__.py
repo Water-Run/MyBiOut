@@ -14,4 +14,4 @@ if 系统.platform != "win32":
 if 系统.maxsize <= 2**32:
     raise ImportError("MyBiOut! 仅支持 64 位 Windows 系统。")
 
-__version__: str = "60314.0"
+__version__: str = "60717.0"

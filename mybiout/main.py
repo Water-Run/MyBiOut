@@ -1,5 +1,6 @@
 r"""
 MyBiOut! 主入口模块, 解析命令行参数并启动 FastAPI 服务
+支持绿色版内嵌 Web 窗口 (pywebview) 与传统浏览器模式
 
 :file: mybiout/main.py
 :author: WaterRun
@@ -22,6 +23,8 @@ from pathlib import Path as 路径
 
 import uvicorn as 服务运行器
 
+from mybiout.pages.utils import 是否冻结运行
+from mybiout.pages.utils import 取工具目录
 from mybiout.pages.utils import 取端口
 
 
@@ -49,7 +52,12 @@ _盲文高密度: str = "⠿⡿⢿⣿⣾⣽⣻⣷⣯⣟⡷⡯⡟⠷⠯⠟⣶⣵�
 _闪光字符: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
 _最大粒子数: int = 280
 
-_程序工具目录: 路径 = 路径(__file__).resolve().parent / "bin"
+def _取程序工具目录() -> 路径:
+    r"""
+    获取 bin 工具目录 (绿色旁路优先)
+    :return: Path: bin 目录
+    """
+    return 取工具目录()
 
 
 def _配置文本输出() -> None:
@@ -87,14 +95,18 @@ def _检查环境() -> list[_环境项]:
     """
     检查结果: list[_环境项] = []
 
+    程序工具目录: 路径 = _取程序工具目录()
+
     # ffmpeg
     找到FFmpeg: bool = 文件工具.which("ffmpeg") is not None
     if not 找到FFmpeg:
         for 候选路径 in (
-            _程序工具目录 / "BBDown" / "ffmpeg.exe",
-            _程序工具目录 / "BBDown" / "ffmpeg",
-            _程序工具目录 / "ffmpeg.exe",
-            _程序工具目录 / "ffmpeg",
+            程序工具目录 / "BBDown" / "ffmpeg.exe",
+            程序工具目录 / "BBDown" / "ffmpeg",
+            程序工具目录 / "ffmpeg.exe",
+            程序工具目录 / "ffmpeg",
+            程序工具目录 / "ffmpeg" / "ffmpeg.exe",
+            程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
         ):
             if 候选路径.exists():
                 找到FFmpeg = True
@@ -105,7 +117,7 @@ def _检查环境() -> list[_环境项]:
             找到FFmpeg,
             "下载: https://ffmpeg.org/download.html\n"
             "      下载后将 ffmpeg.exe 所在目录添加至系统 PATH 环境变量\n"
-            "      或将 ffmpeg.exe 放入 mybiout/bin/ 目录下",
+            "      或将 ffmpeg.exe 放入绿色包/程序目录的 bin/ 下",
         )
     )
 
@@ -113,10 +125,10 @@ def _检查环境() -> list[_环境项]:
     找到BBDown: bool = 文件工具.which("BBDown") is not None or 文件工具.which("bbdown") is not None
     if not 找到BBDown:
         for 候选路径 in (
-            _程序工具目录 / "BBDown" / "BBDown.exe",
-            _程序工具目录 / "BBDown" / "BBDown",
-            _程序工具目录 / "BBDown.exe",
-            _程序工具目录 / "BBDown",
+            程序工具目录 / "BBDown" / "BBDown.exe",
+            程序工具目录 / "BBDown" / "BBDown",
+            程序工具目录 / "BBDown.exe",
+            程序工具目录 / "BBDown",
         ):
             if 候选路径.exists():
                 找到BBDown = True
@@ -126,7 +138,7 @@ def _检查环境() -> list[_环境项]:
             "BBDown",
             找到BBDown,
             "下载: https://github.com/nilaoda/BBDown/releases\n"
-            "      将 BBDown 可执行文件放入系统 PATH 或 mybiout/bin/BBDown/ 目录下",
+            "      将 BBDown 可执行文件放入系统 PATH 或绿色包/程序目录的 bin/ 下",
         )
     )
 
@@ -1027,9 +1039,82 @@ _备用标题: str = r"""
 """
 
 
+def _可否使用窗口壳() -> bool:
+    r"""
+    检测 pywebview 是否可用
+    :return: bool: 可用返回 True
+    """
+    try:
+        import webview  # noqa: F401
+
+        return True
+    except Exception:
+        return False
+
+
+def _停止服务(启动状态: _服务启动状态) -> None:
+    r"""
+    请求 Uvicorn 退出并等待后台线程结束
+    :param 启动状态: 服务启动状态
+    """
+    if 启动状态.服务 is not None:
+        启动状态.服务.should_exit = True
+    if 启动状态.线程对象 is not None and 启动状态.线程对象.is_alive():
+        启动状态.线程对象.join(timeout=5.0)
+
+
+def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
+    r"""
+    使用 pywebview 打开内嵌窗口, 关闭窗口时停止本地服务
+    :param 端口: 服务端口
+    :param 启动状态: 服务启动状态
+    """
+    import webview as 网页视图
+
+    地址: str = f"http://127.0.0.1:{端口}/"
+
+    def _窗口关闭() -> None:
+        r"""
+        窗口关闭回调: 停止后台服务
+        """
+        _停止服务(启动状态)
+
+    网页视图.create_window(
+        title="MyBiOut!",
+        url=地址,
+        width=1280,
+        height=840,
+        min_size=(960, 640),
+        background_color="#0b1220",
+    )
+    try:
+        网页视图.start(debug=False)
+    finally:
+        _停止服务(启动状态)
+
+
+def _打印就绪信息(端口: int, *, 使用窗口: bool) -> None:
+    r"""
+    在控制台打印服务就绪摘要
+    :param 端口: 端口号
+    :param 使用窗口: 是否内嵌窗口模式
+    """
+    print(_备用标题)
+    print(f"  ✦ 端口: {端口}")
+    print(f"  ✦ 访问: http://127.0.0.1:{端口}")
+    if 使用窗口:
+        print("  ✦ 模式: 绿色内嵌窗口 (关闭窗口即退出)")
+    else:
+        print("  ✦ 模式: 系统浏览器")
+    print("  ✦ 仓库: https://github.com/Water-Run/MyBiOut")
+    print("  ✦ 作者: WaterRun")
+    print()
+
+
 def 主程序() -> None:
     r"""
     程序主入口, 解析命令行并启动 FastAPI 服务
+    默认优先使用内嵌 Web 窗口 (绿色套壳); --browser 回退系统浏览器
     :return: None: 无返回值
     """
     _配置文本输出()
@@ -1038,7 +1123,7 @@ def 主程序() -> None:
 
     解析器: 参数解析.ArgumentParser = _中文参数解析器(
         prog="MyBiOut!",
-        description="MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集",
+        description="MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集 (绿色版可双击运行)",
     )
     解析器.add_argument(
         "--port",
@@ -1046,15 +1131,40 @@ def 主程序() -> None:
         default=默认端口,
         help=f"指定服务端口号 (默认: {默认端口})",
     )
+    解析器.add_argument(
+        "--browser",
+        action="store_true",
+        help="使用系统浏览器打开界面 (而非内嵌窗口)",
+    )
+    解析器.add_argument(
+        "--no-animation",
+        action="store_true",
+        help="跳过终端启动动画",
+    )
     参数: 参数解析.Namespace = 解析器.parse_args()
     端口: int = 参数.port
+
+    使用窗口: bool = not 参数.browser
+    if 使用窗口 and not _可否使用窗口壳():
+        使用窗口 = False
+        if not 参数.browser:
+            print("  提示: 未安装 pywebview, 已回退为系统浏览器模式")
+            print("        安装: pip install pywebview")
+            print()
+
+    # 冻结绿色包或无可交互终端时跳过动画
+    跳过动画: bool = (
+        参数.no_animation
+        or 是否冻结运行()
+        or 使用窗口
+        or not 系统.stdout.isatty()
+    )
 
     # ===== 环境检查 =====
     环境检查列表: list[_环境项] = _检查环境()
     缺失环境项: list[_环境项] = _取启动阻断项(环境检查列表)
 
     if 缺失环境项:
-        # 环境缺失 → 创建预失败状态 → 动画将坠机
         缺失名称: str = ", ".join(检查项.名称 for 检查项 in 缺失环境项)
         启动状态: _服务启动状态 = _服务启动状态()
         启动状态.标记失败(f"缺少必需组件: {缺失名称}")
@@ -1062,11 +1172,11 @@ def 主程序() -> None:
         启动状态 = _后台启动服务(端口)
 
     动画错误: Exception | None = None
-
-    try:
-        _播放动画(端口, 启动状态)
-    except Exception as e:
-        动画错误 = e
+    if not 跳过动画:
+        try:
+            _播放动画(端口, 启动状态)
+        except Exception as e:
+            动画错误 = e
 
     if 启动状态.已失败.is_set():
         print(_备用标题)
@@ -1079,13 +1189,8 @@ def 主程序() -> None:
             print()
         return
 
-    if 动画错误 is not None:
-        print(_备用标题)
-        print(f"  ✦ 端口: {端口}")
-        print(f"  ✦ 访问: http://localhost:{端口}")
-        print("  ✦ 仓库: https://github.com/Water-Run/MyBiOut")
-        print("  ✦ 作者: WaterRun")
-        print()
+    if 动画错误 is not None and not 使用窗口:
+        _打印就绪信息(端口, 使用窗口=False)
 
     if not _等待服务启动(启动状态, 超时=25.0):
         print(_备用标题)
@@ -1094,24 +1199,35 @@ def 主程序() -> None:
         print()
         return
 
-    def _打开浏览器() -> None:
-        r"""
-        延迟后自动打开浏览器访问地址
-        :return: None: 无返回值
-        """
-        时间.sleep(0.35)
-        浏览器.open(f"http://localhost:{端口}")
+    if 使用窗口:
+        if not 跳过动画:
+            _打印就绪信息(端口, 使用窗口=True)
+        elif 系统.stdout.isatty():
+            _打印就绪信息(端口, 使用窗口=True)
+        try:
+            _启动窗口壳(端口, 启动状态)
+        except Exception as e:
+            print(f"  ✦ 内嵌窗口启动失败, 回退浏览器: {e}")
+            使用窗口 = False
 
-    线程.Thread(target=_打开浏览器, daemon=True).start()
+    if not 使用窗口:
 
-    try:
-        while 启动状态.线程对象 is not None and 启动状态.线程对象.is_alive():
-            时间.sleep(0.2)
-    except KeyboardInterrupt:
-        if 启动状态.服务 is not None:
-            启动状态.服务.should_exit = True
-        if 启动状态.线程对象 is not None:
-            启动状态.线程对象.join(timeout=5.0)
+        def _打开浏览器() -> None:
+            r"""
+            延迟后自动打开系统浏览器
+            """
+            时间.sleep(0.35)
+            浏览器.open(f"http://127.0.0.1:{端口}")
+
+        if 跳过动画:
+            _打印就绪信息(端口, 使用窗口=False)
+        线程.Thread(target=_打开浏览器, daemon=True).start()
+
+        try:
+            while 启动状态.线程对象 is not None and 启动状态.线程对象.is_alive():
+                时间.sleep(0.2)
+        except KeyboardInterrupt:
+            _停止服务(启动状态)
 
 
 if __name__ == "__main__":

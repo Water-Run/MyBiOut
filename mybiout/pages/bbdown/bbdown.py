@@ -20,7 +20,6 @@ from pathlib import Path as 路径
 
 from mybiout.pages import utils as 工具
 
-_程序工具目录: 路径 = 路径(__file__).resolve().parent.parent.parent / "bin"
 _控制码正则: 正则.Pattern[str] = 正则.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 _子进程附加参数: dict[str, int] = {}
 if 系统.platform == "win32":
@@ -29,16 +28,25 @@ if 系统.platform == "win32":
 _控制台编码: str = "gbk" if 系统.platform == "win32" else "utf-8"
 
 
+def _取程序工具目录() -> 路径:
+    r"""
+    获取 bin 工具目录 (支持绿色旁路与冻结资源)
+    :return: Path: bin 目录
+    """
+    return 工具.取工具目录()
+
+
 def _寻找BBDown() -> str | None:
     r"""
     查找 BBDown 可执行文件
     :return: str | None: 可执行文件路径, 未找到返回 None
     """
+    程序工具目录: 路径 = _取程序工具目录()
     候选路径列表: list[路径] = [
-        _程序工具目录 / "BBDown" / "BBDown.exe",
-        _程序工具目录 / "BBDown" / "BBDown",
-        _程序工具目录 / "BBDown.exe",
-        _程序工具目录 / "BBDown",
+        程序工具目录 / "BBDown" / "BBDown.exe",
+        程序工具目录 / "BBDown" / "BBDown",
+        程序工具目录 / "BBDown.exe",
+        程序工具目录 / "BBDown",
     ]
     for 候选路径 in 候选路径列表:
         if 候选路径.exists():
@@ -51,11 +59,14 @@ def _寻找FFmpeg() -> str | None:
     查找 ffmpeg 可执行文件
     :return: str | None: 可执行文件路径, 未找到返回 None
     """
+    程序工具目录: 路径 = _取程序工具目录()
     候选路径列表: list[路径] = [
-        _程序工具目录 / "BBDown" / "ffmpeg.exe",
-        _程序工具目录 / "BBDown" / "ffmpeg",
-        _程序工具目录 / "ffmpeg.exe",
-        _程序工具目录 / "ffmpeg",
+        程序工具目录 / "BBDown" / "ffmpeg.exe",
+        程序工具目录 / "BBDown" / "ffmpeg",
+        程序工具目录 / "ffmpeg.exe",
+        程序工具目录 / "ffmpeg",
+        程序工具目录 / "ffmpeg" / "ffmpeg.exe",
+        程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
     ]
     for 候选路径 in 候选路径列表:
         if 候选路径.exists():

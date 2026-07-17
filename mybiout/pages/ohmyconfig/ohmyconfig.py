@@ -274,7 +274,7 @@ def 通过登录自动取会话数据(用户代理: str | None = None, 超时秒
                 浏览器类型 = "chromium"
                 浏览器通道 = "chrome"
 
-    资料目录 = 路径(__file__).resolve().parent.parent / "auth_profile"
+    资料目录 = 工具.取资料目录()
     资料目录.mkdir(parents=True, exist_ok=True)
     资料目录文本 = str(资料目录)
 

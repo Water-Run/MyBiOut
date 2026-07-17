@@ -49,7 +49,9 @@ Desktop.ini
 TmpEdit*.txt
 .worktrees/
 worktrees/
-docs/
+# 文档默认忽略大型审查产物; 绿色版说明需入库
+docs/*
+!docs/绿色版.md
 
 # MyBiOut! 项目本地配置（可能含 SESSDATA 等敏感信息）
 mybiout/config.ini

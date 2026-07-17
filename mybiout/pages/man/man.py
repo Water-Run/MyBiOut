@@ -21,9 +21,29 @@ import httpx as 网络请求
 
 from mybiout.pages import utils as 工具
 
-_程序工具目录: 路径 = 路径(__file__).resolve().parent.parent.parent / "bin"
-_胡言数据路径: 路径 = _程序工具目录 / "BullshitGenerator" / "data.json"
-_项目根目录: 路径 = 路径(__file__).resolve().parent.parent.parent
+
+def _取程序工具目录() -> 路径:
+    r"""
+    获取 bin 工具目录
+    :return: Path: bin 目录
+    """
+    return 工具.取工具目录()
+
+
+def _取胡言数据路径() -> 路径:
+    r"""
+    获取狗屁不通语料路径
+    :return: Path: data.json 路径
+    """
+    return _取程序工具目录() / "BullshitGenerator" / "data.json"
+
+
+def _取项目根目录() -> 路径:
+    r"""
+    获取项目/资源根目录 (用于手册上下文)
+    :return: Path: 资源根
+    """
+    return 工具.取资源根目录()
 
 _子进程附加参数: dict[str, int] = {}
 if 系统.platform == "win32":
@@ -220,7 +240,7 @@ def _加载胡言材料() -> dict:
     global _胡言缓存
     if not _胡言缓存:
         try:
-            _胡言缓存 = 数据交换.loads(_胡言数据路径.read_text(encoding="utf-8"))
+            _胡言缓存 = 数据交换.loads(_取胡言数据路径().read_text(encoding="utf-8"))
         except Exception:
             _胡言缓存 = {}
     return _胡言缓存
@@ -553,7 +573,7 @@ def _取项目上下文() -> str:
             return _上下文缓存
     try:
         执行结果: 子进程.CompletedProcess = 子进程.run(
-            ["pmc", str(_项目根目录)],
+            ["pmc", str(_取项目根目录())],
             capture_output=True,
             text=True,
             timeout=60,

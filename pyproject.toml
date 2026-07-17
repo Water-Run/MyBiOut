@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mybiout"
-version = "60314.0"
-description = "MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集"
+version = "60717.0"
+description = "MyBiOut! 综合性一站式开箱即用哔哩哔哩导出工具集 (绿色双击版)"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "WaterRun", email = "linzhuangrun49@gmail.com" }]
@@ -36,10 +36,12 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "httpx>=0.27.0",
     "biliffm4s>=0.1.0",
+    "pywebview>=5.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0.0", "ruff>=0.1.0"]
+green = ["pyinstaller>=6.0.0"]
 
 [project.scripts]
 "MyBiOut!" = "mybiout.main:主程序"

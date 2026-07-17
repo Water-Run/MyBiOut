@@ -95,6 +95,14 @@ def _寻找ADB() -> str | None:
     程序名: str = "adb.exe" if 系统信息.platform == "win32" else "adb"
     if 文件工具.which(程序名) or 文件工具.which("adb"):
         return 程序名
+    工具目录: 路径 = 工具.取工具目录()
+    for 候选路径 in (
+        工具目录 / "adb.exe",
+        工具目录 / "platform-tools" / "adb.exe",
+        工具目录 / "adb" / "adb.exe",
+    ):
+        if 候选路径.exists():
+            return str(候选路径)
     if 系统信息.platform == "win32":
         for 候选路径 in (
             路径(系统.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",

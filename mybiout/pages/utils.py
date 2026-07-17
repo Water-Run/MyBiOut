@@ -1,5 +1,5 @@
 r"""
-MyBiOut! 基础工具模块, 负责配置文件的读写与通用方法
+MyBiOut! 基础工具模块, 负责配置文件的读写、便携路径与通用方法
 
 :file: mybiout/pages/utils.py
 :author: WaterRun
@@ -8,14 +8,87 @@ MyBiOut! 基础工具模块, 负责配置文件的读写与通用方法
 
 import configparser as 配置解析器
 import os as 系统
+import sys as 系统信息
 import tempfile as 临时文件
 import threading as 线程
 from contextlib import suppress as 忽略异常
 from pathlib import Path as 路径
 
-_配置路径: 路径 = 路径(__file__).resolve().parent.parent / "config.ini"
 _默认端口: int = 23333
 _配置锁: 线程.RLock = 线程.RLock()
+
+
+def 是否冻结运行() -> bool:
+    r"""
+    判断是否处于 PyInstaller 等冻结打包环境
+    :return: bool: 冻结运行返回 True
+    """
+    return bool(getattr(系统信息, "frozen", False)) or hasattr(系统信息, "_MEIPASS")
+
+
+def 取运行根目录() -> 路径:
+    r"""
+    获取运行根目录 (绿色包为 exe 旁, 开发态为 mybiout 包目录)
+    配置、auth_profile、旁路 bin 均相对此目录
+    :return: Path: 运行根目录
+    """
+    if getattr(系统信息, "frozen", False):
+        return 路径(系统信息.executable).resolve().parent
+    return 路径(__file__).resolve().parent.parent
+
+
+def 取资源根目录() -> 路径:
+    r"""
+    获取只读资源根目录 (pages / assets / 内置 bin)
+    冻结态优先 sys._MEIPASS/mybiout, 开发态为包目录
+    :return: Path: 资源根目录
+    """
+    临时解压目录 = getattr(系统信息, "_MEIPASS", None)
+    if 临时解压目录:
+        候选: 路径 = 路径(临时解压目录) / "mybiout"
+        if 候选.is_dir():
+            return 候选
+        return 路径(临时解压目录)
+    return 路径(__file__).resolve().parent.parent
+
+
+def 取工具目录() -> 路径:
+    r"""
+    获取外部工具 bin 目录 (优先运行根旁路, 其次资源内置)
+    :return: Path: bin 目录
+    """
+    旁路: 路径 = 取运行根目录() / "bin"
+    if 旁路.is_dir():
+        return 旁路
+    return 取资源根目录() / "bin"
+
+
+def 取页面目录() -> 路径:
+    r"""
+    获取 HTML 页面目录
+    :return: Path: pages 目录
+    """
+    return 取资源根目录() / "pages"
+
+
+def 取静态资源目录() -> 路径:
+    r"""
+    获取静态资源目录
+    :return: Path: assets 目录
+    """
+    return 取资源根目录() / "assets"
+
+
+def 取资料目录() -> 路径:
+    r"""
+    获取可写的浏览器登录资料目录 (Playwright 持久化)
+    :return: Path: auth_profile 目录
+    """
+    return 取运行根目录() / "auth_profile"
+
+
+# 模块级配置路径: 测试可通过 monkeypatch 覆盖; 绿色版落在 exe 旁
+_配置路径: 路径 = 取运行根目录() / "config.ini"
 
 
 def 取默认哔哩哔哩电脑缓存路径() -> str:
