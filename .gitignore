@@ -14,6 +14,9 @@ venv/
 htmlcov/
 coverage.xml
 
+# 测试仅本机保留，不入库
+tests/
+
 # ---------- 构建 / 发布产物 ----------
 build/
 dist/
