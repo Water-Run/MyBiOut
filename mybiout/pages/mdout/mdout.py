@@ -6,6 +6,7 @@ MdOut! Markdown 导出服务层, 负责从 B 站 API 获取信息并生成 Markd
 :time: 2026-04-06
 """
 
+import json as 数据交换
 import re as 正则
 import threading as 线程
 import time as 时间
@@ -36,6 +37,7 @@ _网址模式列表: list[tuple[正则.Pattern[str], str, str]] = [
     (正则.compile(r"^av(\d+)$", 正则.I), "video", "avid"),
     (正则.compile(r"(?:https?://)?(?:www\.)?bilibili\.com/read/cv(\d+)", 正则.I), "article", "cvid"),
     (正则.compile(r"^cv(\d+)$", 正则.I), "article", "cvid"),
+    (正则.compile(r"(?:https?://)?(?:www\.)?bilibili\.com/opus/(\d+)", 正则.I), "article", "opusid"),
     (正则.compile(r"(?:https?://)?space\.bilibili\.com/(\d+)", 正则.I), "user", "mid"),
 ]
 
@@ -269,6 +271,200 @@ def _获取专栏(专栏号: str) -> dict:
     :return: dict: 专栏信息
     """
     return _安全接口读取("/x/article/viewinfo", {"id": 专栏号})
+
+
+def _获取动态专栏(动态号: str) -> dict:
+    r"""
+    获取 opus 动态/图文专栏详情
+
+    动态详情 JSON 接口有风控 (-352), 改解析 opus 页面内嵌的
+    ``window.__INITIAL_STATE__`` —— 标题、作者、统计与正文段落树都在其中。
+    :param: 动态号: opus 动态 ID
+    :return: dict: detail 字典
+    :raise: RuntimeError: 页面请求失败或无可解析数据
+    """
+    with _客户端() as 客户端:
+        响应: 网络请求.Response = 客户端.get(f"https://www.bilibili.com/opus/{动态号}")
+    if 响应.status_code != 200:
+        raise RuntimeError(f"动态页面请求失败 (HTTP {响应.status_code})")
+    匹配 = 正则.search(r"window\.__INITIAL_STATE__=(.*?);\(function", 响应.text, 正则.S)
+    if not 匹配:
+        raise RuntimeError("动态页面无可解析数据 (可能被风控拦截)")
+    try:
+        初始状态: dict = 数据交换.loads(匹配.group(1))
+    except ValueError:
+        raise RuntimeError("动态页面数据解析失败") from None
+    详情: dict = 初始状态.get("detail") or {}
+    if not 详情.get("id_str"):
+        raise RuntimeError("动态不存在或已删除")
+    return 详情
+
+
+def _节点组Markdown(节点列表: list) -> str:
+    r"""
+    将 opus 富文本节点组转换为 Markdown 片段
+    :param: 节点列表: text.nodes 列表
+    :return: str: Markdown 片段
+    """
+    片段列表: list[str] = []
+    for 节点 in 节点列表:
+        类型: str = 节点.get("type", "")
+        if 类型 == "TEXT_NODE_TYPE_WORD":
+            词: dict = 节点.get("word") or {}
+            文本: str = 词.get("words", "")
+            if 文本.strip():
+                样式: dict = 词.get("style") or {}
+                if 样式.get("bold"):
+                    文本 = f"**{文本}**"
+                if 样式.get("italic"):
+                    文本 = f"*{文本}*"
+                if 样式.get("strikethrough"):
+                    文本 = f"~~{文本}~~"
+            片段列表.append(文本)
+        elif 类型 == "TEXT_NODE_TYPE_RICH":
+            富文: dict = 节点.get("rich") or {}
+            文本 = 富文.get("text", "")
+            if not 文本:
+                continue
+            跳转: str = 富文.get("jump_url", "") or ""
+            if 跳转.startswith("//"):
+                跳转 = "https:" + 跳转
+            片段列表.append(f"[{文本}]({跳转})" if 跳转 else 文本)
+        elif 类型 == "TEXT_NODE_TYPE_FORMULA":
+            公式: dict = 节点.get("formula") or {}
+            内容: str = 公式.get("latex_content", "") or 公式.get("content", "")
+            if 内容:
+                片段列表.append(f"${内容}$")
+    return "".join(片段列表)
+
+
+def _段落文本Markdown(段落: dict) -> str:
+    r"""提取段落的纯文本行 (软换行转为 Markdown 硬换行)"""
+    节点列表: list = (段落.get("text") or {}).get("nodes", []) or []
+    return _节点组Markdown(节点列表).replace("\n", "  \n")
+
+
+def _段落Markdown(段落: dict) -> list[str]:
+    r"""
+    将 opus 单个段落转换为 Markdown 行 (按非空字段识别段落类型, 兼容未知 para_type)
+    :param: 段落: paragraphs 项
+    :return: list[str]: Markdown 行列表
+    """
+    if 段落.get("heading") is not None:
+        标题内容: dict = 段落.get("heading") or {}
+        文本: str = _节点组Markdown((标题内容.get("text") or {}).get("nodes", []) or [])
+        级别: int = 标题内容.get("level", 2) or 2
+        return [f"{'#' * min(6, max(2, int(级别)))} {文本}".rstrip(), ""]
+    if 段落.get("pic") is not None:
+        图片组: list = (段落.get("pic") or {}).get("pics", []) or []
+        行: list[str] = [f"![图片]({图['url']})" for 图 in 图片组 if 图.get("url")]
+        return 行 + [""] if 行 else []
+    if 段落.get("line") is not None:
+        return ["---", ""]
+    if 段落.get("blockquote") is not None:
+        引用行: list[str] = []
+        for 子段 in (段落.get("blockquote") or {}).get("children", []) or []:
+            引用行.extend(f"> {子行}".rstrip() for 子行 in _段落Markdown(子段))
+        return 引用行 + [""] if 引用行 else []
+    if 段落.get("list") is not None:
+        列表: dict = 段落.get("list") or {}
+        有序: bool = 列表.get("style") == 2
+        列表行: list[str] = []
+        for 项 in 列表.get("children", []) or 列表.get("items", []) or []:
+            首行: bool = True
+            for 子段 in 项.get("children", []) or []:
+                for 子行 in (行 for 行 in _段落Markdown(子段) if 行.strip()):
+                    if 首行:
+                        序号: int = 项.get("order", 1) or 1
+                        列表行.append(f"{序号}. {子行}" if 有序 else f"- {子行}")
+                        首行 = False
+                    else:
+                        列表行.append(f"  {子行}")
+        return 列表行 + [""] if 列表行 else []
+    if 段落.get("code") is not None:
+        代码: dict = 段落.get("code") or {}
+        语言: str = 代码.get("lang", "") or ""
+        内容: str = str(代码.get("content", "")).rstrip("\n")
+        return [f"```{语言}", 内容, "```", ""]
+    if 段落.get("link_card") is not None:
+        卡片: dict = 段落.get("link_card") or {}
+        链接: str = 卡片.get("url", "") or ""
+        标题: str = 卡片.get("title", "") or 链接
+        return [f"[{标题}]({链接})", ""] if 链接 else []
+    文本 = _段落文本Markdown(段落)
+    return [文本, ""] if 文本.strip() else []
+
+
+def _动态标题(详情: dict) -> str:
+    r"""
+    从 opus 详情中提取标题
+    :param: 详情: detail 字典
+    :return: str: 标题 (可能为空)
+    """
+    for 模块 in 详情.get("modules", []):
+        if 标题模块 := 模块.get("module_title"):
+            if 文本 := 标题模块.get("text", ""):
+                return 文本
+    return (详情.get("basic") or {}).get("title", "")
+
+
+def _动态Markdown(详情: dict, 配置: dict) -> str:
+    r"""
+    由 opus 动态详情生成 Markdown 文档 (含正文)
+    :param: 详情: __INITIAL_STATE__.detail
+    :param: 配置: 导出配置
+    :return: str: Markdown 文本
+    """
+    动态号: str = 详情.get("id_str", "")
+    标题: str = _动态标题(详情) or "未知动态"
+    作者名: str = ""
+    作者号: str = ""
+    发布时间戳: int = 0
+    统计: dict = {}
+    段落列表: list = []
+
+    for 模块 in 详情.get("modules", []):
+        if 作者模块 := 模块.get("module_author"):
+            作者名 = 作者名 or 作者模块.get("name", "") or ""
+            作者号 = 作者号 or str(作者模块.get("mid", "") or "")
+            发布时间戳 = 发布时间戳 or int(作者模块.get("pub_ts", 0) or 0)
+        if 统计模块 := 模块.get("module_stat"):
+            统计 = 统计 or 统计模块
+        if 内容模块 := 模块.get("module_content"):
+            段落列表 = 段落列表 or 内容模块.get("paragraphs", []) or []
+
+    行列表: list[str] = [
+        f"# {标题}\n",
+        f"> 动态 opus{动态号} | https://www.bilibili.com/opus/{动态号}",
+        f"> 导出时间: {_完整时间()}\n",
+    ]
+
+    行列表.extend(["## 基本信息\n", "| 项目 | 内容 |", "|------|------|"])
+    if 作者名 or 作者号:
+        行列表.append(f"| 作者 | {作者名 or 作者号} |")
+    if 作者号:
+        行列表.append(f"| UID | {作者号} |")
+    if 发布时间戳:
+        行列表.append(f"| 发布时间 | {_格式化时间戳(发布时间戳)} |")
+    行列表.append("")
+
+    if 配置.get("include_stats") == "true" and 统计:
+        统计行: list[str] = []
+        for 键, 标签名 in [("forward", "转发"), ("comment", "评论"), ("like", "点赞"), ("coin", "投币")]:
+            项: dict = 统计.get(键) or {}
+            if 项.get("hidden"):
+                continue
+            统计行.append(f"| {标签名} | {_格式化数字(项.get('count', 0))} |")
+        if 统计行:
+            行列表.extend(["## 数据统计\n", "| 指标 | 数值 |", "|------|------|", *统计行, ""])
+
+    if 段落列表:
+        行列表.append("## 正文\n")
+        for 段落 in 段落列表:
+            行列表.extend(_段落Markdown(段落))
+
+    行列表.extend(["---", f"*由 MyBiOut! MdOut 导出于 {_完整时间()}*"])
+    return "\n".join(行列表)
 
 
 def _视频Markdown(信息: dict, 标签: list, 配置: dict) -> str:
@@ -645,6 +841,12 @@ def _执行获取专栏(卡片: 文档卡片) -> None:
     :raise: RuntimeError: 无法获取专栏信息
     """
     配置: dict[str, str] = _设置字典()
+    if 卡片.编号类型 == "opusid":
+        详情: dict = _获取动态专栏(卡片.编号值)
+        卡片.标题 = _动态标题(详情) or "未知动态"
+        卡片.副标题 = f"opus{卡片.编号值}"
+        卡片.Markdown文本 = _动态Markdown(详情, 配置)
+        return
     信息: dict = _获取专栏(卡片.编号值)
     if not 信息:
         raise RuntimeError("无法获取专栏信息")

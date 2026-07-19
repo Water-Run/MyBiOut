@@ -442,6 +442,30 @@
             margin-bottom: 10px;
         }
 
+        #qr-box {
+            width: 232px;
+            height: 232px;
+            margin: 14px auto;
+            padding: 10px;
+            background: #fff;
+            border: 2px dashed #E85B8A;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #qr-box svg {
+            width: 208px;
+            height: 208px;
+        }
+
+        #qr-status {
+            font-size: 14px;
+            color: #7A1438;
+            min-height: 20px;
+            margin-bottom: 6px;
+        }
+
         .modal p {
             color: #777;
             font-size: 14px;
@@ -919,6 +943,19 @@
         </div>
     </div>
 
+    <!-- 扫码登录模态框 -->
+    <div class="modal-backdrop" id="qr-modal">
+        <div class="modal" style="transform:rotate(-0.8deg)">
+            <h3>扫码登录</h3>
+            <div id="qr-box"></div>
+            <p id="qr-status">正在生成二维码…</p>
+            <div class="modal-btns">
+                <button class="btn btn-orange" onclick="刷新二维码()">刷新二维码</button>
+                <button class="btn btn-ghost" onclick="关闭扫码弹窗()">取消</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 重置确认模态框 -->
     <div class="modal-backdrop" id="reset-modal">
         <div class="modal" style="transform:rotate(0.5deg)">
@@ -1155,24 +1192,69 @@
             await 保存设置('export', 'sessdata', '');
             显示提示('SESSDATA 已清空');
         }
+        /* 扫码登录 (B 站官方 passport 接口, 无需浏览器自动化) */
+        let _扫码计时器 = null;
+        let _扫码键 = '';
+
+        function 关闭扫码弹窗() {
+            document.getElementById('qr-modal').classList.remove('show');
+            if (_扫码计时器) { clearTimeout(_扫码计时器); _扫码计时器 = null; }
+        }
+
         async function 触发扫码登录() {
-            显示提示('正在启动扫码登录窗口...');
+            document.getElementById('qr-modal').classList.add('show');
+            await 刷新二维码();
+        }
+
+        async function 刷新二维码() {
+            if (_扫码计时器) { clearTimeout(_扫码计时器); _扫码计时器 = null; }
+            const 盒 = document.getElementById('qr-box');
+            const 状态行 = document.getElementById('qr-status');
+            盒.innerHTML = '';
+            状态行.textContent = '正在生成二维码…';
             try {
-                const r = await fetch('/api/auto-sessdata', {
+                const 响应 = await fetch('/api/qrcode/generate', { method: 'POST' });
+                const 数据 = await 响应.json();
+                if (!数据.ok) { 状态行.textContent = 数据.error || '生成二维码失败'; return; }
+                _扫码键 = 数据.qrcode_key;
+                盒.innerHTML = 数据.qr_svg;
+                状态行.textContent = '请使用哔哩哔哩 App 扫码';
+                _轮询扫码();
+            } catch (异常) {
+                状态行.textContent = '生成二维码异常: ' + 异常.message;
+            }
+        }
+
+        async function _轮询扫码() {
+            const 状态行 = document.getElementById('qr-status');
+            try {
+                const 响应 = await fetch('/api/qrcode/poll', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'launch_login' })
+                    body: JSON.stringify({ qrcode_key: _扫码键 })
                 });
-                const d = await r.json();
-                if (d.status === 'success' && d.sessdata) {
-                    document.getElementById('s-sessdata').value = d.sessdata;
-                    await 保存设置('export', 'sessdata', d.sessdata);
+                const 数据 = await 响应.json();
+                if (数据.status === 'success' && 数据.sessdata) {
+                    关闭扫码弹窗();
+                    document.getElementById('s-sessdata').value = 数据.sessdata;
+                    await 保存设置('export', 'sessdata', 数据.sessdata);
                     显示提示('扫码登录成功，已保存 SESSDATA！');
-                } else {
-                    显示提示(d.error || '扫码登录失败', true);
+                    return;
                 }
-            } catch (e) {
-                显示提示('扫码登录异常: ' + e.message, true);
+                if (数据.status === 'expired') {
+                    状态行.textContent = '二维码已过期，请点「刷新二维码」';
+                    return;
+                }
+                if (数据.status === 'error') {
+                    状态行.textContent = 数据.error || '轮询出错，请刷新重试';
+                    return;
+                }
+                if (数据.status === 'scanned') 状态行.textContent = '已扫码，请在手机上确认登录';
+            } catch (异常) {
+                状态行.textContent = '轮询异常: ' + 异常.message;
+            }
+            if (document.getElementById('qr-modal').classList.contains('show')) {
+                _扫码计时器 = setTimeout(_轮询扫码, 2000);
             }
         }
 
@@ -1263,7 +1345,9 @@
         window.confirmSessdataShared = 确认会话数据;
         window.doSaveSessdataShared = 保存会话数据;
         window.clearSessdataShared = 清空会话数据;
-        window.triggerPlaywrightLogin = 触发扫码登录;
+        window.triggerQrLogin = 触发扫码登录;
+        window.刷新二维码 = 刷新二维码;
+        window.关闭扫码弹窗 = 关闭扫码弹窗;
         window.confirmResetAll = 确认重置全部;
         window.closeResetModal = 关闭重置弹窗;
         window.doResetAll = 执行重置全部;

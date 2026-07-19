@@ -90,19 +90,21 @@ _封面缓存目录.mkdir(parents=True, exist_ok=True)
 def _寻找ADB() -> str | None:
     r"""
     查找 adb 可执行文件路径（参考 biliandout DeviceScanner.find_adb）
+    优先程序 bin/ 旁路（绿色包随发），再 PATH / 常见 SDK 目录
     :return: str | None: 路径, 未找到返回 None
     """
-    程序名: str = "adb.exe" if 系统信息.platform == "win32" else "adb"
-    if 文件工具.which(程序名) or 文件工具.which("adb"):
-        return 程序名
     工具目录: 路径 = 工具.取工具目录()
     for 候选路径 in (
         工具目录 / "adb.exe",
         工具目录 / "platform-tools" / "adb.exe",
         工具目录 / "adb" / "adb.exe",
     ):
-        if 候选路径.exists():
+        if 候选路径.is_file():
             return str(候选路径)
+    程序名: str = "adb.exe" if 系统信息.platform == "win32" else "adb"
+    which路径 = 文件工具.which(程序名) or 文件工具.which("adb")
+    if which路径:
+        return which路径
     if 系统信息.platform == "win32":
         for 候选路径 in (
             路径(系统.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
@@ -117,7 +119,7 @@ def _寻找ADB() -> str | None:
             路径("C:/Program Files/Android/platform-tools/adb.exe"),
             路径("C:/Program Files (x86)/Android/platform-tools/adb.exe"),
         ):
-            if 候选路径.exists():
+            if 候选路径.is_file():
                 return str(候选路径)
     return None
 
@@ -1388,7 +1390,7 @@ def 取环境状态() -> dict:
         "adb": {
             "available": ADB路径值 is not None,
             "path": ADB路径值 or "",
-            "hint": "请安装 ADB 并添加到 PATH，或放入 mybiout/bin/ 目录" if not ADB路径值 else "",
+            "hint": "绿色包应自带 bin/adb.exe；若缺失请将 adb.exe 与 AdbWinApi.dll 等放入程序 bin/" if not ADB路径值 else "",
         },
         "biliffm4s": {
             "available": 有合并库,

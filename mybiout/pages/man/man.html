@@ -7,7 +7,6 @@
     <title>Man! — MyBiOut!</title>
     <link rel="icon" href="/assets/logo.png" type="image/png">
     <link rel="stylesheet" href="/assets/entry.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -557,43 +556,43 @@
                 <div class="manual-body">
 
                     <h2>孩子们，先听一句</h2>
-                    <p>能打开这页，说明 MyBiOut! 已经在跑了。这里<strong>不讲安装</strong>，只讲怎么用、点哪里、坏了先看哪。别慌，一步一步来。</p>
-                    <p>五个入口，先记牢，选错会空转很久：</p>
+                    <p>Man! What can I say? 能打开这页，说明 MyBiOut! 已经在你机器上起飞了。这里<strong>不讲安装</strong>，只讲怎么用、点哪里、坏了先看哪。别慌，牢大带你一轮一轮打，不搞玄学。</p>
+                    <p>五个入口，先记牢——选错入口，比凌晨四点起来练错动作还白练：</p>
                     <ul>
                         <li><b>LocalOut!</b> — 视频<strong>已经</strong>在电脑/手机缓存里 → 合成可播文件</li>
                         <li><b>BBDown!</b> — 手里只有链接 / BV / av → 在线下载</li>
-                        <li><b>MdOut!</b> — 只要标题、UP、简介这些<strong>文字档案</strong> → Markdown</li>
+                        <li><b>MdOut!</b> — 只要标题、UP、简介这些<strong>文字档案</strong> → Markdown（含专栏 / 图文动态正文）</li>
                         <li><b>OhMyConfig</b> — 导出路径、SESSDATA、大模型开关和 Key 都在这</li>
                         <li><b>Man!</b>（本页）— 左手册、右助手；助手默认本地通道，整活也行</li>
                     </ul>
-                    <blockquote>先问自己：东西在哪？缓存在本地 → LocalOut；只有链接 → BBDown；只要文档 → MdOut。选错入口，再努力也像在正确的错误上加班。</blockquote>
+                    <blockquote>先问自己：东西在哪？缓存在本地 → LocalOut；只有链接 → BBDown；只要文档 → MdOut。选错入口，再努力也是在正确的错误上空位打铁。</blockquote>
 
                     <hr>
 
                     <h2>第一次上手（建议顺序）</h2>
                     <ol>
                         <li>进 <b>OhMyConfig</b>，看<strong>导出根目录</strong>是不是你想要的（默认 <code>C:\MyBiOut!</code>）。各模块会在下面建子文件夹。</li>
-                        <li>要高画质、收藏夹、更完整 B 站数据：配 <b>SESSDATA</b>（手填 Cookie 或扫码登录）。不配也能用一截功能，但高画质常会哭。</li>
-                        <li>大模型：默认<strong>关闭</strong>。想真 AI 再打开「启用大模型」并填 Key / Model / Base；关掉就永远本地助手。</li>
-                        <li>回首页进模块开干。卡住时：看任务状态原文 → 再回设置对路径/凭证。</li>
+                        <li>要高画质、收藏夹、更完整 B 站数据：配 <b>SESSDATA</b>。推荐点 <span class="badge-inline">扫码登录获取</span>——B 站 App 扫码即得，走官方登录通道，不碰密码、不养风控；也可以手动粘贴 Cookie。</li>
+                        <li>大模型：默认<strong>关闭</strong>。想真 AI 再打开「启用大模型」并填 Key / Model / Base；关掉就永远本地助手，牢大亲自下场整活。</li>
+                        <li>回首页进模块开干。卡住时：看任务状态原文 → 回设置对路径/凭证。一次只改一个设置，才知道哪一刀生效——曼巴式排障，一次一个动作。</li>
                     </ol>
 
                     <hr>
 
                     <h2>LocalOut!：缓存变成视频</h2>
-                    <p><strong>前提：</strong>片子已经在本机或手机缓存里。没有缓存就去 BBDown，别在这硬扫。</p>
+                    <p><strong>前提：</strong>片子已经在本机或手机缓存里。没有缓存就去 BBDown，别在这空扫——没有球就别硬投，先去 BBDown 拿球权。</p>
                     <p><strong>推荐流程：</strong></p>
                     <ol>
                         <li>选来源：PC 桌面端缓存 / Android（ADB）/ 自定义文件夹。</li>
-                        <li><span class="badge-inline">添加源</span> → 等扫描出卡片（没卡片就先别导出）。</li>
+                        <li><span class="badge-inline">添加源</span> → 等扫描出卡片（没卡片就先别导出，传不了球）。</li>
                         <li>勾选分 P → <span class="badge-inline">加入任务</span> → <span class="badge-inline">导出</span>。</li>
-                        <li>完成后「打开目录」找成品。打不开：多半 FFmpeg 或 m4s 分片不全。</li>
+                        <li>完成后「打开目录」找成品。打不开：多半 FFmpeg 不在 bin/ 或 m4s 分片不全——凌晨四点你也合成不出来。</li>
                     </ol>
                     <p><strong>常见坑（对号入座）：</strong></p>
                     <ul>
-                        <li><b>PC 扫空</b>：设置里 PC 缓存路径是不是 B 站真实目录（客户端一更新就爱搬家）。</li>
-                        <li><b>手机扫不到</b>：USB 调试开着、手机点了允许本机调试、页面环境条能看见设备。</li>
-                        <li><b>导出失败</b>：FFmpeg 在不在（PATH 或绿色包 bin）；卡片信息全不全；同一源再扫一次。</li>
+                        <li><b>PC 扫空</b>：设置里 PC 缓存路径是不是 B 站真实目录（客户端一更新就爱搬家，比转会还勤）。</li>
+                        <li><b>手机扫不到</b>：USB 调试开着、手机点了允许本机调试、页面环境条能看见设备。ADB 在 bin/ 里要有 adb.exe + 配套 dll。</li>
+                        <li><b>导出失败</b>：FFmpeg 在不在（绿色包 bin/ 或 PATH）；卡片信息全不全；同一源再扫一次，别反复肘同一个按钮。</li>
                         <li><b>文件名翻车</b>：命名模板别堆空字段；Windows 路径别太长、别非法字符。</li>
                         <li><b>看起来跑完了目录却空</b>：以导出目录里真有文件为准，不是「感觉跑完了」。</li>
                     </ul>
@@ -601,48 +600,50 @@
                     <hr>
 
                     <h2>BBDown!：按链接下载</h2>
-                    <p>这是 BBDown 命令行的可视化壳：你们贴链接，它排队跑。核心能力是 BBDown 的，页面负责参数和队列。</p>
+                    <p>这是 BBDown 命令行的可视化壳：你们贴链接，它排队跑。核心能力是 BBDown 的，页面负责参数和队列——就像教练画战术、球员执行。</p>
                     <p><strong>能贴什么：</strong> <code>BV</code> / <code>av</code> / <code>ep</code> / <code>ss</code>、完整视频/番剧链接、<code>b23</code> 短链。</p>
                     <p><strong>怎么下：</strong> 粘贴 → 选画质/编码/分 P/弹幕字幕封面 → 添加任务 → 看队列。可取消、失败可重试、列表可清空。</p>
                     <p><strong>常见坑：</strong></p>
                     <ul>
-                        <li><b>高画质不行</b>：先配有效 SESSDATA；再确认视频本身有没有那档清晰度。</li>
-                        <li><b>任务红了</b>：链接有效？Cookie 过期？画质/编码是否存在？bin 里有没有 BBDown.exe？</li>
+                        <li><b>高画质不行</b>：先配有效 SESSDATA（建议扫码登录获取）；再确认视频本身有没有那档清晰度。</li>
+                        <li><b>任务红了</b>：链接有效？Cookie 过期？画质/编码是否存在？bin/ 里有没有 BBDown.exe？一个个肘开排查。</li>
                         <li><b>只要音频/弹幕/字幕</b>：在下载内容里勾，不必手写命令行。</li>
-                        <li><b>很慢</b>：先看网络和 B 站，再考虑降画质、少分 P、改天再来。</li>
+                        <li><b>很慢</b>：先看网络和 B 站，再考虑降画质、少分 P、改天再来——81 分也不是一分钟刷的。</li>
                     </ul>
 
                     <hr>
 
                     <h2>MdOut!：导出信息文档</h2>
-                    <p>只产出 Markdown，<strong>不下载视频本体</strong>。适合归档标题、UP、标签、收藏夹概览、专栏元信息。</p>
+                    <p>只产出 Markdown，<strong>不下载视频本体</strong>。适合归档标题、UP、标签、收藏夹概览，以及<strong>专栏正文 / 图文动态（opus）正文</strong>。</p>
+                    <p><strong>能贴什么：</strong> BV / av / 视频链接、UID / 空间链接、<code>cv</code> 号 / 专栏链接、<code>opus</code> 图文动态链接、<code>b23</code> 短链。链接里带 <code>?spm_id_from=</code> 等尾巴也认，不用手动截。</p>
                     <p><strong>流程：</strong> 输入链接或编号 → 解析添加 → 预览（富文本 / 原文）→ 导出选中或全部就绪 →「打开导出目录」核对。</p>
                     <p><strong>常见坑：</strong></p>
                     <ul>
-                        <li>收藏夹/详情缺字段：多半要 SESSDATA，或接口权限/风控。</li>
-                        <li>类型认错：换完整链接；确认是视频 / 空间 / 收藏夹 / 专栏之一。</li>
+                        <li>收藏夹/详情缺字段：多半要 SESSDATA（扫码登录即可），或接口权限/风控。</li>
+                        <li>类型认错：换完整链接；确认是视频 / 空间 / 收藏夹 / 专栏 / 图文动态之一。</li>
+                        <li><b>专栏/opus 正文为空</b>：正文在叶子节点组里面，预览能看到富文本就是抽到了；如果一直空检查网络到 B 站 API 通不通。</li>
                         <li>预览有字磁盘没有：查导出根目录和 MdOut 子目录名。</li>
-                        <li>一次太多：设置里调请求间隔和收藏详情程度，别把自己限流了。</li>
+                        <li>一次太多：设置里调请求间隔和收藏详情程度，别把自己限流了——手感热也别一口气扔 50 个链接。</li>
                     </ul>
 
                     <hr>
 
                     <h2>OhMyConfig：先改设置再重试</h2>
-                    <p>多数问题<strong>不用重启服务</strong>：保存 → 回模块重新扫/重新下。孩子们改完设置别在旧失败任务上连点。</p>
+                    <p>多数问题<strong>不用重启服务</strong>：保存 → 回模块重新扫/重新下。孩子们改完设置别在旧失败任务上连点——换套战术重新来。</p>
                     <ul>
-                        <li><b>通用</b>：导出根目录、SESSDATA、大模型启用开关与 Key / Model / Base / 超时</li>
+                        <li><b>通用</b>：导出根目录、SESSDATA（<span class="badge-inline">扫码登录获取</span> 或手填）、大模型启用开关与 Key / Model / Base / 超时</li>
                         <li><b>LocalOut</b>：输出名、PC 路径、Android 开关、命名、FFmpeg 并发</li>
                         <li><b>BBDown</b>：画质编码偏好、文件名模板、弹幕字幕封面</li>
                         <li><b>MdOut</b>：字段开关、收藏详情、请求间隔</li>
                     </ul>
-                    <p>Key / Cookie / SESSDATA 写在本机 <code>config.ini</code>（绿色包根目录旁）。别丢网盘同步盘或公用电脑长期挂着——明文就是明文。</p>
+                    <p>Key / Cookie / SESSDATA 写在本机 <code>config.ini</code>（绿色包根目录旁）。别丢网盘同步盘或公用电脑上——明文密码就是明文，隔着屏幕都能被肘。</p>
 
                     <h3>大模型：启用开关怎么理解</h3>
                     <ul>
-                        <li><b>启用 = 关（默认）</b>：右侧「发送」也走本地助手通道（玩梗/高仿分析），不请求云端。</li>
+                        <li><b>启用 = 关（默认）</b>：右侧「发送」也走本地助手通道（牢大亲自整活），不请求云端，完全离线。</li>
                         <li><b>启用 = 开</b> 且 Key、Model、Base 配对：才真调 OpenAI 兼容接口。</li>
                         <li>调用失败或 Key 空：仍回落本地通道，不中断你们玩。</li>
-                        <li>「直接说」：强制本地通道，不管开关，适合整活，不保证技术正确。</li>
+                        <li>「直接说」：强制本地通道，不管开关——适合整活，不保证技术正确，纯属牢大训练赛内容。</li>
                     </ul>
                     <p>示例（Deepseek）：Model <code>deepseek-chat</code>，Base <code>https://api.deepseek.com/v1</code>。</p>
 
@@ -651,28 +652,42 @@
                     <h2>右侧助手怎么问才有用</h2>
                     <p>带上：模块名 + 现象 + 你刚点了什么 + 页面原文。例：</p>
                     <pre><code>LocalOut 扫安卓缓存，提示没有 ADB 设备，手机已开 USB 调试</code></pre>
-                    <p>比只说「不能用」「寄了」强十倍。左手册查流程，右栏聊具体报错。称呼上我们叫孩子们，你们把问题说清楚就行。</p>
+                    <p>比只说「不能用」「寄了」强十倍——就像队医要知道你扭的是左脚还是右脚。左手册查流程，右栏聊具体报错。称呼上我们叫孩子们，你们把问题说清楚就行。</p>
+
+                    <hr>
+
+                    <h2>启动参数与版本（进阶）</h2>
+                    <ul>
+                        <li><code>MyBiOut!.exe --port 2026</code>：指定端口（默认 <b>23333</b>）。端口被占时换一个号即可；换不动说明有旧实例还在跑。</li>
+                        <li><code>MyBiOut!.exe --browser</code>：不开内嵌窗口，改用系统浏览器打开——WebView2 缺了 / 坏了 / 不想装的首选方案。</li>
+                        <li><code>MyBiOut!.exe --no-animation</code>：跳过启动直升机动效，直接进入（适合重复调试）。</li>
+                        <li>界面底部版本号来自绿色包根目录 <code>version.txt</code>，中文年月轨：如 <b>二六〇七甲</b> = 2026 年 7 月第 1 包（甲乙丙丁戊己庚辛壬癸子丑，月内最多 12 包）。</li>
+                    </ul>
 
                     <hr>
 
                     <h2>排错速查</h2>
                     <ul>
-                        <li><b>功能全挂</b>：设置路径 / SESSDATA；模块页环境检测（FFmpeg、BBDown、ADB）。</li>
+                        <li><b>功能全挂</b>：设置路径 / SESSDATA（扫码登录获取新版）；模块页环境检测（FFmpeg、BBDown、ADB）。</li>
+                        <li><b>扫码登录不弹码</b>：网络到 passport.bilibili.com 不通就会生成失败；二维码 3 分钟过期，过期点「刷新二维码」。</li>
                         <li><b>目录空</b>：任务是否完成、导出根是否改过、子目录名是否默认。</li>
                         <li><b>登录相关挂</b>：重扫码或更新 SESSDATA（过期、截断、风控都常见）。</li>
+                        <li><b>端口起不来 / 窗口闪退</b>：换 <code>--port</code>；或用 <code>--browser</code>；看绿色目录有无 <code>startup_error.log</code>。</li>
                         <li><b>助手不像真 AI</b>：看「启用大模型」开没开、Key/Model/Base/超时；关着本来就是本地通道。</li>
                         <li><b>任务卡住</b>：取消当前，改设置后重加；看外部命令是否还在跑。</li>
-                        <li><b>窗口闪一下没了</b>：看绿色目录旁有没有 <code>startup_error.log</code>；可试 <code>MyBiOut!.exe --browser</code> 或装 WebView2。</li>
+                        <li><b>打包失败</b>：多半旧 exe 还在跑或 dist/ 目录被占用；关掉 MyBiOut!.exe 和资源管理器窗口再打包。</li>
                     </ul>
 
                     <hr>
 
                     <h2>环境与依赖（需要时再看）</h2>
                     <ul>
-                        <li><b>FFmpeg</b>：LocalOut 导出必需</li>
-                        <li><b>BBDown</b>：在线下载必需</li>
-                        <li><b>ADB</b>：可选，扫手机缓存</li>
-                        <li><b>WebView2</b>：内嵌窗口；Win11 一般自带</li>
+                        <li><b>目标系统</b>：Windows 11 x64 绿色包；工具在程序旁 <code>bin/</code> 随包分发</li>
+                        <li><b>FFmpeg</b>：LocalOut 导出必需 → <code>bin/ffmpeg.exe</code></li>
+                        <li><b>BBDown</b>：在线下载必需 → <code>bin/BBDown.exe</code></li>
+                        <li><b>ADB</b>：扫手机缓存 → <code>bin/adb.exe</code>（及配套 dll）</li>
+                        <li><b>WebView2</b>：内嵌窗口；Win11 一般自带。没有就弹提示，可 <code>--browser</code></li>
+                        <li>缺工具 / 窗口起不来：启动弹提示即可，程序仍尽量开；对应功能可能不可用</li>
                     </ul>
                     <div class="dep-card">
                         <b>BBDown</b> · <a href="https://github.com/nilaoda/BBDown" target="_blank">nilaoda/BBDown ↗</a> — 下载核心
@@ -687,7 +702,7 @@
                     <hr>
                     <p style="text-align:center;color:#ccc;font-size:12px;margin-top:20px">
                         MyBiOut! — 导出我的哔哩哔哩 · WTFPL<br>
-                        孩子们有问题先看任务状态，再问右侧 😊 · Mamba Out
+                        Man! What can I say? 孩子们先跑最小闭环，再看任务状态，再问右侧 🚁 · Mamba Out
                     </p>
                 </div>
             </div>
@@ -696,7 +711,12 @@
             <div class="chat-panel">
                 <div class="chat-msgs" id="chat-msgs">
                     <div class="chat-welcome">
-                        <!-- <div class="cw-icon">🚁</div> -->
+                        <div class="cw-icon">🚁</div>
+                        <p style="margin-top:12px">孩子们，我是本页助手，牢大待机中。<br>
+                            <b>发送</b>：走大模型（先在 OhMyConfig 启用并填 Key，否则回落本地）；<br>
+                            <b>直接说</b>：强制本地通道，牢大亲自整活——图一乐，别当排障依据。<br>
+                            带上模块名 + 现象 + 页面原文，比只说「寄了」强十倍。
+                        </p>
                     </div>
                 </div>
 
@@ -743,7 +763,7 @@
             const div = document.createElement('div');
             div.className = 'msg msg-bot';
             div.id = 'msg-loading';
-            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble"><div class="msg-thinking"><span class="think-face">😊</span><span>思考分析<span class="think-dots"></span></span></div></div></div>`;
+            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble"><div class="msg-thinking"><span class="think-face">🚁</span><span>思维直升中<span class="think-dots"></span></span></div></div></div>`;
             取元素('chat-msgs').appendChild(div);
             取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
         }
@@ -762,9 +782,24 @@
             return div.querySelector('#stream-bubble');
         }
 
+        /* 轻量本地 Markdown（无 CDN，避免点 Man 时外网卡住） */
         function 渲染Markdown(text) {
-            try { return marked.parse(text); }
-            catch (e) { return 转义网页(text).replace(/\n/g, '<br>'); }
+            try {
+                if (window.marked && typeof window.marked.parse === 'function') {
+                    return window.marked.parse(text);
+                }
+            } catch (e) { /* 走本地降级 */ }
+            let h = 转义网页(String(text || ''));
+            h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/^\- (.+)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>' + m + '</ul>')
+                .replace(/\n{2,}/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            return '<p>' + h + '</p>';
         }
 
         function 渲染回复(bubble, text, source) {
@@ -827,7 +862,7 @@
                             if (chunk.source) source = chunk.source;
                             if (chunk.note) note = chunk.note;
                             if (chunk.status === 'thinking') {
-                                // 保持「思考分析😊」加载态，内容到了再切气泡
+                                // 保持「思维直升中🚁」加载态，内容到了再切气泡
                                 continue;
                             }
 
@@ -867,16 +902,73 @@
             取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
         };
 
-        /* BG STARS */
+        /* BG STARS：入口动画结束后再启动，避免与 entry 画布抢主线程 */
         function 初始化背景() {
-            const 画布 = 取元素('bg-cv'), 画笔 = 画布.getContext('2d');
+            const 画布 = 取元素('bg-cv');
+            if (!画布) return;
+            const 画笔 = 画布.getContext('2d');
+            if (!画笔) return;
             const 橙色 = '#F5A623', 粉色 = '#E85B8A';
             let 星星组 = [];
+            let 已启 = false;
             function 调整尺寸() { 画布.width = innerWidth; 画布.height = innerHeight; }
-            调整尺寸(); window.addEventListener('resize', 调整尺寸);
-            for (let i = 0; i < 28; i++) 星星组.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, sz: Math.random() * 10 + 4, r: Math.random() * Math.PI * 2, rv: (Math.random() - .5) * .015, vy: Math.random() * .25 + .08, vx: (Math.random() - .5) * .2, c: Math.random() > .5 ? 橙色 : 粉色, al: Math.random() * .35 + .15, phase: Math.random() * Math.PI * 2 });
-            function 绘制星星(x, y, r, sz, col, al) { if (al < .01) return; 画笔.save(); 画笔.globalAlpha = al; 画笔.translate(x, y); 画笔.rotate(r); 画笔.beginPath(); for (let i = 0; i < 5; i++) { const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5; i ? 画笔.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : 画笔.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz); 画笔.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4); } 画笔.closePath(); 画笔.fillStyle = col; 画笔.fill(); 画笔.restore(); }
-            (function 循环() { 画笔.clearRect(0, 0, 画布.width, 画布.height); 星星组.forEach(s => { s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012; if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; } if (s.x < -20) s.x = innerWidth + 20; if (s.x > innerWidth + 20) s.x = -20; 绘制星星(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase))); }); requestAnimationFrame(循环); })();
+            function 绘制星星(x, y, r, sz, col, al) {
+                if (al < .01) return;
+                画笔.save();
+                画笔.globalAlpha = al;
+                画笔.translate(x, y);
+                画笔.rotate(r);
+                画笔.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const ao = i * 2 * Math.PI / 5 - Math.PI / 2, ai = ao + Math.PI / 5;
+                    i ? 画笔.lineTo(Math.cos(ao) * sz, Math.sin(ao) * sz) : 画笔.moveTo(Math.cos(ao) * sz, Math.sin(ao) * sz);
+                    画笔.lineTo(Math.cos(ai) * sz * .4, Math.sin(ai) * sz * .4);
+                }
+                画笔.closePath();
+                画笔.fillStyle = col;
+                画笔.fill();
+                画笔.restore();
+            }
+            function 循环() {
+                画笔.clearRect(0, 0, 画布.width, 画布.height);
+                星星组.forEach(s => {
+                    s.x += s.vx; s.y += s.vy; s.r += s.rv; s.phase += .012;
+                    if (s.y > innerHeight + 20) { s.y = -20; s.x = Math.random() * innerWidth; }
+                    if (s.x < -20) s.x = innerWidth + 20;
+                    if (s.x > innerWidth + 20) s.x = -20;
+                    绘制星星(s.x, s.y, s.r, s.sz, s.c, s.al * (.7 + .3 * Math.sin(s.phase)));
+                });
+                requestAnimationFrame(循环);
+            }
+            function 启动() {
+                if (已启) return;
+                已启 = true;
+                调整尺寸();
+                window.addEventListener('resize', 调整尺寸, { passive: true });
+                for (let i = 0; i < 16; i++) {
+                    星星组.push({
+                        x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+                        sz: Math.random() * 8 + 3, r: Math.random() * Math.PI * 2,
+                        rv: (Math.random() - .5) * .012, vy: Math.random() * .2 + .06,
+                        vx: (Math.random() - .5) * .16, c: Math.random() > .5 ? 橙色 : 粉色,
+                        al: Math.random() * .3 + .12, phase: Math.random() * Math.PI * 2
+                    });
+                }
+                requestAnimationFrame(循环);
+            }
+            // 等入口遮罩卸下或就绪类出现后再画背景星
+            if (document.body.classList.contains('mybiout-entry-ready')) {
+                启动();
+            } else {
+                const 观察 = new MutationObserver(() => {
+                    if (document.body.classList.contains('mybiout-entry-ready')) {
+                        观察.disconnect();
+                        启动();
+                    }
+                });
+                观察.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+                setTimeout(启动, 1400);
+            }
         }
         window.发送对话 = 发送对话;
         window.sendChat = 发送对话;

@@ -6,8 +6,9 @@ MyBiOut! 设置页服务层, 负责设置的校验、浏览与业务逻辑
 :time: 2026-04-07
 """
 
-from contextlib import suppress as 忽略异常
 from pathlib import Path as 路径
+from urllib.parse import parse_qs as 解析查询
+from urllib.parse import urlparse as 拆分网址
 
 from mybiout.pages import utils as 工具
 
@@ -256,93 +257,91 @@ def 重置全部() -> dict[str, bool]:
     return {"ok": True}
 
 
-def 通过登录自动取会话数据(用户代理: str | None = None, 超时秒数: int = 180) -> str | None:
+_哔哩请求头: dict[str, str] = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://www.bilibili.com",
+    "Origin": "https://www.bilibili.com",
+}
+
+
+def 生成登录二维码() -> dict:
     r"""
-    打开可视化登录页，引导用户登录后自动读取 SESSDATA。
-    使用持久化的浏览器用户资料目录，避免每次都打开全新的隐私窗口需要重新登录。
+    调用 B 站官方 passport 接口生成扫码登录二维码
+
+    走官方网页扫码登录流程 (与 BBDown 等同款): 不碰密码/短信/滑块,
+    正常浏览器请求头 + 低频轮询, 无风控风险。
+    :return: dict: {ok, qrcode_key, qr_svg} 或 {ok: False, error}
     """
     try:
-        import time as 时间
+        import io as 输入输出
 
-        from playwright.sync_api import sync_playwright as 同步浏览器控制  # type: ignore
-    except Exception:
-        return None
-
-    浏览器类型 = "chromium"
-    浏览器通道 = None
-    if 用户代理:
-        小写代理 = 用户代理.lower()
-        if "edg/" in 小写代理 or "edge" in 小写代理:
-            浏览器类型 = "chromium"
-            浏览器通道 = "msedge"
-        elif "firefox" in 小写代理:
-            浏览器类型 = "firefox"
-        elif "chrome" in 小写代理:
-            if not any(标记 in 小写代理 for 标记 in ["edg/", "edge", "opr/", "opera", "vivaldi", "brave"]):
-                浏览器类型 = "chromium"
-                浏览器通道 = "chrome"
-
-    资料目录 = 工具.取资料目录()
-    资料目录.mkdir(parents=True, exist_ok=True)
-    资料目录文本 = str(资料目录)
+        import httpx as 网络请求
+        import qrcode as 二维码库
+        import qrcode.image.svg as 二维码矢量
+    except ImportError:
+        return {"ok": False, "error": "缺少依赖 (httpx / qrcode), 绿色包应自带"}
 
     try:
-        with 同步浏览器控制() as 浏览器控制:
-            上下文 = None
-            if 浏览器类型 == "firefox":
-                with 忽略异常(Exception):
-                    上下文 = 浏览器控制.firefox.launch_persistent_context(
-                        user_data_dir=资料目录文本,
-                        headless=False,
-                        viewport={"width": 1280, "height": 800},
-                    )
+        with 网络请求.Client(headers=_哔哩请求头, timeout=15.0) as 客户端:
+            响应 = 客户端.get("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
+        数据: dict = 响应.json()
+        if 数据.get("code") != 0:
+            return {"ok": False, "error": f"生成二维码失败: {数据.get('message', '未知错误')}"}
+        扫码内容: str = 数据["data"]["url"]
+        二维码键: str = 数据["data"]["qrcode_key"]
 
-            if 上下文 is None:
-                try:
-                    上下文 = 浏览器控制.chromium.launch_persistent_context(
-                        user_data_dir=资料目录文本,
-                        channel=浏览器通道,
-                        headless=False,
-                        viewport={"width": 1280, "height": 800},
-                    )
-                except Exception:
-                    上下文 = 浏览器控制.chromium.launch_persistent_context(
-                        user_data_dir=资料目录文本,
-                        headless=False,
-                        viewport={"width": 1280, "height": 800},
-                    )
-
-            页面 = 上下文.new_page()
-            页面.goto("https://www.bilibili.com", wait_until="domcontentloaded")
-
-            with 忽略异常(Exception):
-                页面.evaluate(
-                    """() => {
-                        const d=document.createElement('div');
-                        d.style.cssText='position:fixed;z-index:999999;top:10px;left:10px;padding:8px 12px;background:#fb7299;color:#fff;font-size:14px;border-radius:6px;font-family:sans-serif;box-shadow:0 2px 10px rgba(0,0,0,0.2);';
-                        d.textContent='请在此窗口完成B站登录，登录成功后可自动关闭';
-                        document.body.appendChild(d);
-                    }"""
-                )
-
-            截止时间 = 时间.time() + max(30, 超时秒数)
-            while 时间.time() < 截止时间:
-                站点饼干 = 上下文.cookies("https://www.bilibili.com")
-                for 饼干 in 站点饼干:
-                    if 饼干.get("name") == "SESSDATA" and 饼干.get("value"):
-                        会话值 = 饼干["value"]
-                        上下文.close()
-                        return 会话值
-                时间.sleep(1.0)
-
-            上下文.close()
-    except Exception:
-        return None
-    return None
+        图像 = 二维码库.make(扫码内容, image_factory=二维码矢量.SvgPathImage, box_size=10, border=2)
+        缓冲 = 输入输出.BytesIO()
+        图像.save(缓冲)
+        return {"ok": True, "qrcode_key": 二维码键, "qr_svg": 缓冲.getvalue().decode("utf-8")}
+    except Exception as 异常:
+        return {"ok": False, "error": f"生成二维码异常: {异常}"}
 
 
-def 自动获取会话数据(用户代理: str | None = None) -> str | None:
+def 轮询扫码登录(二维码键: str) -> dict:
     r"""
-    打开可视化登录窗口引导用户登录后获取 SESSDATA。
+    轮询扫码登录状态 (官方接口, 前端低频调用即可)
+    :param: 二维码键: qrcode_key
+    :return: dict: {status: waiting/scanned/success/expired/error, sessdata?}
     """
-    return 通过登录自动取会话数据(用户代理=用户代理, 超时秒数=180)
+    try:
+        import httpx as 网络请求
+    except ImportError:
+        return {"status": "error", "error": "缺少 httpx 依赖, 绿色包应自带"}
+
+    try:
+        with 网络请求.Client(headers=_哔哩请求头, timeout=15.0) as 客户端:
+            响应 = 客户端.get(
+                "https://passport.bilibili.com/x/passport-login/web/qrcode/poll",
+                params={"qrcode_key": 二维码键},
+            )
+        数据: dict = 响应.json()
+        if 数据.get("code") != 0:
+            return {"status": "error", "error": 数据.get("message", "轮询失败")}
+        载荷: dict = 数据.get("data") or {}
+        状态码 = 载荷.get("code")
+        if 状态码 == 0:
+            查询: dict = 解析查询(拆分网址(载荷.get("url", "")).query)
+            会话值: str = (查询.get("SESSDATA") or [""])[0]
+            if not 会话值:
+                # 兜底: 从 Set-Cookie 里取
+                for 饼干头 in 响应.headers.get_list("set-cookie"):
+                    if 饼干头.startswith("SESSDATA="):
+                        会话值 = 饼干头.split(";", 1)[0].split("=", 1)[1]
+                        break
+            if not 会话值:
+                return {"status": "error", "error": "登录成功但未取到 SESSDATA"}
+            return {"status": "success", "sessdata": 会话值}
+        if 状态码 == 86090:
+            return {"status": "scanned"}
+        if 状态码 == 86101:
+            return {"status": "waiting"}
+        if 状态码 == 86038:
+            return {"status": "expired"}
+        return {"status": "error", "error": f"未知状态: {载荷.get('message', 状态码)}"}
+    except Exception as 异常:
+        return {"status": "error", "error": f"轮询异常: {异常}"}

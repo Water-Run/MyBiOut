@@ -16,7 +16,7 @@
 - [BBDown](https://github.com/nilaoda/BBDown): 知名哔哩哔哩下载工具  
 - [pywebview](https://pywebview.flowrl.com/): 内嵌 Web 窗口套壳  
 
-> 项目仅可在 Windows x64 环境下运行  
+> 发布形态面向 **Windows 11 x64** 绿色包（亦可能在 Win10 x64 上运行，但不作保证）  
 
 ## 使用
 
@@ -27,12 +27,16 @@
 
 内嵌窗口基于系统 **WebView2**. Windows 11 一般已自带; 若窗口无法打开, 安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).  
 
+绿色包 `bin/` **随程序分发** `BBDown.exe`、`ffmpeg.exe`、`adb.exe`（及 ADB 配套 dll），一般无需再装系统 PATH 工具。内嵌窗口依赖系统 **WebView2**（Win11 一般自带）。  
+
+若缺工具或 WebView2 起不来：启动时**弹提示即可**，程序仍尽量打开（可回退浏览器）；对应功能可能不可用。  
+
 可选参数: `MyBiOut!.exe --port 2026` / `--browser`  
 
 | 路径 | 说明 |
 |---|---|
 | `config.ini` | 配置文件 |
-| `bin/` | `BBDown.exe` / `ffmpeg` 等外部工具 |
+| `bin/` | 随包工具：`BBDown.exe` / `ffmpeg.exe` / `adb.exe` |
 | `auth_profile/` | 扫码登录可选资料目录 |
 | `version.txt` | 版本号 (界面底部优先读此文件) |
 | `使用说明.txt` | 简要说明 |

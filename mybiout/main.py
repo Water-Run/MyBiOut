@@ -125,6 +125,27 @@ def _提示致命错误(消息: str, *, 标题: str = "MyBiOut!") -> None:
         pass
 
 
+def _提示环境警告(消息: str, *, 标题: str = "MyBiOut! 环境提示") -> None:
+    r"""
+    非致命环境缺失提示。控制台打印；冻结无控制台时用警告消息框。
+    不阻止服务启动——缺啥功能页自己标红即可。
+    """
+    with 忽略异常(Exception):
+        _安全打印(消息)
+    # 有交互控制台时只打日志；windowed 绿色包用消息框
+    if not 是否冻结运行():
+        return
+    if _是否有交互控制台():
+        return
+    try:
+        import ctypes
+
+        # 0x30 = MB_ICONWARNING
+        ctypes.windll.user32.MessageBoxW(0, 消息, 标题, 0x30)
+    except Exception:
+        pass
+
+
 # ===== 环境检查 =====
 
 
@@ -141,59 +162,81 @@ class _环境项:
 
 def _检查环境() -> list[_环境项]:
     r"""
-    检查运行环境中各必需依赖项的可用性
+    检查运行环境中各功能依赖的可用性（均不阻断启动）
     :return: list[_环境项]: 检查结果列表
     """
     检查结果: list[_环境项] = []
 
     程序工具目录: 路径 = _取程序工具目录()
 
-    # ffmpeg
-    找到FFmpeg: bool = 文件工具.which("ffmpeg") is not None
+    # ffmpeg（绿色包应随 bin 分发）
+    找到FFmpeg: bool = False
+    for 候选路径 in (
+        程序工具目录 / "ffmpeg.exe",
+        程序工具目录 / "ffmpeg",
+        程序工具目录 / "ffmpeg" / "ffmpeg.exe",
+        程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
+        程序工具目录 / "BBDown" / "ffmpeg.exe",
+        程序工具目录 / "BBDown" / "ffmpeg",
+    ):
+        if 候选路径.is_file():
+            找到FFmpeg = True
+            break
     if not 找到FFmpeg:
-        for 候选路径 in (
-            程序工具目录 / "BBDown" / "ffmpeg.exe",
-            程序工具目录 / "BBDown" / "ffmpeg",
-            程序工具目录 / "ffmpeg.exe",
-            程序工具目录 / "ffmpeg",
-            程序工具目录 / "ffmpeg" / "ffmpeg.exe",
-            程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
-        ):
-            if 候选路径.exists():
-                找到FFmpeg = True
-                break
+        找到FFmpeg = 文件工具.which("ffmpeg") is not None
     检查结果.append(
         _环境项(
             "ffmpeg",
             找到FFmpeg,
-            "下载: https://ffmpeg.org/download.html\n"
-            "      下载后将 ffmpeg.exe 所在目录添加至系统 PATH 环境变量\n"
-            "      或将 ffmpeg.exe 放入绿色包/程序目录的 bin/ 下",
+            "绿色包应自带 bin/ffmpeg.exe。\n"
+            "若缺失：将 ffmpeg.exe 放入程序目录 bin/ 下（Win11 x64）",
         )
     )
 
     # BBDown
-    找到BBDown: bool = 文件工具.which("BBDown") is not None or 文件工具.which("bbdown") is not None
+    找到BBDown: bool = False
+    for 候选路径 in (
+        程序工具目录 / "BBDown.exe",
+        程序工具目录 / "BBDown",
+        程序工具目录 / "BBDown" / "BBDown.exe",
+        程序工具目录 / "BBDown" / "BBDown",
+    ):
+        if 候选路径.is_file():
+            找到BBDown = True
+            break
     if not 找到BBDown:
-        for 候选路径 in (
-            程序工具目录 / "BBDown" / "BBDown.exe",
-            程序工具目录 / "BBDown" / "BBDown",
-            程序工具目录 / "BBDown.exe",
-            程序工具目录 / "BBDown",
-        ):
-            if 候选路径.exists():
-                找到BBDown = True
-                break
+        找到BBDown = 文件工具.which("BBDown") is not None or 文件工具.which("bbdown") is not None
     检查结果.append(
         _环境项(
             "BBDown",
             找到BBDown,
-            "下载: https://github.com/nilaoda/BBDown/releases\n"
-            "      将 BBDown 可执行文件放入系统 PATH 或绿色包/程序目录的 bin/ 下",
+            "绿色包应自带 bin/BBDown.exe。\n"
+            "若缺失：将 BBDown.exe 放入程序目录 bin/ 下",
         )
     )
 
-    # biliffm4s
+    # ADB（可选：Android 缓存扫描）
+    找到ADB: bool = False
+    for 候选路径 in (
+        程序工具目录 / "adb.exe",
+        程序工具目录 / "platform-tools" / "adb.exe",
+        程序工具目录 / "adb" / "adb.exe",
+    ):
+        if 候选路径.is_file():
+            找到ADB = True
+            break
+    if not 找到ADB:
+        找到ADB = 文件工具.which("adb.exe") is not None or 文件工具.which("adb") is not None
+    检查结果.append(
+        _环境项(
+            "ADB",
+            找到ADB,
+            "绿色包应自带 bin/adb.exe（及配套 dll）。\n"
+            "仅扫手机缓存需要；没有则 PC 本地缓存仍可用",
+        )
+    )
+
+    # biliffm4s（打包进 Python 依赖，开发态才可能缺）
     找到biliffm4s: bool = False
     try:
         import biliffm4s  # noqa: F401
@@ -209,7 +252,68 @@ def _检查环境() -> list[_环境项]:
         )
     )
 
+    # WebView2：内嵌窗口依赖；缺了不拦启动，提示即可（可 --browser）
+    找到WebView2: bool = _检测WebView2运行时()
+    检查结果.append(
+        _环境项(
+            "WebView2",
+            找到WebView2,
+            "内嵌窗口需要 Microsoft Edge WebView2 Runtime。\n"
+            "Win11 一般自带；若缺：装 WebView2 Runtime，或启动时加 --browser 用系统浏览器。\n"
+            "下载: https://developer.microsoft.com/microsoft-edge/webview2/",
+        )
+    )
+
     return 检查结果
+
+
+def _检测WebView2运行时() -> bool:
+    r"""
+    粗测本机是否装有 WebView2 Runtime（仅 Win；其它平台视为无需）。
+    不保证一定能开窗，开窗失败仍走「提示即可」。
+    """
+    if 系统.platform != "win32":
+        return True
+
+    # 1) 注册表（Edge WebView2 Evergreen 客户端 GUID）
+    客户端键们: tuple[str, ...] = (
+        r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+        r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+    )
+    try:
+        import winreg as 注册表
+
+        for 根 in (注册表.HKEY_LOCAL_MACHINE, 注册表.HKEY_CURRENT_USER):
+            for 子键 in 客户端键们:
+                try:
+                    with 注册表.OpenKey(根, 子键) as 键:
+                        版本, _ = 注册表.QueryValueEx(键, "pv")
+                        if 版本 and str(版本) not in ("", "0.0.0.0"):
+                            return True
+                except OSError:
+                    continue
+    except Exception:
+        pass
+
+    # 2) 常见安装目录
+    for 环境键 in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"):
+        根 = 系统.environ.get(环境键) or ""
+        if not 根:
+            continue
+        应用根 = 路径(根) / "Microsoft" / "EdgeWebView" / "Application"
+        if not 应用根.is_dir():
+            continue
+        try:
+            for 子 in 应用根.iterdir():
+                if (子 / "msedgewebview2.exe").is_file():
+                    return True
+        except OSError:
+            continue
+
+    # 3) PATH 里偶发能找到
+    if 文件工具.which("msedgewebview2"):
+        return True
+    return False
 
 
 def _打印环境详情(检查列表: list[_环境项]) -> None:
@@ -227,16 +331,23 @@ def _打印环境详情(检查列表: list[_环境项]) -> None:
             for 提示行 in 检查项.提示.split("\n"):
                 print(f"      {提示行.strip()}")
     print()
-    print("  请安装全部缺失组件后重新启动 MyBiOut!")
+    print("  缺失项仅影响对应功能，程序仍可启动。")
     print()
+
+
+def _取功能缺失项(检查列表: list[_环境项]) -> list[_环境项]:
+    r"""
+    返回不可用的功能依赖（仅提示，不阻断启动）。
+    """
+    return [项 for 项 in 检查列表 if not 项.可用]
 
 
 def _取启动阻断项(_检查列表: list[_环境项]) -> list[_环境项]:
     r"""
     返回会阻止 Web 服务启动的环境问题。
 
-    BBDown、ffmpeg、biliffm4s 都只影响具体功能页，不能阻断配置页、
-    Markdown 导出页或环境诊断接口的访问。
+    BBDown、ffmpeg、ADB、biliffm4s、WebView2 都只影响具体能力（导出/下载/内嵌窗），
+    不能阻断服务本身。缺了或窗口起不来：只弹提示即可。
     """
     return []
 
@@ -1243,14 +1354,28 @@ def 主程序() -> None:
         or not _是否有交互控制台()
     )
 
-    # ===== 环境检查 =====
+    # ===== 环境检查（缺工具只提示，不拦启动） =====
     环境检查列表: list[_环境项] = _检查环境()
+    缺失功能项: list[_环境项] = _取功能缺失项(环境检查列表)
     缺失环境项: list[_环境项] = _取启动阻断项(环境检查列表)
 
+    if 缺失功能项:
+        _打印环境详情(环境检查列表)
+        缺失名称: str = "、".join(项.名称 for 项 in 缺失功能项)
+        提示正文: str = (
+            f"以下组件未找到：{缺失名称}\n\n"
+            "程序仍会启动，但对应功能可能不可用。\n\n"
+            "· BBDown / ffmpeg / ADB：应在程序目录 bin/ 下（Win11 x64 绿色包随发）\n"
+            "· WebView2：内嵌窗口需要；Win11 一般自带。没有可装 Runtime，\n"
+            "  或用 MyBiOut!.exe --browser 走系统浏览器\n\n"
+            "缺啥就提示一下，哦启动不了对应能力即可。"
+        )
+        _提示环境警告(提示正文)
+
     if 缺失环境项:
-        缺失名称: str = ", ".join(检查项.名称 for 检查项 in 缺失环境项)
+        阻断名称: str = ", ".join(检查项.名称 for 检查项 in 缺失环境项)
         启动状态: _服务启动状态 = _服务启动状态()
-        启动状态.标记失败(f"缺少必需组件: {缺失名称}")
+        启动状态.标记失败(f"缺少必需组件: {阻断名称}")
     else:
         启动状态 = _后台启动服务(端口)
 
@@ -1294,12 +1419,15 @@ def 主程序() -> None:
         try:
             _启动窗口壳(端口, 启动状态)
         except Exception as e:
-            _安全打印(f"  * 内嵌窗口启动失败, 回退浏览器: {e}")
-            if 是否冻结运行() and not _是否有交互控制台():
-                _提示致命错误(
-                    f"内嵌窗口启动失败, 将尝试系统浏览器。\n\n{e}\n\n"
-                    "若仍无界面, 请安装 WebView2 Runtime 或使用 MyBiOut!.exe --browser"
-                )
+            # 与其它环境依赖同级：提示「哦启动不了」即可，再回退浏览器
+            _安全打印(f"  * 内嵌窗口启动不了: {e}")
+            _提示环境警告(
+                "内嵌窗口（WebView2）启动不了。\n\n"
+                f"原因：{e}\n\n"
+                "将尝试用系统浏览器打开界面。\n"
+                "也可安装 WebView2 Runtime，或下次用：\n"
+                "  MyBiOut!.exe --browser"
+            )
             使用窗口 = False
 
     if not 使用窗口:

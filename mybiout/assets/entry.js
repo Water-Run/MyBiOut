@@ -39,15 +39,15 @@
     const 蓝 = "#00AEEC";
     const 墨 = "#2B1822";
     const 纸 = "#FFFFFF";
-    const 入口速度 = 1.3;
+    const 入口速度 = 1.55;
     const 基础时序 = {
-        ready: 780,
-        fallbackReady: 920,
-        画布: 1880,
-        渲染: 2300,
-        remove: 2450,
-        overlayDelay: 1780,
-        overlayDuration: 520,
+        ready: 520,
+        fallbackReady: 640,
+        画布: 1280,
+        渲染: 1560,
+        remove: 1680,
+        overlayDelay: 1180,
+        overlayDuration: 380,
     };
 
     const 入口变体表 = [
@@ -117,7 +117,8 @@
     核心.style.setProperty("--entry-tilt", `${生成后.angle * 0.08}deg`);
 
     const 画笔 = 画布.getContext("2d", { alpha: true });
-    const 斑点群 = 生成斑点(生成后, Math.round(160 * 生成后.density));
+    // 斑点数量上限：降低首屏主线程压力（点 Man 等跳转时体感更顺）
+    const 斑点群 = 生成斑点(生成后, Math.min(72, Math.round(90 * 生成后.density)));
     let width = 0;
     let height = 0;
     let dpr = 1;
@@ -187,7 +188,7 @@
             flash: [20, "card"],
             bubbles: [46, "dot"],
         }[变体.mode] || [32, "slice"];
-        const 数量 = Math.max(8, Math.round(基础[0] * 生成后.density));
+        const 数量 = Math.max(6, Math.min(36, Math.round(基础[0] * 生成后.density * 0.62)));
 
         for (let i = 0; i < 数量; i++) {
             const type = 选择碎片类型(基础[1], i, 变体.mode);

@@ -54,10 +54,13 @@ auth.json
 *.local.json
 *.pem
 
-# ---------- 旁路二进制工具（体积大、机器相关） ----------
+# ---------- 旁路二进制工具（体积大、机器相关；随绿色包分发） ----------
 mybiout/bin/*.exe
+mybiout/bin/*.dll
 mybiout/bin/ffmpeg/
 mybiout/bin/ffmpeg/**
+mybiout/bin/platform-tools/
+mybiout/bin/platform-tools/**
 # 语料只需 data.json 入库, 其余旁路工具文件不跟踪
 mybiout/bin/BullshitGenerator/**
 !mybiout/bin/BullshitGenerator/data.json

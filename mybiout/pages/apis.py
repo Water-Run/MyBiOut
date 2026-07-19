@@ -708,26 +708,29 @@ async def 打开资源管理器接口(请求对象: 请求) -> dict[str, bool | 
     return 在资源管理器中打开(路径文本)
 
 
-@应用.post("/api/auto-sessdata")
-async def 自动会话数据接口(请求对象: 请求) -> dict[str, 任意]:
+@应用.post("/api/qrcode/generate")
+async def 生成登录二维码接口() -> dict[str, 任意]:
     r"""
-    通过扫码登录获取 SESSDATA:
-    action: "launch_login"
+    生成扫码登录二维码 (B 站官方 passport 接口, 无风控风险)
+    """
+    from mybiout.pages.ohmyconfig.ohmyconfig import 生成登录二维码
+
+    return 生成登录二维码()
+
+
+@应用.post("/api/qrcode/poll")
+async def 轮询扫码登录接口(请求对象: 请求) -> dict[str, 任意]:
+    r"""
+    轮询扫码登录状态, 成功时返回 SESSDATA
     """
     请求体: dict[str, 任意] = await _读取数据字典(请求对象)
-    动作: str = _转字符串(请求体.get("action", "launch_login"))
-    用户代理 = 请求对象.headers.get("user-agent", "")
+    二维码键: str = _转字符串(请求体.get("qrcode_key", ""))
+    if not 二维码键:
+        return {"status": "error", "error": "缺少 qrcode_key"}
 
-    from mybiout.pages.ohmyconfig import ohmyconfig as 设置模块
+    from mybiout.pages.ohmyconfig.ohmyconfig import 轮询扫码登录
 
-    if 动作 == "launch_login":
-        取会话数据 = 设置模块.通过登录自动取会话数据
-        结果 = 取会话数据(用户代理, 超时秒数=180)
-        if 结果:
-            return {"status": "success", "sessdata": 结果}
-        return {"status": "failed", "error": "扫码登录超时或窗口被关闭"}
-
-    return {"status": "failed", "error": "已移除浏览器 Cookie 自动提取能力，请使用扫码登录"}
+    return 轮询扫码登录(二维码键)
 
 
 @应用.post("/api/reset-all-settings")

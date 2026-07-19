@@ -5,9 +5,7 @@ httpx
 biliffm4s
 pywebview
 pyinstaller
-
-# 可选: OhMyConfig 扫码登录
-# playwright
+qrcode
 
 # 开发 / 冒烟测试
 pytest

@@ -114,6 +114,7 @@ _跳过拷贝后缀: frozenset[str] = frozenset(
     "biliffm4s",
     "pywebview",
     "pyinstaller",
+    "qrcode",
 ]
 
 内嵌数据项: list[tuple[路径, str]] = [
@@ -416,6 +417,103 @@ def 安全移除树(目标: 路径, *, 说明: str = "") -> None:
         f"  请先关闭 MyBiOut! 与相关窗口后再打包。"
         f"{附加}"
     )
+
+
+def _检测占用中的绿色版进程() -> str:
+    r"""
+    检测绿色版 exe 是否在运行（运行中的 exe 会锁住 dist 产物目录）
+    :return: str: 占用提示文本, 未检测到或非 Win 返回空串
+    """
+    if 系统.platform != "win32":
+        return ""
+    try:
+        结果 = 子进程.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {产物显示名}.exe", "/FO", "CSV", "/NH"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="gbk",
+            errors="replace",
+        )
+    except OSError:
+        return ""
+    for 行 in (结果.stdout or "").splitlines():
+        if not 行.startswith(f'"{产物显示名}.exe"'):
+            continue
+        段列表 = [段.strip('"') for 段 in 行.split('","')]
+        if len(段列表) >= 2:
+            return f"检测到 {产物显示名}.exe 正在运行 (PID {段列表[1]}), 它会锁住产物目录。"
+    return ""
+
+
+def _终止占用中的绿色版进程() -> tuple[bool, str]:
+    r"""
+    尝试终止运行中的绿色版 exe（强制杀进程）。
+    运行中的 exe 锁住 dist 产物目录会导致 rmtree 失败。
+    :return: (是否执行了终止, 状态消息)
+    """
+    if 系统.platform != "win32":
+        return False, ""
+    检测结果: str = _检测占用中的绿色版进程()
+    if not 检测结果:
+        return False, "未检测到运行中的绿色版 exe"
+    try:
+        终止结果: 子进程.CompletedProcess = 子进程.run(
+            ["taskkill", "/F", "/IM", f"{产物显示名}.exe"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="gbk",
+            errors="replace",
+        )
+        if 终止结果.returncode == 0:
+            return True, f"已终止占用中的 {产物显示名}.exe"
+        return False, f"终止失败(taskkill 返回 {终止结果.returncode}): {终止结果.stderr.strip() or 终止结果.stdout.strip()}"
+    except OSError as 异常:
+        return False, f"无法执行 taskkill: {异常}"
+
+
+def 预清理构建产物目录(状态: 打包进度 | None = None) -> None:
+    r"""
+    构建前清理 dist/<产物名>。PyInstaller 的 COLLECT 阶段会 rmtree 该目录,
+    其内部删除无重试, 一旦旧 exe 在运行占用目录, 报的是难懂的 traceback 且
+    白等整个分析/链接阶段。此处先行清理: 先杀旧进程, 再带重试 rmtree。
+    """
+    产物目录: 路径 = 工程根目录 / 产物输出目录名 / 产物显示名
+    if not 产物目录.exists():
+        return
+    占用提示: str = _检测占用中的绿色版进程()
+    if 占用提示:
+        终止成功, 终止消息 = _终止占用中的绿色版进程()
+        if 终止成功:
+            if 状态 is None or 状态.纯文本:
+                打印信息(终止消息)
+            占用提示 = ""
+            时间.sleep(1.0)
+    else:
+        终止消息 = ""
+    最后: BaseException | None = None
+    for 次 in range(删除重试次数):
+        try:
+            文件工具.rmtree(产物目录)
+            if 状态 is None or 状态.纯文本:
+                打印信息(f"已清理旧产物目录: {产物目录.name}")
+            return
+        except OSError as 异常:
+            最后 = 异常
+            时间.sleep(删除重试间隔秒 * (次 + 1))
+            if not 占用提示:
+                # 可能杀完进程后 Windows 还在释放句柄, 等一秒再测
+                时间.sleep(1.2)
+                占用提示 = _检测占用中的绿色版进程()
+    说明: str = f"无法清理旧构建产物目录: {产物目录}\n  原因: {最后}\n"
+    if 占用提示:
+        说明 += f"  {占用提示}\n"
+    说明 += "  请关闭正在运行的 MyBiOut!.exe、打开该目录的资源管理器窗口或杀毒实时扫描后重试。"
+    if 状态 is not None and not 状态.纯文本:
+        状态.标记失败(说明.replace("\n", " | "))
+        raise SystemExit(1)
+    失败退出(说明)
 
 
 def _路径含本机用户痕迹(值: str) -> bool:
@@ -1802,13 +1900,20 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
                         刷新输出()
                         时间.sleep(0.025)
 
+                # 基础检查阶段: 并行跑代码检查 + 终止占用中的旧绿色版进程
                 检查结果: list[tuple[bool, str]] = [(True, "")]
+                释放结果: list[tuple[bool, str]] = [(False, "")]
 
                 def _跑检查() -> None:
                     检查结果[0] = 快速代码检查()
 
+                def _跑释放() -> None:
+                    释放结果[0] = _终止占用中的绿色版进程()
+
                 检查线程 = 线程.Thread(target=_跑检查, daemon=True)
                 检查线程.start()
+                释放线程 = 线程.Thread(target=_跑释放, daemon=True)
+                释放线程.start()
                 停留起点 = 时间.monotonic()
                 脉冲 = 0
                 while 检查线程.is_alive() or 时间.monotonic() - 停留起点 < 2.9:
@@ -1844,16 +1949,29 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
                         )
                     if 状态行文 <= 高度:
                         清行(状态行文)
-                        提示 = "代码结构 / 语法快速校对中…"
                         if not 检查线程.is_alive() and 检查结果[0][0]:
                             提示 = "结构与语法检查通过 · 即将起飞"
                         elif not 检查线程.is_alive() and not 检查结果[0][0]:
                             提示 = _截断显示(f"检查告警: {检查结果[0][1]}", 宽度 - 4)
+                        else:
+                            提示 = "代码结构 / 语法快速校对中…"
                         绘制(
                             状态行文,
                             max(1, (宽度 - _中日韩宽度(提示)) // 2),
                             提示,
                             颜色=_淡化(主题.渐变乙, 0.9),
+                        )
+                    if 状态行文 + 1 <= 高度:
+                        清行(状态行文 + 1)
+                        释文 = ""
+                        if not 释放线程.is_alive():
+                            释成功, 释消息 = 释放结果[0]
+                            释文 = 释消息 if 释成功 else ("· " + 释消息)
+                        绘制(
+                            状态行文 + 1,
+                            max(1, (宽度 - _中日韩宽度(释文)) // 2),
+                            释文,
+                            颜色=_淡化(主题.渐变甲, 0.75),
                         )
                     # 细星尘
                     if 脉冲 % 5 == 0:
@@ -1866,6 +1984,7 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
                     刷新输出()
                     时间.sleep(0.05)
                 检查线程.join(timeout=1.0)
+                释放线程.join(timeout=1.0)
                 if not 检查结果[0][0]:
                     # 不阻断打包, 仅在状态行多留一瞬
                     时间.sleep(0.6)
@@ -2915,6 +3034,7 @@ def 安装依赖(状态: 打包进度 | None = None) -> None:
 def 执行构建(状态: 打包进度 | None = None) -> None:
     if 状态 is None or 状态.纯文本:
         打印步骤(2, 4, "PyInstaller 构建（目录版 / 无控制台窗口）")
+    预清理构建产物目录(状态)
     for 源路径, _目标 in 内嵌数据项:
         if not 源路径.exists():
             说明 = f"构建所需资源不存在: {源路径}"
@@ -3098,6 +3218,44 @@ def 目录内是否有FFmpeg(工具目录: 路径) -> bool:
     return False
 
 
+def 目录内是否有ADB(工具目录: 路径) -> bool:
+    for 候选 in (
+        工具目录 / "adb.exe",
+        工具目录 / "platform-tools" / "adb.exe",
+        工具目录 / "adb" / "adb.exe",
+    ):
+        if 候选.is_file():
+            return True
+    return False
+
+
+def _解析真实可执行文件(which路径: str | 路径) -> 路径 | None:
+    r"""
+    which 可能指向 scoop shim（小跳转壳），优先解析同目录真实 exe 或跟随 target。
+    """
+    源 = 路径(which路径)
+    if not 源.is_file():
+        return None
+    # scoop shim 通常很小；真实 adb/ffmpeg 体积大得多
+    try:
+        if 源.stat().st_size < 500_000:
+            旁路候选 = [
+                源.parent / 源.name,
+            ]
+            # scoop apps: .../shims/adb.exe → .../apps/adb/*/platform-tools/adb.exe
+            apps = 源.parent.parent / "apps"
+            if apps.is_dir():
+                for 子 in apps.rglob(源.name):
+                    if 子.is_file() and 子.stat().st_size >= 500_000:
+                        return 子
+            for 候选 in 旁路候选:
+                if 候选.is_file() and 候选.stat().st_size >= 500_000:
+                    return 候选
+    except OSError:
+        pass
+    return 源
+
+
 def 尝试从系统路径补齐FFmpeg(工具目录: 路径, 状态: 打包进度 | None = None) -> None:
     if 目录内是否有FFmpeg(工具目录):
         if 状态 is None or 状态.纯文本:
@@ -3108,14 +3266,41 @@ def 尝试从系统路径补齐FFmpeg(工具目录: 路径, 状态: 打包进度
         if 状态 is None or 状态.纯文本:
             打印警告("旁路与系统 PATH 均未发现 ffmpeg，稍后将按硬性条件校验")
         return
-    源文件 = 路径(系统中的)
-    if not 源文件.is_file():
+    源文件 = _解析真实可执行文件(系统中的)
+    if 源文件 is None or not 源文件.is_file():
         return
     工具目录.mkdir(parents=True, exist_ok=True)
     目标文件 = 工具目录 / "ffmpeg.exe"
     文件工具.copy2(源文件, 目标文件)
     if 状态 is None or 状态.纯文本:
-        打印成功(f"已从系统 PATH 复制 ffmpeg 到绿色包: {目标文件}")
+        打印成功(f"已从系统 PATH 复制 ffmpeg 到绿色包: {目标文件.name} ({源文件})")
+
+
+def 尝试从系统路径补齐ADB(工具目录: 路径, 状态: 打包进度 | None = None) -> None:
+    r"""
+    将 adb.exe 及 Win 配套 dll 打进 bin/（仅 Win11 x64 目标）。
+    """
+    if 目录内是否有ADB(工具目录):
+        if 状态 is None or 状态.纯文本:
+            打印信息("已检测到旁路 adb")
+        return
+    系统中的 = 文件工具.which("adb.exe") or 文件工具.which("adb")
+    if not 系统中的:
+        if 状态 is None or 状态.纯文本:
+            打印警告("旁路与系统 PATH 均未发现 adb，稍后将按硬性条件校验")
+        return
+    源文件 = _解析真实可执行文件(系统中的)
+    if 源文件 is None or not 源文件.is_file():
+        return
+    工具目录.mkdir(parents=True, exist_ok=True)
+    文件工具.copy2(源文件, 工具目录 / "adb.exe")
+    # 同目录配套库（缺了 adb 可能启动失败）
+    for 名 in ("AdbWinApi.dll", "AdbWinUsbApi.dll", "libwinpthread-1.dll"):
+        旁 = 源文件.parent / 名
+        if 旁.is_file():
+            文件工具.copy2(旁, 工具目录 / 名)
+    if 状态 is None or 状态.纯文本:
+        打印成功(f"已从系统 PATH 复制 adb 到绿色包: adb.exe ({源文件})")
 
 
 def 校验绿色包工具(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
@@ -3133,12 +3318,18 @@ def 校验绿色包工具(绿色根: 路径, 状态: 打包进度 | None = None)
         失败退出(说明)
     尝试从系统路径补齐FFmpeg(工具目录, 状态)
     if not 目录内是否有FFmpeg(工具目录):
-        说明 = "组装失败：绿色包中无 ffmpeg，且 PATH 中也没有"
+        说明 = "组装失败：绿色包中无 ffmpeg，且 PATH 中也没有（Win11 x64 请准备 ffmpeg.exe）"
+        if 状态 and not 状态.纯文本:
+            状态.标记失败(说明)
+        失败退出(说明)
+    尝试从系统路径补齐ADB(工具目录, 状态)
+    if not 目录内是否有ADB(工具目录):
+        说明 = "组装失败：绿色包中无 adb，且 PATH 中也没有（Win11 x64 请准备 platform-tools/adb.exe）"
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
     if 状态 is None or 状态.纯文本:
-        打印成功("旁路工具校验通过（BBDown、ffmpeg）")
+        打印成功("旁路工具校验通过（BBDown、ffmpeg、adb）")
 
 
 def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路径:
@@ -3246,13 +3437,13 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
 
 【启动】
 1. 双击「MyBiOut!.exe」即可启动；关闭窗口即退出程序。
-2. 运行环境：Windows 10 / 11 的 64 位系统。
+2. 运行环境：Windows 11 的 64 位系统（亦兼容 Win10 x64，但仅保证 Win11）。
 3. 内嵌窗口依赖「WebView2 运行时」。Windows 11 一般已自带；
    若无法打开窗口，请安装微软 WebView2 运行时后再试。
 
 【目录说明】
 · config.ini     配置文件（本发布包为默认空凭证、无本机路径，可按需填写）
-· bin/           外部工具（BBDown、ffmpeg 等）
+· bin/           随包分发工具：BBDown.exe、ffmpeg.exe、adb.exe（及 ADB 配套 dll）
 · version.txt    版本号（界面底部会读取）
 · 使用说明.txt   本文件
 

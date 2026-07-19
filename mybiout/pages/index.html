@@ -42,13 +42,14 @@
         /* ========== LOGO (左上) ========== */
         .logo {
             position: absolute;
-            top: 36px;
+            top: 28px;
             left: 28px;
+            z-index: 5;
         }
 
         .logo img {
-            width: 150px;
-            height: 150px;
+            width: 118px;
+            height: 118px;
             object-fit: contain;
             border: 3px solid #F5A623;
             box-shadow: 5px 5px 0 #E85B8A;
@@ -83,12 +84,20 @@
             animation: logo-shake .4s ease;
         }
 
-        /* ========== SETTINGS LINK ========== */
-        .settings-link {
+        /* ========== 右上工具条：仓库 + 设置（避开中心卡片） ========== */
+        .top-right {
             position: absolute;
-            top: 196px;
-            left: 28px;
-            font-size: 16px;
+            top: 28px;
+            right: 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+            z-index: 5;
+        }
+
+        .settings-link {
+            font-size: 15px;
             font-weight: 900;
             color: #7A1438;
             background: #fff;
@@ -98,7 +107,7 @@
             box-shadow: 5px 5px 0 #F5A623, 0 0 0 2px rgba(122, 20, 56, .16);
             text-shadow: 0 1px 0 rgba(255, 255, 255, .8);
             transition: color .2s, border-color .2s, background .2s, transform .12s, box-shadow .12s;
-            z-index: 4;
+            white-space: nowrap;
         }
 
         .settings-link:hover {
@@ -109,11 +118,7 @@
             transform: translate(2px, 2px) rotate(-1deg);
         }
 
-        /* ========== GITHUB (右上) ========== */
         .github-link {
-            position: absolute;
-            top: 36px;
-            right: 28px;
             background: #F5A623;
             color: #fff;
             font-size: 15px;
@@ -133,11 +138,12 @@
         /* ========== CARDS ========== */
         .cards {
             position: absolute;
-            top: 50%;
+            top: 54%;
             left: 50%;
             transform: translate(-50%, -50%);
             display: flex;
-            gap: 52px;
+            gap: 48px;
+            z-index: 2;
         }
 
         .card {
@@ -387,9 +393,11 @@
         <div class="logo">
             <img src="./assets/logo.png" alt="MyBiOut!">
         </div>
-        <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
-        <a class="github-link" id="github-btn" href="https://github.com/Water-Run/MyBiOut" target="_blank"
-            rel="noopener">来仓库点星标 ⭐ 提交问题 🐛</a>
+        <div class="top-right">
+            <a class="github-link" id="github-btn" href="https://github.com/Water-Run/MyBiOut" target="_blank"
+                rel="noopener">来仓库点星标 ⭐ 提交问题 🐛</a>
+            <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
+        </div>
         <div class="cards">
             <a class="card" href="/localout">
                 <img src="./assets/localout.png" alt="本地缓存导出">

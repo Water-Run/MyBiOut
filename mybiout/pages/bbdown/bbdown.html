@@ -126,16 +126,22 @@
 
         .hdr-link {
             font-size: 12px;
-            font-weight: 700;
-            color: #E85B8A;
-            border-bottom: 2px dashed #E85B8A;
-            padding-bottom: 1px;
-            transition: color .2s, border-color .2s;
+            font-weight: 800;
+            color: #7A1438;
+            background: #fff;
+            border: 2px solid #fff;
+            border-radius: 4px;
+            padding: 4px 10px 3px;
+            box-shadow: 2px 2px 0 rgba(122, 20, 56, .28);
+            transition: color .15s, background .15s, border-color .15s, transform .12s, box-shadow .12s;
         }
 
         .hdr-link:hover {
-            color: #F5A623;
-            border-color: #F5A623;
+            color: #fff;
+            background: #F5A623;
+            border-color: #fff;
+            box-shadow: 1px 1px 0 rgba(122, 20, 56, .4);
+            transform: translate(1px, 1px);
         }
 
         /* ===== INPUT BAR ===== */
@@ -318,14 +324,19 @@
         }
 
         .env-block a {
-            color: #fff;
-            font-weight: 700;
-            border-bottom: 1px dashed #E85B8A;
+            color: #7A1438;
+            font-weight: 800;
+            background: rgba(255, 255, 255, .92);
+            border: 1.5px solid #E85B8A;
+            border-radius: 3px;
+            padding: 1px 6px;
+            text-decoration: none;
         }
 
         .env-block a:hover {
-            color: #F5A623;
-            border-color: #F5A623;
+            color: #fff;
+            background: #E85B8A;
+            border-color: #7A1438;
         }
 
         /* ===== TASK CARD ===== */
@@ -842,9 +853,9 @@
                 ff.className = 'env-tag ' + (r.ffmpeg_available ? 'env-ok' : 'env-err');
                 let html = '';
                 if (r.bbdown_available) html += '<span class="e-ok">✅ BBDown 就绪</span><br>';
-                else html += '<span class="e-err">❌ BBDown 未找到</span><br>';
+                else html += '<span class="e-err">❌ BBDown 未找到</span>（请把 BBDown.exe 放到程序 bin/）<br>';
                 if (r.ffmpeg_available) html += '<span class="e-ok">✅ ffmpeg 就绪</span>';
-                else { html += '<span class="e-err">❌ ffmpeg 未找到</span><br>'; html += '<a href="https://ffmpeg.org/download.html" target="_blank">去下载 ffmpeg ↗</a>'; }
+                else { html += '<span class="e-err">❌ ffmpeg 未找到</span>（绿色包应自带 bin/ffmpeg.exe）<br>'; html += '<a href="https://ffmpeg.org/download.html" target="_blank">官方下载 ffmpeg ↗</a>'; }
                 const sess = 取元素('env-sess');
                 if (r.has_sessdata) {
                     sess.textContent = '✅ Session'; sess.className = 'env-tag env-ok';
