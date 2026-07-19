@@ -51,6 +51,8 @@ from pathlib import Path as 路径
 # Windows 删除被占用目录时的重试
 删除重试次数: int = 6
 删除重试间隔秒: float = 0.35
+# 构建产物实际目录 (预清理失败时可能使用临时名)
+_实际产物目录: 路径 | None = None
 
 # 发布配置必须清空的凭证键（大小写不敏感）
 _凭证键名: frozenset[str] = frozenset(
@@ -438,7 +440,9 @@ def _检测占用中的绿色版进程() -> str:
     except OSError:
         return ""
     for 行 in (结果.stdout or "").splitlines():
-        if not 行.startswith(f'"{产物显示名}.exe"'):
+        # CSV 格式: "映像名称","PID","会话名","会话#","内存使用"
+        # 兼容 tasklist 偶尔输出带空格/逗号的映像名
+        if 产物显示名 not in 行:
             continue
         段列表 = [段.strip('"') for 段 in 行.split('","')]
         if len(段列表) >= 2:
@@ -448,18 +452,15 @@ def _检测占用中的绿色版进程() -> str:
 
 def _终止占用中的绿色版进程() -> tuple[bool, str]:
     r"""
-    尝试终止运行中的绿色版 exe（强制杀进程）。
-    运行中的 exe 锁住 dist 产物目录会导致 rmtree 失败。
+    无条件尝试终止运行中的绿色版 exe（强制杀进程+子进程树）。
+    不做预检测——taskkill 对不存在的进程也安全返回。
     :return: (是否执行了终止, 状态消息)
     """
     if 系统.platform != "win32":
         return False, ""
-    检测结果: str = _检测占用中的绿色版进程()
-    if not 检测结果:
-        return False, "未检测到运行中的绿色版 exe"
     try:
         终止结果: 子进程.CompletedProcess = 子进程.run(
-            ["taskkill", "/F", "/IM", f"{产物显示名}.exe"],
+            ["taskkill", "/F", "/T", "/IM", f"{产物显示名}.exe"],
             check=False,
             capture_output=True,
             text=True,
@@ -467,53 +468,76 @@ def _终止占用中的绿色版进程() -> tuple[bool, str]:
             errors="replace",
         )
         if 终止结果.returncode == 0:
-            return True, f"已终止占用中的 {产物显示名}.exe"
-        return False, f"终止失败(taskkill 返回 {终止结果.returncode}): {终止结果.stderr.strip() or 终止结果.stdout.strip()}"
+            return True, f"已终止占用中的 {产物显示名}.exe (含子进程树)"
+        if 终止结果.returncode == 128:
+            return False, "未找到运行中的绿色版 exe (无需终止)"
+        return False, f"终止失败(taskkill 返回 {终止结果.returncode})"
     except OSError as 异常:
         return False, f"无法执行 taskkill: {异常}"
 
 
-def 预清理构建产物目录(状态: 打包进度 | None = None) -> None:
+def 预清理构建产物目录(状态: 打包进度 | None = None) -> tuple[bool, str]:
     r"""
-    构建前清理 dist/<产物名>。PyInstaller 的 COLLECT 阶段会 rmtree 该目录,
-    其内部删除无重试, 一旦旧 exe 在运行占用目录, 报的是难懂的 traceback 且
-    白等整个分析/链接阶段。此处先行清理: 先杀旧进程, 再带重试 rmtree。
+    构建前清理 dist/<产物名>。PyInstaller COLLECT 阶段会 rmtree 该目录,
+    其内部删除无重试, 一旦旧 exe / 外部进程占用目录, 报难懂 traceback 且
+    白等整个分析/链接阶段。
+
+    :return: (是否清理成功, 消息) — 未成功时调用方应使用临时目录构建
     """
     产物目录: 路径 = 工程根目录 / 产物输出目录名 / 产物显示名
     if not 产物目录.exists():
-        return
-    占用提示: str = _检测占用中的绿色版进程()
-    if 占用提示:
-        终止成功, 终止消息 = _终止占用中的绿色版进程()
-        if 终止成功:
-            if 状态 is None or 状态.纯文本:
-                打印信息(终止消息)
-            占用提示 = ""
-            时间.sleep(1.0)
-    else:
-        终止消息 = ""
+        return True, ""
+
+    _终止占用中的绿色版进程()
+
     最后: BaseException | None = None
-    for 次 in range(删除重试次数):
+    for 次 in range(12):
+        if 次 > 0:
+            时间.sleep(1.0 + 次 * 0.6)
+            _终止占用中的绿色版进程()
         try:
+            # 先递归改属性防止只读文件卡 rmtree
+            for 根, 目录们, 文件们 in 操作系统.walk(产物目录, topdown=False):
+                for 名 in 文件们 + 目录们:
+                    (路径(根) / 名).chmod(0o777)
             文件工具.rmtree(产物目录)
             if 状态 is None or 状态.纯文本:
                 打印信息(f"已清理旧产物目录: {产物目录.name}")
-            return
+            return True, ""
         except OSError as 异常:
             最后 = 异常
-            时间.sleep(删除重试间隔秒 * (次 + 1))
-            if not 占用提示:
-                # 可能杀完进程后 Windows 还在释放句柄, 等一秒再测
-                时间.sleep(1.2)
-                占用提示 = _检测占用中的绿色版进程()
-    说明: str = f"无法清理旧构建产物目录: {产物目录}\n  原因: {最后}\n"
+
+    # rmtree 全败 — 改名绕开旧目录
+    try:
+        import uuid as _清理临时ID
+        避开名 = 产物目录.with_name(f"{产物显示名}__old_{_清理临时ID.uuid4().hex[:8]}")
+        if 避开名.exists():
+            文件工具.rmtree(避开名, ignore_errors=True)
+        产物目录.rename(避开名)
+        _markRebootDelete(避开名)
+        if 状态 is None or 状态.纯文本:
+            打印信息(f"已将旧产物目录改名绕开: {避开名.name} (重启后删除)")
+        return True, ""
+    except OSError:
+        pass
+
+    占用提示 = _检测占用中的绿色版进程()
+    消息 = f"dist/{产物显示名} 被占用, 已尝试 taskkill + rmtree ×12 + rename 均失败"
     if 占用提示:
-        说明 += f"  {占用提示}\n"
-    说明 += "  请关闭正在运行的 MyBiOut!.exe、打开该目录的资源管理器窗口或杀毒实时扫描后重试。"
-    if 状态 is not None and not 状态.纯文本:
-        状态.标记失败(说明.replace("\n", " | "))
-        raise SystemExit(1)
-    失败退出(说明)
+        消息 += f" | {占用提示}"
+    return False, 消息
+
+
+def _markRebootDelete(路径对象: 路径) -> None:
+    r"""标记文件或目录在下次重启时删除 (MOVEFILE_DELAY_UNTIL_REBOOT)"""
+    if 系统.platform != "win32":
+        return
+    try:
+        MOVEFILE_DELAY_UNTIL_REBOOT = 0x4
+        import ctypes as _清理ctypes
+        _清理ctypes.windll.kernel32.MoveFileExW(str(路径对象), None, MOVEFILE_DELAY_UNTIL_REBOOT)
+    except Exception:
+        pass
 
 
 def _路径含本机用户痕迹(值: str) -> bool:
@@ -3032,9 +3056,13 @@ def 安装依赖(状态: 打包进度 | None = None) -> None:
 
 
 def 执行构建(状态: 打包进度 | None = None) -> None:
+    global _实际产物目录
     if 状态 is None or 状态.纯文本:
         打印步骤(2, 4, "PyInstaller 构建（目录版 / 无控制台窗口）")
-    预清理构建产物目录(状态)
+    清理成功, 清理消息 = 预清理构建产物目录(状态)
+    if not 清理成功:
+        if 状态 is None or 状态.纯文本:
+            打印警告(清理消息 + " | 将使用临时目录构建")
     for 源路径, _目标 in 内嵌数据项:
         if not 源路径.exists():
             说明 = f"构建所需资源不存在: {源路径}"
@@ -3043,6 +3071,14 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
             失败退出(说明)
 
     图标文件 = 程序包目录 / "assets" / "logo.ico"
+    _实际产物目录 = 工程根目录 / 产物输出目录名 / 产物显示名
+    if not 清理成功:
+        import uuid as _避让ID
+        _临时产出根 = 工程根目录 / 产物输出目录名 / f"_tmp_{_避让ID.uuid4().hex[:6]}"
+        _临时产出根.mkdir(parents=True, exist_ok=True)
+        _实际产物目录 = _临时产出根 / 产物显示名
+        if 状态 is None or 状态.纯文本:
+            打印信息(f"dist/{产物显示名} 被占用, 产物输出到: {_临时产出根}")
     参数: list[str] = [
         系统.executable,
         "-m",
@@ -3056,7 +3092,7 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
         "--paths",
         str(工程根目录),
         "--distpath",
-        str(工程根目录 / 产物输出目录名),
+        str(_实际产物目录.parent),
         "--workpath",
         str(工程根目录 / 构建缓存目录名),
         "--specpath",
@@ -3084,7 +3120,7 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
         参数 += ["--log-level", "ERROR"]
 
     构建目录 = 工程根目录 / 构建缓存目录名
-    产物目录 = 工程根目录 / 产物输出目录名 / 产物显示名
+    产物目录 = _实际产物目录
     停止监视 = 线程.Event()
 
     def _监视构建体积() -> None:
@@ -3336,7 +3372,7 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
     r"""按文件计数拷贝, 进度 = 已拷文件 / 总文件。"""
     if 状态 is None or 状态.纯文本:
         打印步骤(3, 4, "组装绿色运行目录")
-    构建输出 = 工程根目录 / 产物输出目录名 / 产物显示名
+    构建输出 = _实际产物目录 if _实际产物目录 is not None else (工程根目录 / 产物输出目录名 / 产物显示名)
     绿色根 = 工程根目录 / 产物输出目录名 / 绿色目录名
     if not 构建输出.is_dir():
         说明 = f"未找到 PyInstaller 构建输出: {构建输出}"
