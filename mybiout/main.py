@@ -52,6 +52,7 @@ _盲文高密度: str = "⠿⡿⢿⣿⣾⣽⣻⣷⣯⣟⡷⡯⡟⠷⠯⠟⣶⣵�
 _闪光字符: str = "✦✧⋆˚✩✫✬✮✰⊹✵✺❖"
 _最大粒子数: int = 280
 
+
 def _取程序工具目录() -> 路径:
     r"""
     获取 bin 工具目录 (绿色旁路优先)
@@ -72,6 +73,35 @@ def _配置文本输出() -> None:
             continue
         with 忽略异常(TypeError, ValueError):
             重配函数(errors="replace")
+
+
+def _是否有交互控制台() -> bool:
+    r"""
+    判断 stdout 是否为可交互终端 (windowed 冻结包通常无控制台)
+    """
+    输出 = 系统.stdout
+    if 输出 is None:
+        return False
+    try:
+        return bool(输出.isatty())
+    except Exception:
+        return False
+
+
+def _提示致命错误(消息: str, *, 标题: str = "MyBiOut!") -> None:
+    r"""
+    输出致命错误; 冻结且无控制台时用系统消息框, 避免 --windowed 静默失败
+    """
+    with 忽略异常(Exception):
+        print(消息)
+    if not 是否冻结运行() or _是否有交互控制台():
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(0, 消息, 标题, 0x10)
+    except Exception:
+        pass
 
 
 # ===== 环境检查 =====
@@ -977,7 +1007,7 @@ def _播放动画(端口: int, 启动状态: _服务启动状态 | None = None) 
     信息左边: int = max(1, (宽度 - 58) // 2)
     信息行列表: list[tuple[str, tuple[int, int, int]]] = [
         (f"  ✦ 端口   │ {端口}", 主题.辅色组[0]),
-        (f"  ✦ 访问   │ http://localhost:{端口}", 主题.辅色组[1 % len(主题.辅色组)]),
+        (f"  ✦ 访问   │ http://127.0.0.1:{端口}", 主题.辅色组[1 % len(主题.辅色组)]),
         ("", (0, 0, 0)),
         ("  ✦ 仓库   │ https://github.com/Water-Run/MyBiOut", 主题.渐变甲),
         ("  ✦ 作者   │ WaterRun", 主题.渐变乙),
@@ -1079,7 +1109,7 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
         """
         _停止服务(启动状态)
 
-    网页视图.create_window(
+    窗口 = 网页视图.create_window(
         title="MyBiOut!",
         url=地址,
         width=1280,
@@ -1087,6 +1117,8 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
         min_size=(960, 640),
         background_color="#0b1220",
     )
+    with 忽略异常(Exception):
+        窗口.events.closed += _窗口关闭
     try:
         网页视图.start(debug=False)
     finally:
@@ -1152,12 +1184,12 @@ def 主程序() -> None:
             print("        安装: pip install pywebview")
             print()
 
-    # 冻结绿色包或无可交互终端时跳过动画
+    # 冻结绿色包或无可交互终端时跳过动画 (stdout 可能为 None: windowed)
     跳过动画: bool = (
         参数.no_animation
         or 是否冻结运行()
         or 使用窗口
-        or not 系统.stdout.isatty()
+        or not _是否有交互控制台()
     )
 
     # ===== 环境检查 =====
@@ -1179,35 +1211,44 @@ def 主程序() -> None:
             动画错误 = e
 
     if 启动状态.已失败.is_set():
+        原因: str = 启动状态.原因 or "未知原因"
         print(_备用标题)
         print(f"  ✦ 端口: {端口}")
-        print(f"  ✦ 启动失败: {启动状态.原因 or '未知原因'}")
+        print(f"  ✦ 启动失败: {原因}")
         if 缺失环境项:
             _打印环境详情(环境检查列表)
         else:
             print("  ✦ 请检查端口占用/配置后重试")
             print()
+        _提示致命错误(f"启动失败: {原因}\n端口: {端口}")
         return
 
     if 动画错误 is not None and not 使用窗口:
         _打印就绪信息(端口, 使用窗口=False)
 
     if not _等待服务启动(启动状态, 超时=25.0):
+        原因 = 启动状态.原因 or "服务启动超时"
         print(_备用标题)
         print(f"  ✦ 端口: {端口}")
-        print(f"  ✦ 启动失败: {启动状态.原因 or '服务启动超时'}")
+        print(f"  ✦ 启动失败: {原因}")
         print()
+        _提示致命错误(f"启动失败: {原因}\n端口: {端口}")
         return
 
     if 使用窗口:
         if not 跳过动画:
             _打印就绪信息(端口, 使用窗口=True)
-        elif 系统.stdout.isatty():
+        elif _是否有交互控制台():
             _打印就绪信息(端口, 使用窗口=True)
         try:
             _启动窗口壳(端口, 启动状态)
         except Exception as e:
             print(f"  ✦ 内嵌窗口启动失败, 回退浏览器: {e}")
+            if 是否冻结运行() and not _是否有交互控制台():
+                _提示致命错误(
+                    f"内嵌窗口启动失败, 将尝试系统浏览器。\n\n{e}\n\n"
+                    "若仍无界面, 请安装 WebView2 Runtime 或使用 MyBiOut!.exe --browser"
+                )
             使用窗口 = False
 
     if not 使用窗口:

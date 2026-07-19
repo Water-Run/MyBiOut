@@ -20,7 +20,7 @@
 
 ## 使用
 
-1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut!-*.rar`  
+1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut!-*.zip`  
 2. 解压到任意目录  
 3. 双击 **`MyBiOut!.exe`**  
 4. 关闭窗口即退出  
@@ -34,15 +34,20 @@
 | `config.ini` | 配置文件 |
 | `bin/` | `BBDown.exe` / `ffmpeg` 等外部工具 |
 | `auth_profile/` | 扫码登录可选资料目录 |
-| `version.txt` | 版本号 (界面底部动态显示) |
+| `version.txt` | 版本号 (界面底部优先读此文件) |
+| `使用说明.txt` | 简要说明 |
 
 ## 打包
 
-维护者在本机执行 (需 Python 3.14+ 与 [WinRAR](https://www.win-rar.com/)):  
+维护者在本机执行 (需 Python 3.14+; 发布包用标准库 zip, **无需 WinRAR**):  
 
 ```cmd
 python 打包.py
 ```
 
-版本号格式为 `YY.MM.DD.序号` (如 `26.07.17.1`), 由打包脚本写入 `mybiout/version.txt` 并按日递增; 页面底部通过 `/api/version` 动态读取.  
-产出: `dist/release/MyBiOut!-<版本>.rar`  
+版本号格式为 `YY.MM.DD.序号` (如 `26.07.17.1`), 由打包脚本写入 `mybiout/version.txt` 并按日递增; 页面底部经 `/api/version` 读取 (优先绿色包根目录 `version.txt`).  
+发布包内的 `config.ini` 为**脱敏默认配置**, 不会拷贝本机已有凭证.  
+产出: `dist/release/MyBiOut!-<版本>.zip`  
+重复打包会复用 PyInstaller 缓存、不强制 `pip -U`, 通常比首次快很多.
+
+开发依赖见 `requirements.txt` (可选: `pip install -r requirements.txt`).

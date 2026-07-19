@@ -1,0 +1,13 @@
+# MyBiOut! 运行与打包依赖 (Windows x64 / Python 3.14+)
+fastapi
+uvicorn[standard]
+httpx
+biliffm4s
+pywebview
+pyinstaller
+
+# 可选: OhMyConfig 扫码登录
+# playwright
+
+# 开发 / 冒烟测试
+pytest

@@ -1,21 +1,70 @@
+# ---------- Python ----------
 __pycache__/
 *.py[cod]
+*$py.class
 .venv/
 venv/
-build/
-dist/
-*.rar
+*.egg
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.tox/
 .coverage
+htmlcov/
+coverage.xml
+
+# ---------- 构建 / 发布产物 ----------
+build/
+dist/
+# 误落在仓库根的 PyInstaller spec / 半成品
+*.spec
+*.tmp
+*.part
+*.partial
+*.bak
+*.swp
+*.log
+
+# 压缩包与 wheel（发布物只应出现在被忽略的 dist/ 内）
+*.rar
+*.zip
+*.7z
+*.whl
+
+# ---------- 编辑器 / 工作区 ----------
 .idea/
 .vscode/
-*.egg-info/
+.worktrees/
+
+# ---------- 密钥与本机会话（绝不可入库） ----------
 mybiout/config.ini
 auth_profile/
+mybiout/auth_profile/
+.env
+.env.*
+!.env.example
+cookie.json
+auth.json
+*.local.json
+*.pem
+
+# ---------- 旁路二进制工具（体积大、机器相关） ----------
 mybiout/bin/*.exe
+mybiout/bin/ffmpeg/
+mybiout/bin/ffmpeg/**
 # 语料只需 data.json 入库, 其余旁路工具文件不跟踪
 mybiout/bin/BullshitGenerator/**
 !mybiout/bin/BullshitGenerator/data.json
+
+# ---------- 本机导出 / 缓存 ----------
+/output/
+/downloads/
+/bbdown!/
+/localout!/
+/mdout!/
+
+# ---------- 系统垃圾 ----------
 Thumbs.db
 .DS_Store
+desktop.ini

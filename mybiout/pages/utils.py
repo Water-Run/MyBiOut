@@ -87,7 +87,7 @@ def 取资料目录() -> 路径:
     return 取运行根目录() / "auth_profile"
 
 
-# 模块级配置路径: 测试可通过 monkeypatch 覆盖; 绿色版落在 exe 旁
+# 模块级配置路径: 绿色版/开发态均落在运行根 (exe 旁或 mybiout/)
 _配置路径: 路径 = 取运行根目录() / "config.ini"
 
 
