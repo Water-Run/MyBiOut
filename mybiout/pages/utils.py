@@ -105,9 +105,10 @@ def 取默认哔哩哔哩电脑缓存路径() -> str:
         "sessdata": "",
     },
     "api": {
+        "enabled": "false",
         "key": "",
         "model": "",
-        "base_url": "https://api.poe.com/v1",
+        "base_url": "https://api.deepseek.com/v1",
         "timeout": "infinite",
     },
     "localout": {
@@ -240,6 +241,14 @@ def 取导出路径() -> 路径:
     导出路径: 路径 = 路径(取设置("export", "path"))
     导出路径.mkdir(parents=True, exist_ok=True)
     return 导出路径
+
+
+def 取接口是否启用() -> bool:
+    r"""
+    Man 页大模型是否启用 (关闭时一律走本地助手通道)
+    """
+    值 = (取设置("api", "enabled") or "false").strip().lower()
+    return 值 in {"1", "true", "yes", "on", "启用"}
 
 
 def 取接口密钥() -> str:

@@ -141,7 +141,7 @@ async def 手册页面() -> 网页响应:
 @应用.get("/api/version")
 async def 取版本接口() -> dict[str, str]:
     r"""
-    动态读取 version.txt 中的版本号 (YY.MM.DD.序号)
+    动态读取 version.txt 中的版本号 (如 二六〇七甲)
     :return: dict[str, str]: {"version": "..."}
     """
     return {"version": 取版本号()}
@@ -760,11 +760,12 @@ async def 手册流式对话(请求对象: 请求):
 
     请求体: dict[str, 任意] = await _读取数据字典(请求对象)
     提示词: str = _转字符串(请求体.get("prompt", ""))
+    直接说: bool = bool(请求体.get("force_bs", False))
 
     from mybiout.pages.man.man import 流式对话SSE
 
     return StreamingResponse(
-        流式对话SSE(提示词),
+        流式对话SSE(提示词, 直接说=直接说),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

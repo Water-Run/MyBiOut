@@ -17,6 +17,8 @@ coverage.xml
 # ---------- 构建 / 发布产物 ----------
 build/
 dist/
+# 打包脚本自动补齐的 RAR 等本机工具 (勿入库)
+tools/
 # 误落在仓库根的 PyInstaller spec / 半成品
 *.spec
 *.tmp

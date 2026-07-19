@@ -116,6 +116,14 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
             工具.设设置(分区, 键, 规范值)
             return _成功()
 
+        case ("api", "enabled"):
+            规范值 = 值.strip().lower()
+            if 规范值 in {"1", "true", "yes", "on", "启用"}:
+                工具.设设置(分区, 键, "true")
+            else:
+                工具.设设置(分区, 键, "false")
+            return _成功()
+
         case ("api", "key" | "model"):
             工具.设设置(分区, 键, 值.strip())
             return _成功()

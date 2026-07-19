@@ -284,7 +284,14 @@ body.mybiout-entry-ready .logbar {
     }
 }
 
-/* 页面底部版本号 (entry.js 动态读取 /api/version) */
+/* 哔哩哔哩粉 (顶栏/品牌强调) */
+:root {
+    --bili-pink: #FB7299;
+    --bili-pink-deep: #e45a84;
+    --bili-pink-soft: #ff9dbd;
+}
+
+/* 页面底部版本号 — 仅主页由 entry.js 挂载 */
 .mybiout-version {
     position: fixed;
     left: 0;

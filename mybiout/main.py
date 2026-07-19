@@ -63,7 +63,8 @@ def _取程序工具目录() -> 路径:
 
 def _配置文本输出() -> None:
     r"""
-    避免控制台或重定向输出编码不支持装饰字符时直接中断启动。
+    避免控制台/冻结包 stdout 在 GBK 下打印 ✦ 等字符直接崩掉。
+    windowed 启动时 stdout 可能是包装流, reconfigure 不一定生效, 故打印侧另有 _安全打印。
     """
     for 输出流 in (系统.stdout, 系统.stderr):
         if 输出流 is None:
@@ -71,8 +72,28 @@ def _配置文本输出() -> None:
         重配函数 = getattr(输出流, "reconfigure", None)
         if 重配函数 is None:
             continue
-        with 忽略异常(TypeError, ValueError):
+        with 忽略异常(TypeError, ValueError, OSError, AttributeError):
+            重配函数(encoding="utf-8", errors="replace")
+        with 忽略异常(TypeError, ValueError, OSError, AttributeError):
             重配函数(errors="replace")
+
+
+def _安全打印(*参数: object, **关键字: object) -> None:
+    r"""print 的容错包装: 编码失败时降级为 ASCII 可表示文本。"""
+    try:
+        print(*参数, **关键字)
+        return
+    except UnicodeEncodeError:
+        pass
+    except Exception:
+        return
+    try:
+        文本 = " ".join(str(x) for x in 参数)
+        文本 = 文本.encode("gbk", errors="replace").decode("gbk", errors="replace")
+        print(文本, **{k: v for k, v in 关键字.items() if k != "file"})
+    except Exception:
+        with 忽略异常(Exception):
+            print(repr(参数))
 
 
 def _是否有交互控制台() -> bool:
@@ -93,7 +114,7 @@ def _提示致命错误(消息: str, *, 标题: str = "MyBiOut!") -> None:
     输出致命错误; 冻结且无控制台时用系统消息框, 避免 --windowed 静默失败
     """
     with 忽略异常(Exception):
-        print(消息)
+        _安全打印(消息)
     if not 是否冻结运行() or _是否有交互控制台():
         return
     try:
@@ -1093,6 +1114,28 @@ def _停止服务(启动状态: _服务启动状态) -> None:
         启动状态.线程对象.join(timeout=5.0)
 
 
+def _取窗口图标路径() -> str | None:
+    r"""
+    窗口/任务栏图标: 优先 logo.ico, 其次 logo.png (包内 assets)
+    """
+    from pathlib import Path as 路径
+
+    候选根: list[路径] = []
+    try:
+        from mybiout.pages.utils import 取资源根目录
+
+        候选根.append(取资源根目录())
+    except Exception:
+        pass
+    候选根.append(路径(__file__).resolve().parent)
+    for 根 in 候选根:
+        for 名 in ("assets/logo.ico", "assets/logo.png"):
+            文件 = 根 / 名
+            if 文件.is_file():
+                return str(文件)
+    return None
+
+
 def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
     r"""
     使用 pywebview 打开内嵌窗口, 关闭窗口时停止本地服务
@@ -1102,6 +1145,7 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
     import webview as 网页视图
 
     地址: str = f"http://127.0.0.1:{端口}/"
+    图标 = _取窗口图标路径()
 
     def _窗口关闭() -> None:
         r"""
@@ -1109,14 +1153,22 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
         """
         _停止服务(启动状态)
 
-    窗口 = 网页视图.create_window(
-        title="MyBiOut!",
-        url=地址,
-        width=1280,
-        height=840,
-        min_size=(960, 640),
-        background_color="#0b1220",
-    )
+    窗口参数: dict = {
+        "title": "MyBiOut!",
+        "url": 地址,
+        "width": 1280,
+        "height": 840,
+        "min_size": (960, 640),
+        "background_color": "#0b1220",
+    }
+    if 图标:
+        窗口参数["icon"] = 图标
+    try:
+        窗口 = 网页视图.create_window(**窗口参数)
+    except TypeError:
+        # 旧版 pywebview 可能不认 icon 参数
+        窗口参数.pop("icon", None)
+        窗口 = 网页视图.create_window(**窗口参数)
     with 忽略异常(Exception):
         窗口.events.closed += _窗口关闭
     try:
@@ -1128,19 +1180,18 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
 def _打印就绪信息(端口: int, *, 使用窗口: bool) -> None:
     r"""
     在控制台打印服务就绪摘要
-    :param 端口: 端口号
-    :param 使用窗口: 是否内嵌窗口模式
+    使用 * 等 ASCII 符号, 避免 windowed/GBK 下 ✦ 触发 UnicodeEncodeError 整进程崩溃。
     """
-    print(_备用标题)
-    print(f"  ✦ 端口: {端口}")
-    print(f"  ✦ 访问: http://127.0.0.1:{端口}")
+    _安全打印(_备用标题)
+    _安全打印(f"  * 端口: {端口}")
+    _安全打印(f"  * 访问: http://127.0.0.1:{端口}")
     if 使用窗口:
-        print("  ✦ 模式: 绿色内嵌窗口 (关闭窗口即退出)")
+        _安全打印("  * 模式: 绿色内嵌窗口 (关闭窗口即退出)")
     else:
-        print("  ✦ 模式: 系统浏览器")
-    print("  ✦ 仓库: https://github.com/Water-Run/MyBiOut")
-    print("  ✦ 作者: WaterRun")
-    print()
+        _安全打印("  * 模式: 系统浏览器")
+    _安全打印("  * 仓库: https://github.com/Water-Run/MyBiOut")
+    _安全打印("  * 作者: WaterRun")
+    _安全打印()
 
 
 def 主程序() -> None:
@@ -1180,9 +1231,9 @@ def 主程序() -> None:
     if 使用窗口 and not _可否使用窗口壳():
         使用窗口 = False
         if not 参数.browser:
-            print("  提示: 未安装 pywebview, 已回退为系统浏览器模式")
-            print("        安装: pip install pywebview")
-            print()
+            _安全打印("  提示: 未安装 pywebview, 已回退为系统浏览器模式")
+            _安全打印("        安装: pip install pywebview")
+            _安全打印()
 
     # 冻结绿色包或无可交互终端时跳过动画 (stdout 可能为 None: windowed)
     跳过动画: bool = (
@@ -1212,14 +1263,14 @@ def 主程序() -> None:
 
     if 启动状态.已失败.is_set():
         原因: str = 启动状态.原因 or "未知原因"
-        print(_备用标题)
-        print(f"  ✦ 端口: {端口}")
-        print(f"  ✦ 启动失败: {原因}")
+        _安全打印(_备用标题)
+        _安全打印(f"  * 端口: {端口}")
+        _安全打印(f"  * 启动失败: {原因}")
         if 缺失环境项:
             _打印环境详情(环境检查列表)
         else:
-            print("  ✦ 请检查端口占用/配置后重试")
-            print()
+            _安全打印("  * 请检查端口占用/配置后重试")
+            _安全打印()
         _提示致命错误(f"启动失败: {原因}\n端口: {端口}")
         return
 
@@ -1228,10 +1279,10 @@ def 主程序() -> None:
 
     if not _等待服务启动(启动状态, 超时=25.0):
         原因 = 启动状态.原因 or "服务启动超时"
-        print(_备用标题)
-        print(f"  ✦ 端口: {端口}")
-        print(f"  ✦ 启动失败: {原因}")
-        print()
+        _安全打印(_备用标题)
+        _安全打印(f"  * 端口: {端口}")
+        _安全打印(f"  * 启动失败: {原因}")
+        _安全打印()
         _提示致命错误(f"启动失败: {原因}\n端口: {端口}")
         return
 
@@ -1243,7 +1294,7 @@ def 主程序() -> None:
         try:
             _启动窗口壳(端口, 启动状态)
         except Exception as e:
-            print(f"  ✦ 内嵌窗口启动失败, 回退浏览器: {e}")
+            _安全打印(f"  * 内嵌窗口启动失败, 回退浏览器: {e}")
             if 是否冻结运行() and not _是否有交互控制台():
                 _提示致命错误(
                     f"内嵌窗口启动失败, 将尝试系统浏览器。\n\n{e}\n\n"
@@ -1272,4 +1323,24 @@ def 主程序() -> None:
 
 
 if __name__ == "__main__":
-    主程序()
+    try:
+        主程序()
+    except Exception as 异常:  # noqa: BLE001
+        import traceback as 回溯
+
+        详情: str = 回溯.format_exc()
+        try:
+            from pathlib import Path as _路径
+
+            _根 = _路径(系统.executable).resolve().parent if 是否冻结运行() else _路径.cwd()
+            (_根 / "startup_error.log").write_text(详情, encoding="utf-8")
+        except Exception:
+            pass
+        try:
+            _提示致命错误(
+                f"启动时发生未处理异常:\n\n{异常}\n\n"
+                f"详情已写入 startup_error.log（若可写）。\n\n{详情[-1200:]}"
+            )
+        except Exception:
+            pass
+        raise

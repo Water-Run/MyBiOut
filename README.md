@@ -20,7 +20,7 @@
 
 ## 使用
 
-1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut!-*.zip`  
+1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut!-*.rar`  
 2. 解压到任意目录  
 3. 双击 **`MyBiOut!.exe`**  
 4. 关闭窗口即退出  
@@ -39,15 +39,16 @@
 
 ## 打包
 
-维护者在本机执行 (需 Python 3.14+; 发布包用标准库 zip, **无需 WinRAR**):  
+维护者在本机执行 (Python 3.14+)。发布包固定为 **`.rar`**：脚本会探测 PATH / 常见目录 / `tools/rar`；若没有可用的 `rar a` 创建端，会尝试 winget 或下载安装到工程 `tools/rar`（本机缓存，不进 git）。  
 
 ```cmd
 python 打包.py
 ```
 
-版本号格式为 `YY.MM.DD.序号` (如 `26.07.17.1`), 由打包脚本写入 `mybiout/version.txt` 并按日递增; 页面底部经 `/api/version` 读取 (优先绿色包根目录 `version.txt`).  
+版本号为中文轨 **年月 + 月内序标** (如 `二六〇七甲` = 2026 年 7 月第 1 包; 序标 `甲乙丙丁戊己庚辛壬癸子丑`, 每月最多 12 个), 由打包脚本写入 `mybiout/version.txt`; 页面底部经 `/api/version` 读取 (优先绿色包根目录 `version.txt`).  
 发布包内的 `config.ini` 为**脱敏默认配置**, 不会拷贝本机已有凭证.  
-产出: `dist/release/MyBiOut!-<版本>.zip`  
+产出: `dist/release/MyBiOut!-<版本>.rar` (例 `MyBiOut!-二六〇七甲.rar`)  
+
 重复打包会复用 PyInstaller 缓存、不强制 `pip -U`, 通常比首次快很多.
 
 开发依赖见 `requirements.txt` (可选: `pip install -r requirements.txt`).

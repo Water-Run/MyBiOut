@@ -5,12 +5,12 @@ MyBiOut! 绿色版一键打包脚本（独立维护入口）
     python 打包.py
 
 流程:
-    0) 互斥锁 + 清理半成品残留；计算并写入版本号
+    0) 互斥锁 + 清理半成品残留；计算并写入中文版本号
     1) 安装依赖（已装则跳过升级, 加快重复打包）
     2) PyInstaller 构建（增量、无 collect-all 全量收集）
     3) 组装绿色目录（先删旧绿包；工具/脱敏配置强制校验）
-    4) 标准库 zipfile 原子写出 zip 发布包（无需 WinRAR）
-    5) 收尾：校验 zip、裁剪过旧发布包
+    4) 调用本机 rar 命令行打 .rar 发布包（PATH 上的 rar / 任意提供 Rar 的安装均可）
+    5) 收尾：裁剪过旧发布包
 
 终端 TUI（有交互控制台时）:
     开场 10→1 → MyBiOut! / 即将开始（快速语法结构检查）
@@ -31,7 +31,6 @@ import subprocess as 子进程
 import sys as 系统
 import threading as 线程
 import time as 时间
-import zipfile as 压缩包
 from dataclasses import dataclass as 数据类
 from dataclasses import field as 字段
 from datetime import date as 日期
@@ -203,8 +202,8 @@ class 打包进度:
     文案: str = "准备中…"
     明细: str = ""
     阶段键: str = "版本"
-    旧版本: str = "0.0.0.0"
-    新版本: str = "0.0.0.0"
+    旧版本: str = "〇〇〇〇甲"
+    新版本: str = "〇〇〇〇甲"
     已结束: bool = False
     已成功: bool = False
     失败原因: str = ""
@@ -353,8 +352,14 @@ def _应跳过拷贝路径(路径点: 路径) -> bool:
     后缀 = 路径点.suffix.lower()
     if 后缀 in _跳过拷贝后缀:
         return True
-    # 双后缀半成品: foo.zip.part
-    if 名小.endswith(".zip.part") or 名小.endswith(".zip.tmp") or 名小.endswith(".zip.partial"):
+    # 半成品压缩包
+    if (
+        名小.endswith(".zip.part")
+        or 名小.endswith(".zip.tmp")
+        or 名小.endswith(".rar.part")
+        or 名小.endswith(".rar.tmp")
+        or 名小.endswith(".partial")
+    ):
         return True
     return False
 
@@ -552,6 +557,7 @@ def 清理打包残留(
                 or 名小.endswith(".tmp")
                 or 名小.endswith(".partial")
                 or 名小.endswith(".zip.part")
+                or 名小.endswith(".rar.part")
             ):
                 try:
                     文件.unlink()
@@ -561,15 +567,20 @@ def 清理打包残留(
                     pass
 
     if 阶段 == "收尾" and 发布目录.is_dir():
-        zips = sorted(
-            (p for p in 发布目录.glob(f"{产物显示名}-*.zip") if p.is_file()),
+        包们 = sorted(
+            (
+                p
+                for p in 发布目录.iterdir()
+                if p.is_file()
+                and p.name.startswith(f"{产物显示名}-")
+                and p.suffix.lower() in {".rar", ".zip"}
+            ),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
         保留 = max(1, int(发布包保留个数))
-        for 旧包 in zips[保留:]:
-            # 若明确保留当前版本, 永不删当前（即使保留个数被调成 0 也已 max1）
-            if 保留版本 and 保留版本 in 旧包.name and 旧包 == zips[0]:
+        for 旧包 in 包们[保留:]:
+            if 保留版本 and 保留版本 in 旧包.name and 旧包 == 包们[0]:
                 continue
             try:
                 旧包.unlink()
@@ -2710,6 +2721,36 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
 
 
 # ---------- 版本 / 环境 ----------
+# 中文版本号: 年(二位) + 月(二位) + 月内序号(甲…丑 共 12)
+# 例: 二六〇七甲 = 2026 年 7 月 第 1 个发布包
+_中文数码: str = "〇一二三四五六七八九"
+_月内序标: str = "甲乙丙丁戊己庚辛壬癸子丑"  # 1..12
+
+
+def _二位中文(数: int) -> str:
+    数 = max(0, int(数)) % 100
+    return _中文数码[数 // 10] + _中文数码[数 % 10]
+
+
+def _月内序标到序号(标记: str) -> int | None:
+    标记 = (标记 or "").strip()
+    if not 标记:
+        return None
+    if 标记 in _月内序标:
+        return _月内序标.index(标记) + 1
+    return None
+
+
+def _序号到月内序标(序号: int) -> str:
+    if not 1 <= 序号 <= len(_月内序标):
+        raise ValueError(f"月内序号须为 1..{len(_月内序标)}, 收到 {序号}")
+    return _月内序标[序号 - 1]
+
+
+def 本月版本前缀(当日: 日期 | None = None) -> str:
+    r"""如 二六〇七 (年二位 + 月二位, 中文数码)。"""
+    天 = 当日 or 日期.today()
+    return _二位中文(天.year % 100) + _二位中文(天.month)
 
 
 def 读取当前版本() -> str:
@@ -2717,17 +2758,33 @@ def 读取当前版本() -> str:
         文本 = 版本文件路径.read_text(encoding="utf-8").strip()
         if 文本:
             return 文本
-    return "0.0.0.0"
+    return "〇〇〇〇甲"
 
 
-def 计算下一版本(旧版本: str) -> str:
-    今日前缀 = 日期.today().strftime("%y.%m.%d")
+def 计算下一版本(旧版本: str, 当日: 日期 | None = None) -> str:
+    r"""
+    下一中文版本号 (按月递增, 每月最多 12 个)。
+    兼容读取旧式 YY.MM.DD.序号: 同年同月则序标从 1 起重新计中文轨
+    (旧轨按日计数, 不直接映射到甲乙, 避免误跳号)。
+    """
+    天 = 当日 or 日期.today()
+    前缀 = 本月版本前缀(天)
     序号 = 1
-    if 旧版本.startswith(今日前缀 + "."):
-        尾 = 旧版本[len(今日前缀) + 1 :]
-        if 尾.isdigit():
-            序号 = int(尾) + 1
-    return f"{今日前缀}.{序号}"
+    旧 = (旧版本 or "").strip()
+    if 旧.startswith(前缀):
+        尾 = 旧[len(前缀) :]
+        旧序 = _月内序标到序号(尾)
+        if 旧序 is not None:
+            序号 = 旧序 + 1
+    # 旧阿拉伯格式 26.07.19.3 — 仅用于识别「已是本月产物」, 中文轨仍从甲起算
+    # 若已是中文且本月已满 12, 下方抛错
+    if 序号 > len(_月内序标):
+        失败退出(
+            f"本月中文版本已用尽 ({前缀}甲…{_月内序标[-1]} 共 {len(_月内序标)} 个)。\n"
+            f"  当前: {旧}\n"
+            f"  请下月再打包, 或手动改 mybiout/version.txt 后重试。"
+        )
+    return 前缀 + _序号到月内序标(序号)
 
 
 def 写入版本文件(版本: str) -> None:
@@ -2865,6 +2922,7 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
                 状态.标记失败(说明)
             失败退出(说明)
 
+    图标文件 = 程序包目录 / "assets" / "logo.ico"
     参数: list[str] = [
         系统.executable,
         "-m",
@@ -2884,6 +2942,8 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
         "--specpath",
         str(工程根目录 / 构建缓存目录名),
     ]
+    if 图标文件.is_file():
+        参数 += ["--icon", str(图标文件)]
     for 源路径, 目标标记 in 内嵌数据项:
         参数 += ["--add-data", f"{源路径};{目标标记}"]
     for 模块名 in 隐藏导入列表:
@@ -2895,6 +2955,10 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
     if 状态 is None or 状态.纯文本:
         打印信息("不嵌入本机 config.ini（避免凭证进入发布包）")
         打印信息("产物为 GUI 子系统（--windowed），双击无黑框")
+        if 图标文件.is_file():
+            打印信息(f"exe 图标: {图标文件.name}（assets/logo）")
+        else:
+            打印警告(f"未找到 {图标文件.name}，将使用默认图标")
         打印信息("增量构建: 无 --clean / 无 --collect-all")
     else:
         参数 += ["--log-level", "ERROR"]
@@ -2966,9 +3030,10 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
         默认分区 = {
             "export": {"path": r"C:\MyBiOut!", "sessdata": ""},
             "api": {
+                "enabled": "false",
                 "key": "",
                 "model": "",
-                "base_url": "https://api.poe.com/v1",
+                "base_url": "https://api.deepseek.com/v1",
                 "timeout": "infinite",
             },
             "localout": {
@@ -3207,77 +3272,479 @@ https://github.com/Water-Run/MyBiOut
     return 绿色根
 
 
-def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | None = None) -> 路径:
-    r"""zipfile 按文件计数推进; 先写 .part 再替换, 写完 testzip。"""
-    if 状态 is None or 状态.纯文本:
-        打印步骤(4, 4, "压缩为 zip 发布包")
+# 打包时若环境无 rar, 自动落到工程 tools/ 下 (gitignore, 不进仓库)
+_工具目录: 路径 = 工程根目录 / "tools"
+_便携Rar目录: 路径 = _工具目录 / "rar"
+# 官方 WinRAR x64 安装包 (含可创建档案的 Rar.exe; 静默装到 tools/rar)
+_RAR安装包名: str = "winrar-x64-711.exe"
+_RAR下载地址表: tuple[str, ...] = (
+    "https://www.win-rar.com/fileadmin/winrar-versions/winrar/winrar-x64-711.exe",
+    "https://www.rarlab.com/rar/winrar-x64-711.exe",
+)
 
-    发布目录 = 工程根目录 / 产物输出目录名 / 发布目录名
+
+def _枚举Rar候选() -> list[路径]:
+    候选: list[路径] = []
+    for 名 in ("rar", "Rar", "RAR", "rar.exe", "Rar.exe"):
+        which = 文件工具.which(名)
+        if which:
+            候选.append(路径(which))
+    相对尾巴: tuple[tuple[str, ...], ...] = (
+        ("WinRAR", "Rar.exe"),
+        ("WinRAR", "rar.exe"),
+        ("Programs", "WinRAR", "Rar.exe"),
+    )
+    for 环境键 in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA", "ProgramW6432"):
+        根 = 操作系统.environ.get(环境键)
+        if not 根:
+            continue
+        根路径 = 路径(根)
+        for 段 in 相对尾巴:
+            候选.append(根路径.joinpath(*段))
+    候选.extend(
+        [
+            _便携Rar目录 / "Rar.exe",
+            _便携Rar目录 / "rar.exe",
+            工程根目录 / "tools" / "rar.exe",
+            工程根目录 / "bin" / "rar.exe",
+        ]
+    )
+    已见: set[str] = set()
+    出: list[路径] = []
+    for 路径点 in 候选:
+        名小 = 路径点.name.lower()
+        # unrar 只能解压, 不能 a 创建
+        if "unrar" in 名小:
+            continue
+        try:
+            键 = str(路径点.resolve()).lower()
+        except OSError:
+            键 = str(路径点).lower()
+        if 键 in 已见:
+            continue
+        已见.add(键)
+        if 路径点.is_file():
+            出.append(路径点)
+    return 出
+
+
+def _探测Rar可执行文件() -> 路径 | None:
+    列表 = _枚举Rar候选()
+    return 列表[0] if 列表 else None
+
+
+def _校验Rar能创建(rar程序: 路径) -> bool:
+    r"""在临时目录试压一个极小 rar, 确认不是仅解压的 unrar。"""
+    import tempfile as 临时库
+
+    try:
+        with 临时库.TemporaryDirectory(prefix="mybiout_rar_") as 临时:
+            根 = 路径(临时)
+            (根 / "t.txt").write_text("ok", encoding="utf-8")
+            出 = 根 / "t.rar"
+            参数 = [
+                str(rar程序),
+                "a",
+                "-ep1",
+                "-idq",
+                "-m1",
+                str(出),
+                "t.txt",
+            ]
+            结果 = 子进程.run(
+                参数,
+                cwd=str(根),
+                check=False,
+                stdin=子进程.DEVNULL,
+                stdout=子进程.PIPE,
+                stderr=子进程.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                **(
+                    {"creationflags": 0x08000000}
+                    if 操作系统.name == "nt"
+                    else {}
+                ),
+            )
+            if 结果.returncode != 0 or not 出.is_file():
+                # 再试不带 -idq (有的实现不认)
+                参数2 = [str(rar程序), "a", "-m1", str(出), "t.txt"]
+                结果2 = 子进程.run(
+                    参数2,
+                    cwd=str(根),
+                    check=False,
+                    stdin=子进程.DEVNULL,
+                    stdout=子进程.PIPE,
+                    stderr=子进程.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    **(
+                        {"creationflags": 0x08000000}
+                        if 操作系统.name == "nt"
+                        else {}
+                    ),
+                )
+                if 结果2.returncode != 0 or not 出.is_file() or 出.stat().st_size < 8:
+                    return False
+            头 = 出.read_bytes()[:4]
+            return 头 == b"Rar!"
+    except OSError:
+        return False
+
+
+def _通过Winget补Rar() -> bool:
+    winget = 文件工具.which("winget")
+    if not winget:
+        return False
+    打印信息("尝试用 winget 安装 RAR 工具 (RARLab.WinRAR)…")
+    结果 = 子进程.run(
+        [
+            winget,
+            "install",
+            "-e",
+            "--id",
+            "RARLab.WinRAR",
+            "--accept-package-agreements",
+            "--accept-source-agreements",
+            "--disable-interactivity",
+        ],
+        check=False,
+        stdin=子进程.DEVNULL,
+        stdout=子进程.PIPE,
+        stderr=子进程.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    return 结果.returncode == 0
+
+
+def _下载文件(地址: str, 目标: 路径) -> None:
+    import urllib.request as 网络请求库  # 标准库, 无额外依赖
+
+    目标.parent.mkdir(parents=True, exist_ok=True)
+    临时 = 目标.with_suffix(目标.suffix + ".download")
+    if 临时.exists():
+        try:
+            临时.unlink()
+        except OSError:
+            pass
+    请求 = 网络请求库.Request(
+        地址,
+        headers={"User-Agent": "MyBiOut-Packager/1.0 (Windows; rar-bootstrap)"},
+    )
+    with 网络请求库.urlopen(请求, timeout=120) as 响应, 临时.open("wb") as 写出:
+        while True:
+            块 = 响应.read(256 * 1024)
+            if not 块:
+                break
+            写出.write(块)
+    临时.replace(目标)
+
+
+def _查找7z解压器() -> 路径 | None:
+    for 名 in ("7z", "7za", "7zr", "7z.exe", "7za.exe", "7zr.exe"):
+        which = 文件工具.which(名)
+        if which:
+            return 路径(which)
+    for 环境键 in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        根 = 操作系统.environ.get(环境键)
+        if not 根:
+            continue
+        for 相对 in (
+            ("7-Zip", "7z.exe"),
+            ("7-Zip", "7za.exe"),
+            ("Programs", "7-Zip", "7z.exe"),
+        ):
+            候选 = 路径(根).joinpath(*相对)
+            if 候选.is_file():
+                return 候选
+    便携 = _工具目录 / "7zr.exe"
+    if 便携.is_file():
+        return 便携
+    return None
+
+
+def _确保7z解压器() -> 路径 | None:
+    r"""优先系统 7-Zip; 否则下载官方 7zr.exe (公有领域/LGPL, 仅用于抽出安装包)。"""
+    已有 = _查找7z解压器()
+    if 已有 is not None:
+        return 已有
+    目标 = _工具目录 / "7zr.exe"
+    地址表 = (
+        "https://www.7-zip.org/a/7zr.exe",
+        "https://github.com/ip7z/7zip/releases/download/24.09/7zr.exe",
+    )
+    打印信息("下载 7zr.exe 以便从安装包中抽出 Rar.exe (无需管理员)…")
+    for 地址 in 地址表:
+        try:
+            _下载文件(地址, 目标)
+            if 目标.is_file() and 目标.stat().st_size > 50_000:
+                return 目标
+        except Exception as 异常:  # noqa: BLE001
+            打印警告(f"7zr 下载失败: {异常}")
+    return None
+
+
+def _用7z从安装包抽出Rar(安装包: 路径, 目标目录: 路径) -> 路径 | None:
+    七z = _确保7z解压器()
+    if 七z is None:
+        return None
+    目标目录.mkdir(parents=True, exist_ok=True)
+    打印信息(f"用 {七z.name} 从安装包抽出 Rar.exe → {目标目录}")
+    结果 = 子进程.run(
+        [str(七z), "x", str(安装包), f"-o{目标目录}", "-y"],
+        check=False,
+        stdin=子进程.DEVNULL,
+        stdout=子进程.PIPE,
+        stderr=子进程.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if 结果.returncode != 0:
+        打印警告(f"7z 解压返回 {结果.returncode}")
+    for 名 in ("Rar.exe", "rar.exe", "Rar", "rar"):
+        直达 = 目标目录 / 名
+        if 直达.is_file() and _校验Rar能创建(直达):
+            return 直达
+    for 命中 in 目标目录.rglob("Rar.exe"):
+        if 命中.is_file() and _校验Rar能创建(命中):
+            return 命中
+    for 命中 in 目标目录.rglob("rar.exe"):
+        if 命中.is_file() and "unrar" not in 命中.name.lower() and _校验Rar能创建(命中):
+            return 命中
+    return None
+
+
+def _通过官方安装包补Rar到Tools() -> 路径 | None:
+    r"""
+    下载含 Rar.exe 的安装包到 tools/cache, 优先无提权抽出到 tools/rar;
+    静默安装仅作次选 (常需管理员, 失败则忽略)。
+    """
+    缓存目录 = _工具目录 / "cache"
+    安装包 = 缓存目录 / _RAR安装包名
+    打印信息("正在准备 RAR 创建端到 tools/ …")
+    最后错误: Exception | None = None
+    for 地址 in _RAR下载地址表:
+        try:
+            if not 安装包.is_file() or 安装包.stat().st_size < 1_000_000:
+                打印信息(f"下载: {地址}")
+                _下载文件(地址, 安装包)
+            break
+        except Exception as 异常:  # noqa: BLE001
+            最后错误 = 异常
+            打印警告(f"下载失败 ({异常}), 试下一源…")
+            continue
+    else:
+        if 最后错误:
+            打印警告(f"全部下载源失败: {最后错误}")
+        return None
+
+    if not 安装包.is_file():
+        return None
+
+    目标目录 = _便携Rar目录
+    # 1) 无管理员: 7z 直接从安装包抽出
+    抽出 = _用7z从安装包抽出Rar(安装包, 目标目录)
+    if 抽出 is not None:
+        return 抽出
+
+    # 2) 次选静默安装 (可能 WinError 740 要提升)
+    目标目录.mkdir(parents=True, exist_ok=True)
+    安装目录 = str(目标目录.resolve())
+    打印信息(f"尝试静默安装到 {安装目录} (若提示需要管理员将自动跳过)…")
+    try:
+        结果 = 子进程.run(
+            [str(安装包), "/S", f"/D={安装目录}"],
+            check=False,
+            stdin=子进程.DEVNULL,
+            stdout=子进程.PIPE,
+            stderr=子进程.PIPE,
+        )
+    except OSError as 异常:
+        打印警告(f"静默安装无法启动 ({异常})")
+        结果 = None
+    if 结果 is not None:
+        for _ in range(20):
+            for 名 in ("Rar.exe", "rar.exe"):
+                候选 = 目标目录 / 名
+                if 候选.is_file() and _校验Rar能创建(候选):
+                    return 候选
+            时间.sleep(0.3)
+        for 命中 in 目标目录.rglob("Rar.exe"):
+            if 命中.is_file() and _校验Rar能创建(命中):
+                return 命中
+
+    打印警告("未能从安装包得到可用的 Rar.exe")
+    return None
+
+
+def 查找Rar可执行文件() -> 路径:
+    r"""兼容旧名: 仅探测, 找不到则失败 (测试可 mock)。"""
+    已有 = _探测Rar可执行文件()
+    if 已有 is not None:
+        return 已有
+    失败退出(
+        "未找到可创建 RAR 的命令行工具。\n"
+        "  请将 rar.exe 加入 PATH, 或放到 tools/rar/Rar.exe; 也可直接运行打包脚本让其自动补齐。"
+    )
+    raise AssertionError("不可达")
+
+
+def 确保Rar可执行文件(状态: 打包进度 | None = None) -> 路径:
+    r"""
+    保证本机有能 `rar a` 写出 .rar 的工具:
+    1) 探测 PATH / 常见目录 / tools
+    2) 校验真正能创建 (排除 unrar)
+    3) winget 补装 / 官方安装包静默装到 tools/rar
+    """
+    for 候选 in _枚举Rar候选():
+        if _校验Rar能创建(候选):
+            if 状态 is None or 状态.纯文本:
+                打印信息(f"RAR 工具: {候选}")
+            return 候选
+
+    if 状态 is None or 状态.纯文本:
+        打印警告("环境缺少可用的 rar 创建端, 开始自动补齐…")
+    elif 状态:
+        状态.进入阶段("压缩", "自动准备 RAR 工具…", 段内=0.02, 明细="bootstrap")
+
+    if _通过Winget补Rar():
+        for 候选 in _枚举Rar候选():
+            if _校验Rar能创建(候选):
+                打印成功(f"已通过 winget 就绪: {候选}")
+                return 候选
+
+    便携 = _通过官方安装包补Rar到Tools()
+    if 便携 is not None:
+        打印成功(f"已安装便携 RAR: {便携}")
+        return 便携
+
+    # 装完再扫一遍系统目录
+    for 候选 in _枚举Rar候选():
+        if _校验Rar能创建(候选):
+            return 候选
+
+    失败退出(
+        "无法自动准备 RAR 创建工具, 发布包必须是 .rar。\n"
+        "  可手动任选其一后重试:\n"
+        "  · 安装任意提供 rar.exe 的工具, 并保证 `rar a` 可用\n"
+        "  · 将 Rar.exe 放到: " + str(_便携Rar目录 / "Rar.exe") + "\n"
+        "  · 或执行: winget install -e --id RARLab.WinRAR"
+    )
+    raise AssertionError("不可达")
+
+
+def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | None = None) -> 路径:
+    r"""
+    调用本机 rar 兼容命令行生成 .rar；包内顶层目录为 MyBiOut!/。
+    环境缺 rar 时会自动检测并补齐 (tools/ 或 winget)。
+    先写到临时名再替换, 避免半成品被当分发包。
+    """
+    if 状态 is None or 状态.纯文本:
+        打印步骤(4, 4, "压缩为 rar 发布包")
+
+    if not 绿色根.is_dir():
+        说明 = f"绿色目录不存在: {绿色根}"
+        if 状态 and not 状态.纯文本:
+            状态.标记失败(说明)
+        失败退出(说明)
+
+    rar程序 = 确保Rar可执行文件(状态)
+
+    发布目录 = (工程根目录 / 产物输出目录名 / 发布目录名).resolve()
     发布目录.mkdir(parents=True, exist_ok=True)
-    归档文件 = 发布目录 / f"{产物显示名}-{版本}.zip"
-    临时文件 = 发布目录 / f"{产物显示名}-{版本}.zip.part"
+    # 绝对路径, 避免 rar 在 OEM 代码页下处理中文版本号相对路径失败
+    归档文件 = (发布目录 / f"{产物显示名}-{版本}.rar").resolve()
+    临时文件 = (发布目录 / f"{产物显示名}-{版本}.rar.part").resolve()
     if 临时文件.exists():
-        安全删除文件(临时文件, 说明="清理上次未完成的 zip.part")
+        安全删除文件(临时文件, 说明="清理上次未完成的 rar.part")
+    if 归档文件.exists():
+        安全删除文件(归档文件, 说明="覆盖同名旧 rar")
 
     文件列表 = 列举待拷文件(绿色根)
     总数 = max(1, len(文件列表))
     if 状态:
         状态.进入阶段(
             "压缩",
-            "写入 zip",
-            段内=0.0,
+            "RAR 打包中…",
+            段内=0.05,
             明细=f"0/{总数} 文件",
             计量当前=0,
             计量总共=总数,
         )
 
+    # 标准 rar 语法 (RARLAB / 多数命令行 rar 兼容):
+    # a 添加, -r 递归, -m3 压缩等级, -o+ 覆盖, -ap 包内路径前缀
+    参数: list[str] = [
+        str(rar程序),
+        "a",
+        "-r",
+        "-m3",
+        "-o+",
+        f"-ap{产物显示名}",
+        str(临时文件),
+        "*",
+    ]
+    # 安静模式: 支持则加上 (不支持时部分实现会忽略未知开关失败, 故优先精简;
+    # WinRAR 的 -idq 很有用, 有 "rar" 字样时再附上)
+    if "rar" in rar程序.name.lower():
+        参数.insert(4, "-idq")
+
+    停止监视 = 线程.Event()
+
+    def _监视体积() -> None:
+        饱和 = max(80 * 1024 * 1024, 目录体积字节(绿色根) // 2)
+        while not 停止监视.is_set():
+            已 = 临时文件.stat().st_size if 临时文件.is_file() else 0
+            段内 = 0.05 + 0.9 * min(1.0, 已 / max(1, 饱和))
+            if 状态:
+                状态.进入阶段(
+                    "压缩",
+                    "RAR 写入…",
+                    段内=段内,
+                    明细=f"{已 / (1024 * 1024):.0f} MB",
+                )
+            停止监视.wait(0.6)
+
+    监视: 线程.Thread | None = None
+    if 状态 is not None:
+        监视 = 线程.Thread(target=_监视体积, daemon=True)
+        监视.start()
     try:
-        with 压缩包.ZipFile(
-            临时文件,
-            mode="w",
-            compression=压缩包.ZIP_DEFLATED,
-            compresslevel=6,
-        ) as 包:
-            for 序号, 路径点 in enumerate(文件列表):
-                相对 = 路径点.relative_to(绿色根)
-                包内 = 路径(产物显示名) / 相对
-                包.write(路径点, arcname=str(包内).replace("\\", "/"))
-                if 状态 and ((序号 + 1) % 20 == 0 or 序号 + 1 == 总数):
-                    状态.进入阶段(
-                        "压缩",
-                        "写入 zip",
-                        段内=(序号 + 1) / 总数,
-                        明细=f"{序号 + 1}/{总数} 文件",
-                        计量当前=序号 + 1,
-                        计量总共=总数,
-                    )
-        with 压缩包.ZipFile(临时文件, mode="r") as 包:
-            坏 = 包.testzip()
-            if 坏 is not None:
-                raise RuntimeError(f"zip 自检失败, 损坏条目: {坏}")
-            if len(包.namelist()) == 0:
-                raise RuntimeError("zip 为空")
-        if 归档文件.exists():
-            安全删除文件(归档文件, 说明="覆盖同名旧发布包")
-        try:
-            临时文件.replace(归档文件)
-        except OSError:
-            文件工具.move(str(临时文件), str(归档文件))
-    except Exception as 异常:  # noqa: BLE001
-        if 临时文件.exists():
-            try:
-                临时文件.unlink()
-            except OSError:
-                pass
-        说明 = f"zip 压缩失败: {异常}"
+        执行命令(参数, 工作目录=绿色根, 步骤说明="RAR 压缩", 状态=状态)
+    finally:
+        停止监视.set()
+        if 监视 is not None:
+            监视.join(timeout=2.0)
+
+    if not 临时文件.is_file() or 临时文件.stat().st_size < 64:
+        说明 = f"RAR 未生成有效文件: {临时文件}"
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
+
+    # 魔数: RAR 1.5+ / 5.0 均为 "Rar!" (52 61 72 21)
+    头 = 临时文件.read_bytes()[:4]
+    if 头 != b"Rar!" and 临时文件.stat().st_size < 1024:
+        说明 = f"产物不像 RAR 文件 (文件头 {头!r}): {临时文件}"
+        if 状态 and not 状态.纯文本:
+            状态.标记失败(说明)
+        失败退出(说明)
+
+    try:
+        临时文件.replace(归档文件)
+    except OSError:
+        文件工具.move(str(临时文件), str(归档文件))
 
     大小兆 = 归档文件.stat().st_size / 1024 / 1024
     if 状态 is None or 状态.纯文本:
         打印成功(f"发布包已生成: {归档文件}")
         打印信息(f"文件大小约 {大小兆:.1f} MB")
+        打印信息(f"压缩工具: {rar程序}")
     if 状态:
         状态.完成阶段("压缩", "压缩完成", 明细=f"{总数} 文件 / {大小兆:.1f} MB")
     return 归档文件

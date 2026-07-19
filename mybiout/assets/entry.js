@@ -1,7 +1,13 @@
 (function () {
-    // 页脚版本: 动态请求 /api/version (源文件 mybiout/version.txt, 打包脚本写入)
+    // 版本号仅主页常驻; 子页面不挂
+    function 是否主页() {
+        var 路径 = (location.pathname || "/").replace(/\\/g, "/");
+        return 路径 === "/" || 路径 === "" || /\/index\.html?$/i.test(路径);
+    }
     function 挂载版本号() {
-        if (!document.body) {
+        if (!document.body || !是否主页()) {
+            var 旧 = document.querySelector(".mybiout-version");
+            if (旧) 旧.remove();
             return;
         }
         let 节点 = document.querySelector(".mybiout-version");

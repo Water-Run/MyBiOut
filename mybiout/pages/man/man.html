@@ -68,15 +68,19 @@
             gap: 18px;
             margin-bottom: 12px;
             flex-shrink: 0;
+            background: #FB7299;
+            padding: 10px 16px;
+            border: 3px solid #e45a84;
+            box-shadow: 4px 4px 0 #F5A623;
         }
 
         .back {
-            background: #E85B8A;
-            color: #fff;
+            background: #fff;
+            color: #FB7299;
             font-size: 13px;
             font-weight: 700;
             padding: 8px 18px;
-            border: 3px solid #c44876;
+            border: 3px solid #e45a84;
             box-shadow: 4px 4px 0 #F5A623;
             transition: transform .12s, box-shadow .12s;
         }
@@ -89,14 +93,14 @@
         .hdr h1 {
             font-size: 32px;
             font-weight: 900;
-            color: #F5A623;
-            text-shadow: 3px 3px 0 #E85B8A;
+            color: #fff;
+            text-shadow: 2px 2px 0 #e45a84;
             transform: rotate(-0.6deg);
         }
 
         .hdr-sub {
             font-size: 13px;
-            color: #E85B8A;
+            color: #fff;
             font-weight: 700;
         }
 
@@ -380,38 +384,37 @@
             padding-left: 16px;
         }
 
-        .msg-loading {
+        .msg-thinking {
             display: flex;
-            gap: 5px;
-            padding: 8px 0;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            color: #666;
+            font-size: 14px;
+            letter-spacing: 0.02em;
         }
 
-        .msg-loading span {
-            width: 8px;
-            height: 8px;
-            background: #E85B8A;
-            display: inline-block;
-            animation: bounce .6s ease-in-out infinite;
+        .msg-thinking .think-face {
+            font-size: 16px;
+            animation: think-pulse 1.1s ease-in-out infinite;
         }
 
-        .msg-loading span:nth-child(2) {
-            animation-delay: .15s;
+        .msg-thinking .think-dots::after {
+            content: "";
+            animation: think-dots 1.2s steps(4, end) infinite;
         }
 
-        .msg-loading span:nth-child(3) {
-            animation-delay: .3s;
+        @keyframes think-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.85; }
+            50% { transform: scale(1.12); opacity: 1; }
         }
 
-        @keyframes bounce {
-
-            0%,
-            100% {
-                transform: translateY(0);
-            }
-
-            50% {
-                transform: translateY(-8px);
-            }
+        @keyframes think-dots {
+            0% { content: ""; }
+            25% { content: "."; }
+            50% { content: ".."; }
+            75% { content: "..."; }
+            100% { content: ""; }
         }
 
         .chat-welcome {
@@ -553,194 +556,138 @@
                 </div>
                 <div class="manual-body">
 
-                    <h2>概述</h2>
-                    <p><code>MyBiOut!</code>（My-Bilibili-Output，导出我的哔哩哔哩）是一个已经运行在本机网页里的哔哩哔哩内容导出工具集。看到这个页面时，说明服务已经启动，接下来只需要理解每个页面该做什么、遇到异常该先检查哪里。</p>
-                    <p>系统主要包含五个入口：<b>LocalOut!</b> 导出本地缓存，<b>BBDown!</b> 下载在线视频，<b>MdOut!</b> 导出 Markdown，<b>OhMyConfig</b> 管理全局和模块设置，<b>Man!</b> 提供手册与右侧 AI 助手。</p>
-                    <blockquote>所有导出、下载、解析结果都受本机路径、外部命令、B站登录状态和网络响应影响。遇到问题先看页面提示和任务状态，再看设置页。</blockquote>
+                    <h2>孩子们，先听一句</h2>
+                    <p>能打开这页，说明 MyBiOut! 已经在跑了。这里<strong>不讲安装</strong>，只讲怎么用、点哪里、坏了先看哪。别慌，一步一步来。</p>
+                    <p>五个入口，先记牢，选错会空转很久：</p>
+                    <ul>
+                        <li><b>LocalOut!</b> — 视频<strong>已经</strong>在电脑/手机缓存里 → 合成可播文件</li>
+                        <li><b>BBDown!</b> — 手里只有链接 / BV / av → 在线下载</li>
+                        <li><b>MdOut!</b> — 只要标题、UP、简介这些<strong>文字档案</strong> → Markdown</li>
+                        <li><b>OhMyConfig</b> — 导出路径、SESSDATA、大模型开关和 Key 都在这</li>
+                        <li><b>Man!</b>（本页）— 左手册、右助手；助手默认本地通道，整活也行</li>
+                    </ul>
+                    <blockquote>先问自己：东西在哪？缓存在本地 → LocalOut；只有链接 → BBDown；只要文档 → MdOut。选错入口，再努力也像在正确的错误上加班。</blockquote>
 
                     <hr>
 
-                    <h2>推荐使用顺序</h2>
+                    <h2>第一次上手（建议顺序）</h2>
                     <ol>
-                        <li>先进入 <b>OhMyConfig</b> 检查导出根目录。默认导出根目录为 <code>C:\MyBiOut!</code>，各模块会在其下创建自己的输出目录。</li>
-                        <li>如果需要高画质下载、收藏夹读取或更完整的 B 站数据，先配置 <b>B站认证 Cookie (SESSDATA)</b>。可以手动填写，也可以用扫码登录获取。</li>
-                        <li>按目标选择模块：已有缓存用 <b>LocalOut!</b>，想直接下载链接用 <b>BBDown!</b>，想整理视频/用户/专栏信息为文档用 <b>MdOut!</b>。</li>
-                        <li>如果不确定某个按钮或错误是什么意思，在右侧问 AI 助手；没有配置大模型时，右侧会用内置生成器降级回复。</li>
+                        <li>进 <b>OhMyConfig</b>，看<strong>导出根目录</strong>是不是你想要的（默认 <code>C:\MyBiOut!</code>）。各模块会在下面建子文件夹。</li>
+                        <li>要高画质、收藏夹、更完整 B 站数据：配 <b>SESSDATA</b>（手填 Cookie 或扫码登录）。不配也能用一截功能，但高画质常会哭。</li>
+                        <li>大模型：默认<strong>关闭</strong>。想真 AI 再打开「启用大模型」并填 Key / Model / Base；关掉就永远本地助手。</li>
+                        <li>回首页进模块开干。卡住时：看任务状态原文 → 再回设置对路径/凭证。</li>
                     </ol>
 
                     <hr>
 
-                    <h2>LocalOut 使用流程</h2>
-
-                    <h3>🎞️ LocalOut! — 本地缓存导出</h3>
-                    <p>LocalOut 负责把已经存在于本机或 Android 设备里的 B 站缓存解析出来，并合并为可播放文件。它不是在线播放下载器：如果视频没有被缓存到本地，请使用 BBDown。</p>
-                    <p>可用来源：</p>
+                    <h2>LocalOut!：缓存变成视频</h2>
+                    <p><strong>前提：</strong>片子已经在本机或手机缓存里。没有缓存就去 BBDown，别在这硬扫。</p>
+                    <p><strong>推荐流程：</strong></p>
+                    <ol>
+                        <li>选来源：PC 桌面端缓存 / Android（ADB）/ 自定义文件夹。</li>
+                        <li><span class="badge-inline">添加源</span> → 等扫描出卡片（没卡片就先别导出）。</li>
+                        <li>勾选分 P → <span class="badge-inline">加入任务</span> → <span class="badge-inline">导出</span>。</li>
+                        <li>完成后「打开目录」找成品。打不开：多半 FFmpeg 或 m4s 分片不全。</li>
+                    </ol>
+                    <p><strong>常见坑（对号入座）：</strong></p>
                     <ul>
-                        <li><b>PC 桌面端缓存</b>：读取桌面端缓存目录，解析 <code>videoInfo.json</code> 和分段文件。</li>
-                        <li><b>Android 设备缓存（ADB）</b>：通过 USB 连接设备，扫描应用缓存目录，解析 <code>entry.json</code>。</li>
-                        <li><b>自定义本地路径</b>：选择任意已经复制到电脑上的缓存目录，适合从手机手动拷贝后的处理。</li>
-                    </ul>
-                    <p>标准流程：<span class="badge-inline">添加源</span> → <span class="badge-inline">等待扫描</span> → <span
-                            class="badge-inline">选择视频</span> → <span class="badge-inline">添加到任务</span> → <span
-                            class="badge-inline">导出</span></p>
-                    <p>常用设置包括输出目录名、PC 缓存路径、Android 扫描开关、文件名模板、FFmpeg 并发数和标题缺失时的降级策略。文件名模板可以组合 BV号、标题、UP主、分P号、时间等字段。</p>
-                    <h3>LocalOut 常见情况</h3>
-                    <ul>
-                        <li><b>扫描不到 PC 缓存</b>：先在设置页确认 PC 缓存路径；如果 B 站客户端更换了缓存位置，使用“浏览”选择真实目录。</li>
-                        <li><b>ADB 设备不出现</b>：确认手机已开启 USB 调试、已在手机上允许当前电脑调试，并且页面环境检测能找到 ADB。</li>
-                        <li><b>导出失败或文件打不开</b>：通常与 FFmpeg、biliffm4s、缓存文件缺失或音视频分片不完整有关。重新扫描同一源，确认卡片信息完整后再导出。</li>
-                        <li><b>标题不完整</b>：使用设置页的命名规则和降级策略，避免空标题、非法字符或过长路径导致导出失败。</li>
+                        <li><b>PC 扫空</b>：设置里 PC 缓存路径是不是 B 站真实目录（客户端一更新就爱搬家）。</li>
+                        <li><b>手机扫不到</b>：USB 调试开着、手机点了允许本机调试、页面环境条能看见设备。</li>
+                        <li><b>导出失败</b>：FFmpeg 在不在（PATH 或绿色包 bin）；卡片信息全不全；同一源再扫一次。</li>
+                        <li><b>文件名翻车</b>：命名模板别堆空字段；Windows 路径别太长、别非法字符。</li>
+                        <li><b>看起来跑完了目录却空</b>：以导出目录里真有文件为准，不是「感觉跑完了」。</li>
                     </ul>
 
                     <hr>
 
-                    <h2>BBDown 使用流程</h2>
-
-                    <h3>📥 BBDown! — 视频下载</h3>
-                    <p>BBDown 页面是对 <code>BBDown</code> 命令行工具的可视化封装，适合直接输入链接或编号下载在线视频。核心下载能力来自 BBDown，本页面负责组织参数、排队任务和展示状态。</p>
-                    <p>支持的输入格式：</p>
+                    <h2>BBDown!：按链接下载</h2>
+                    <p>这是 BBDown 命令行的可视化壳：你们贴链接，它排队跑。核心能力是 BBDown 的，页面负责参数和队列。</p>
+                    <p><strong>能贴什么：</strong> <code>BV</code> / <code>av</code> / <code>ep</code> / <code>ss</code>、完整视频/番剧链接、<code>b23</code> 短链。</p>
+                    <p><strong>怎么下：</strong> 粘贴 → 选画质/编码/分 P/弹幕字幕封面 → 添加任务 → 看队列。可取消、失败可重试、列表可清空。</p>
+                    <p><strong>常见坑：</strong></p>
                     <ul>
-                        <li><code>BV</code>、<code>av</code>、<code>ep</code>、<code>ss</code> 等编号。</li>
-                        <li>完整 B 站视频、番剧、合集链接。</li>
-                        <li><code>b23</code> 短链。</li>
-                    </ul>
-                    <p>先在页面中填入链接，再按需要选择 API 模式、画质、编码、下载内容、分P范围、弹幕、字幕和封面选项。添加后任务会进入队列，当前任务可取消，失败任务可重试，完成或失败列表可清空。</p>
-                    <h3>BBDown 常见情况</h3>
-                    <ul>
-                        <li><b>高画质不可用</b>：通常需要有效的 SESSDATA。进入设置页配置登录凭证后重试。</li>
-                        <li><b>任务失败</b>：检查链接是否有效、BBDown 是否可用、Cookie 是否过期、所选画质/编码是否存在。</li>
-                        <li><b>只想要音频、弹幕或字幕</b>：在下载内容和附加选项里选择对应模式，不需要手动改命令行。</li>
-                        <li><b>下载很慢</b>：先确认网络和 B 站响应，再考虑降低画质、减少分P范围或稍后重试。</li>
+                        <li><b>高画质不行</b>：先配有效 SESSDATA；再确认视频本身有没有那档清晰度。</li>
+                        <li><b>任务红了</b>：链接有效？Cookie 过期？画质/编码是否存在？bin 里有没有 BBDown.exe？</li>
+                        <li><b>只要音频/弹幕/字幕</b>：在下载内容里勾，不必手写命令行。</li>
+                        <li><b>很慢</b>：先看网络和 B 站，再考虑降画质、少分 P、改天再来。</li>
                     </ul>
 
                     <hr>
 
-                    <h2>MdOut 使用流程</h2>
-
-                    <h3>📝 MdOut! — Markdown 导出</h3>
-                    <p>MdOut 用于把 B 站内容整理为 Markdown 文档，适合归档视频信息、用户信息、收藏夹概览或专栏元信息。它不会下载视频本体，只导出结构化文本。</p>
-                    <p>支持三种内容：</p>
+                    <h2>MdOut!：导出信息文档</h2>
+                    <p>只产出 Markdown，<strong>不下载视频本体</strong>。适合归档标题、UP、标签、收藏夹概览、专栏元信息。</p>
+                    <p><strong>流程：</strong> 输入链接或编号 → 解析添加 → 预览（富文本 / 原文）→ 导出选中或全部就绪 →「打开导出目录」核对。</p>
+                    <p><strong>常见坑：</strong></p>
                     <ul>
-                        <li><b>视频信息</b>：标题、UP主、简介、数据统计、标签、分P列表等。</li>
-                        <li><b>用户信息</b>：用户资料、关注粉丝、投稿统计、收藏夹列表和可选详情。</li>
-                        <li><b>专栏文章</b>：文章标题、作者、简介、数据统计和链接信息。</li>
-                    </ul>
-                    <p>流程是输入链接或编号，点击解析并添加，等待获取完成后在预览区检查内容。预览支持 <b>富文本</b> 和 <b>原文</b> 两种模式，确认后可以导出选中项或导出全部就绪项。</p>
-                    <h3>MdOut 常见情况</h3>
-                    <ul>
-                        <li><b>收藏夹或详细信息缺失</b>：通常需要有效 SESSDATA，或受 B 站接口权限/风控影响。</li>
-                        <li><b>解析类型不对</b>：换用完整链接，或确认输入的是视频、用户空间、收藏夹、专栏中的一种。</li>
-                        <li><b>导出内容太多或太少</b>：在设置页调整封面、标签、统计、收藏夹详情程度和请求间隔。</li>
-                        <li><b>预览正常但找不到文件</b>：使用页面“打开导出目录”，并检查导出根目录和 MdOut 输出目录名。</li>
+                        <li>收藏夹/详情缺字段：多半要 SESSDATA，或接口权限/风控。</li>
+                        <li>类型认错：换完整链接；确认是视频 / 空间 / 收藏夹 / 专栏之一。</li>
+                        <li>预览有字磁盘没有：查导出根目录和 MdOut 子目录名。</li>
+                        <li>一次太多：设置里调请求间隔和收藏详情程度，别把自己限流了。</li>
                     </ul>
 
                     <hr>
 
-                    <h2>⚙ 设置（OhMyConfig）</h2>
-                    <p>设置页是所有模块的控制台。大多数问题不需要重启服务，保存设置后回到对应页面重新添加任务或重新扫描即可。</p>
-                    <p>设置分为四组：</p>
+                    <h2>OhMyConfig：先改设置再重试</h2>
+                    <p>多数问题<strong>不用重启服务</strong>：保存 → 回模块重新扫/重新下。孩子们改完设置别在旧失败任务上连点。</p>
                     <ul>
-                        <li><b>通用设置</b>：导出根目录、统一 SESSDATA、大模型 API。</li>
-                        <li><b>LocalOut 设置</b>：输出目录名、Android 扫描开关、PC 缓存路径、文件命名规则、FFmpeg 并发数。</li>
-                        <li><b>BBDown 设置</b>：画质/编码偏好、文件名模板、弹幕/字幕/封面和下载行为。</li>
-                        <li><b>MdOut 设置</b>：导出选项、收藏夹详情程度、请求间隔、输出目录。</li>
+                        <li><b>通用</b>：导出根目录、SESSDATA、大模型启用开关与 Key / Model / Base / 超时</li>
+                        <li><b>LocalOut</b>：输出名、PC 路径、Android 开关、命名、FFmpeg 并发</li>
+                        <li><b>BBDown</b>：画质编码偏好、文件名模板、弹幕字幕封面</li>
+                        <li><b>MdOut</b>：字段开关、收藏详情、请求间隔</li>
                     </ul>
-                    <p><b>敏感信息提醒：</b>API Key、Cookie、SESSDATA 会写入程序目录（绿色包根目录 / 开发态为 <code>mybiout/</code>）下的 <code>config.ini</code>。这是本机工具的便利设计，不适合在共享电脑或会被同步上传的目录里保存长期凭证。</p>
+                    <p>Key / Cookie / SESSDATA 写在本机 <code>config.ini</code>（绿色包根目录旁）。别丢网盘同步盘或公用电脑长期挂着——明文就是明文。</p>
 
-                    <h3>大模型配置与响应</h3>
-                    <p>大模型配置只影响 Man 页面右侧助手，不影响 LocalOut、BBDown、MdOut 的基础导出能力。字段含义如下：</p>
+                    <h3>大模型：启用开关怎么理解</h3>
                     <ul>
-                        <li><b>Key</b>：OpenAI 兼容服务的 API Key。为空时不会调用大模型。</li>
-                        <li><b>Model</b>：模型名称，必须是当前 Base URL 对应服务端认识的名称。</li>
-                        <li><b>Base</b>：OpenAI 兼容接口地址。可以填到服务根路径、<code>/v1</code>，也可以直接填到 <code>/chat/completions</code>。</li>
-                        <li><b>超时</b>：请求等待时间。网络慢、模型慢或上下文较大时可以调长；不想等待太久时调短。</li>
+                        <li><b>启用 = 关（默认）</b>：右侧「发送」也走本地助手通道（玩梗/高仿分析），不请求云端。</li>
+                        <li><b>启用 = 开</b> 且 Key、Model、Base 配对：才真调 OpenAI 兼容接口。</li>
+                        <li>调用失败或 Key 空：仍回落本地通道，不中断你们玩。</li>
+                        <li>「直接说」：强制本地通道，不管开关，适合整活，不保证技术正确。</li>
                     </ul>
-                    <p>点击右侧“发送”时，系统会先用 <code>pmc</code> 打包项目代码，再把项目功能地图、回答规范、Mamble/Mamba 风格提示和你的问题一起发送给模型。模型调用失败、Key 为空或响应异常时，会自动降级为内置的计算机主题“狗屁不通文章生成器”。</p>
-                    <p>“直接说”会跳过 API，强制使用内置生成器。它适合看风格和玩梗，不适合当作准确技术结论。</p>
+                    <p>示例（Deepseek）：Model <code>deepseek-chat</code>，Base <code>https://api.deepseek.com/v1</code>。</p>
 
                     <hr>
 
-                    <h2>Man! 手册页</h2>
-                    <p>左侧是静态手册，适合快速查流程；右侧是「What can I say about...」对话助手，适合问“这个错误是什么意思”“我该点哪里”“为什么没有导出”等具体问题。</p>
-                    <p>提问时尽量包含模块、现象、你刚刚点了什么、页面提示了什么。例如：<code>LocalOut 扫描不到安卓缓存，页面说没有 ADB 设备</code> 比 <code>不能用</code> 更容易得到可执行答案。</p>
+                    <h2>右侧助手怎么问才有用</h2>
+                    <p>带上：模块名 + 现象 + 你刚点了什么 + 页面原文。例：</p>
+                    <pre><code>LocalOut 扫安卓缓存，提示没有 ADB 设备，手机已开 USB 调试</code></pre>
+                    <p>比只说「不能用」「寄了」强十倍。左手册查流程，右栏聊具体报错。称呼上我们叫孩子们，你们把问题说清楚就行。</p>
 
                     <hr>
 
-                    <h2>常见情况</h2>
+                    <h2>排错速查</h2>
                     <ul>
-                        <li><b>页面能打开但功能不可用</b>：通常是外部工具、登录凭证、路径或网络问题。先去设置页和对应模块的环境检测区域确认。</li>
-                        <li><b>导出目录为空</b>：确认任务是否完成、导出根目录是否改过、模块输出目录名是否符合预期。</li>
-                        <li><b>登录态相关功能失败</b>：重新扫码获取或更新 SESSDATA。凭证过期、被风控、复制不完整都会导致请求失败。</li>
-                        <li><b>模型助手没有真实回答</b>：检查 Key、Model、Base、超时；如果提示降级，说明大模型没有成功返回。</li>
-                        <li><b>任务卡住</b>：先看是否有正在运行的外部命令或网络请求；可以取消当前任务，调整设置后重新添加。</li>
-                        <li><b>文件名异常</b>：Windows 路径长度、非法字符、重复标题和空字段都可能影响导出，优先使用更短、更稳定的命名模板。</li>
+                        <li><b>功能全挂</b>：设置路径 / SESSDATA；模块页环境检测（FFmpeg、BBDown、ADB）。</li>
+                        <li><b>目录空</b>：任务是否完成、导出根是否改过、子目录名是否默认。</li>
+                        <li><b>登录相关挂</b>：重扫码或更新 SESSDATA（过期、截断、风控都常见）。</li>
+                        <li><b>助手不像真 AI</b>：看「启用大模型」开没开、Key/Model/Base/超时；关着本来就是本地通道。</li>
+                        <li><b>任务卡住</b>：取消当前，改设置后重加；看外部命令是否还在跑。</li>
+                        <li><b>窗口闪一下没了</b>：看绿色目录旁有没有 <code>startup_error.log</code>；可试 <code>MyBiOut!.exe --browser</code> 或装 WebView2。</li>
                     </ul>
 
                     <hr>
 
-                    <h2>依赖与致谢</h2>
-
+                    <h2>环境与依赖（需要时再看）</h2>
+                    <ul>
+                        <li><b>FFmpeg</b>：LocalOut 导出必需</li>
+                        <li><b>BBDown</b>：在线下载必需</li>
+                        <li><b>ADB</b>：可选，扫手机缓存</li>
+                        <li><b>WebView2</b>：内嵌窗口；Win11 一般自带</li>
+                    </ul>
                     <div class="dep-card">
-                        <b>BBDown</b> — 知名哔哩哔哩命令行下载工具<br>
-                        <a href="https://github.com/nilaoda/BBDown" target="_blank">github.com/nilaoda/BBDown ↗</a><br>
-                        MyBiOut! 的 BBDown 模块是对其的可视化封装，核心下载能力完全依赖此项目。致敬 nilaoda 大佬的卓越工作！
+                        <b>BBDown</b> · <a href="https://github.com/nilaoda/BBDown" target="_blank">nilaoda/BBDown ↗</a> — 下载核心
                     </div>
-
                     <div class="dep-card">
-                        <b>FFmpeg</b> — 音视频处理的瑞士军刀<br>
-                        <a href="https://ffmpeg.org/" target="_blank">ffmpeg.org ↗</a><br>
-                        用于 LocalOut 模块中 .m4s 文件的合并与转码。没有 FFmpeg 就没有视频导出。
+                        <b>FFmpeg / biliffm4s</b> — 本地 m4s 合并
                     </div>
-
                     <div class="dep-card">
-                        <b>biliffm4s</b> — 对 FFmpeg 的 Python 封装<br>
-                        <a href="https://github.com/Water-Run/-m4s-Python-biliffm4s"
-                            target="_blank">github.com/Water-Run/-m4s-Python-biliffm4s ↗</a><br>
-                        提供了 .m4s 音视频合并的 Python 接口。
+                        <b>BullshitGenerator</b> · <a href="https://github.com/menzi11/BullshitGenerator" target="_blank">menzi11 ↗</a> — 本地助手通道的灵感；正式排障以页面真实状态为准
                     </div>
-
-                    <div class="dep-card">
-                        <b>pmc (pack-my-code)</b> — 极简代码上下文打包工具<br>
-                        <a href="https://github.com/Water-Run/pack-my-code"
-                            target="_blank">github.com/Water-Run/pack-my-code ↗</a><br>
-                        在 Man! 页面中用于打包项目完整代码，作为大模型对话的上下文。
-                    </div>
-
-                    <div class="dep-card">
-                        <b>狗屁不通文章生成器 (BullshitGenerator)</b><br>
-                        <a href="https://github.com/menzi11/BullshitGenerator"
-                            target="_blank">github.com/menzi11/BullshitGenerator ↗</a><br>
-                        当大模型不可用时的幽默降级方案。原项目用于 GUI 文本渲染测试，这里用来生成「AI 回复」。生成的文章真的狗屁不通，请勿用于正规用途！
-                    </div>
-
-                    <div class="dep-card">
-                        <b>FastAPI / Uvicorn</b> — 现代高性能 Python Web 框架<br>
-                        <b>httpx</b> — 现代 Python HTTP 客户端<br>
-                        <b>marked.js</b> — JavaScript Markdown 解析器
-                    </div>
-
-                    <hr>
-
-                    <h2>环境要求</h2>
-                    <ul>
-                        <li><b>Python 3.14+</b></li>
-                        <li><b>Windows</b> 操作系统</li>
-                        <li><b>FFmpeg</b>（LocalOut 导出必需）</li>
-                        <li><b>BBDown</b>（BBDown 下载必需）</li>
-                        <li><b>ADB</b>（可选，Android 设备缓存扫描）</li>
-                        <li><b>pmc</b>（可选，Man 页面 AI 对话上下文打包）</li>
-                    </ul>
-
-                    <hr>
-
-                    <h2>许可证</h2>
-                    <p>本项目使用 <b>WTFPL</b>（Do What The Fuck You Want To Public License）发布。</p>
-                    <blockquote>You just DO WHAT THE FUCK YOU WANT TO.</blockquote>
 
                     <hr>
                     <p style="text-align:center;color:#ccc;font-size:12px;margin-top:20px">
-                        MyBiOut! — 导出我的哔哩哔哩<br>
-                        Made with ❤️ by WaterRun
+                        MyBiOut! — 导出我的哔哩哔哩 · WTFPL<br>
+                        孩子们有问题先看任务状态，再问右侧 😊 · Mamba Out
                     </p>
                 </div>
             </div>
@@ -754,7 +701,7 @@
                 </div>
 
                 <div class="chat-input-bar">
-                    <input type="text" id="chat-input" placeholder="想问点什么..."
+                    <input type="text" id="chat-input" placeholder="孩子们想问点什么..."
                         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();发送对话(false)}">
                     <button class="btn btn-pk" id="btn-send" onclick="发送对话(false)">发送</button>
                     <button class="btn btn-or" id="btn-bs" onclick="发送对话(true)">直接说</button>
@@ -796,7 +743,7 @@
             const div = document.createElement('div');
             div.className = 'msg msg-bot';
             div.id = 'msg-loading';
-            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble"><div class="msg-loading"><span></span><span></span><span></span></div></div></div>`;
+            div.innerHTML = `<div class="msg-inner"><div class="msg-bubble"><div class="msg-thinking"><span class="think-face">😊</span><span>思考分析<span class="think-dots"></span></span></div></div></div>`;
             取元素('chat-msgs').appendChild(div);
             取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
         }
@@ -820,6 +767,14 @@
             catch (e) { return 转义网页(text).replace(/\n/g, '<br>'); }
         }
 
+        function 渲染回复(bubble, text, source) {
+            if (source === 'llm') {
+                bubble.innerHTML = 渲染Markdown(text);
+            } else {
+                bubble.innerHTML = 转义网页(text).replace(/\n/g, '<br>');
+            }
+        }
+
         async function 发送对话(forceBs) {
             if (正在发送) return;
             const input = 取元素('chat-input');
@@ -831,110 +786,78 @@
             取元素('btn-bs').disabled = true;
             input.value = '';
             添加用户消息(text);
+            添加加载消息();
 
-            if (forceBs) {
-                // 非流式: 直接说模式
-                添加加载消息();
-                try {
-                    const r = await fetch('/api/man/chat', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: text, force_bs: true })
-                    });
-                    const data = await r.json();
-                    移除加载();
-                    if (data.ok) {
-                        const bubble = 创建回复容器();
-                        bubble.innerHTML = 转义网页(data.reply).replace(/\n/g, '<br>');
-                        if (data.note) {
-                            bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + 转义网页(data.note) + '</em>';
-                        }
-                    } else {
-                        提示(data.error || '请求失败', true);
+            try {
+                // 发送 / 直接说 统一 SSE：大模型流式 或 本地助手「边想边写」
+                const response = await fetch('/api/man/chat-stream', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: text, force_bs: !!forceBs })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let fullReply = '';
+                let source = forceBs ? 'bullshit' : 'llm';
+                let bubble = null;
+                let note = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const dataStr = line.slice(6).trim();
+                        if (!dataStr) continue;
+                        try {
+                            const chunk = JSON.parse(dataStr);
+
+                            if (chunk.error) {
+                                移除加载();
+                                提示(chunk.error, true);
+                                break;
+                            }
+
+                            if (chunk.source) source = chunk.source;
+                            if (chunk.note) note = chunk.note;
+                            if (chunk.status === 'thinking') {
+                                // 保持「思考分析😊」加载态，内容到了再切气泡
+                                continue;
+                            }
+
+                            if (chunk.content) {
+                                if (!bubble) bubble = 创建回复容器();
+                                fullReply += chunk.content;
+                                渲染回复(bubble, fullReply, source);
+                                取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
+                            }
+
+                            if (chunk.done) {
+                                if (!bubble && fullReply) {
+                                    bubble = 创建回复容器();
+                                    渲染回复(bubble, fullReply, source);
+                                }
+                                if (bubble && note) {
+                                    bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + 转义网页(note) + '</em>';
+                                }
+                            }
+                        } catch (e) { }
                     }
-                } catch (e) {
-                    移除加载();
-                    提示('网络错误: ' + e.message, true);
                 }
-            } else {
-                // 流式传输
-                添加加载消息();
-                try {
-                    const response = await fetch('/api/man/chat-stream', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: text })
-                    });
 
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-                    let buffer = '';
-                    let fullReply = '';
-                    let source = 'llm';
-                    let bubble = null;
-                    let note = '';
-
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
-
-                        for (const line of lines) {
-                            if (!line.startsWith('data: ')) continue;
-                            const dataStr = line.slice(6).trim();
-                            if (!dataStr) continue;
-                            try {
-                                const chunk = JSON.parse(dataStr);
-
-                                if (chunk.error) {
-                                    移除加载();
-                                    提示(chunk.error, true);
-                                    break;
-                                }
-
-                                if (chunk.source) source = chunk.source;
-                                if (chunk.note) note = chunk.note;
-
-                                if (chunk.content) {
-                                    if (!bubble) {
-                                        bubble = 创建回复容器();
-                                    }
-                                    fullReply += chunk.content;
-                                    if (source === 'llm') {
-                                        bubble.innerHTML = 渲染Markdown(fullReply);
-                                    } else {
-                                        bubble.innerHTML = 转义网页(fullReply).replace(/\n/g, '<br>');
-                                    }
-                                    取元素('chat-msgs').scrollTop = 取元素('chat-msgs').scrollHeight;
-                                }
-
-                                if (chunk.done) {
-                                    if (!bubble && fullReply) {
-                                        bubble = 创建回复容器();
-                                        if (source === 'llm') {
-                                            bubble.innerHTML = 渲染Markdown(fullReply);
-                                        } else {
-                                            bubble.innerHTML = 转义网页(fullReply).replace(/\n/g, '<br>');
-                                        }
-                                    }
-                                    if (bubble && note) {
-                                        bubble.innerHTML += '<br><em style="color:#aaa;font-size:11px">' + 转义网页(note) + '</em>';
-                                    }
-                                }
-                            } catch (e) { }
-                        }
-                    }
-
-                    if (!bubble) {
-                        移除加载();
-                        if (!fullReply) 提示('未收到回复', true);
-                    }
-
-                } catch (e) {
+                if (!bubble) {
                     移除加载();
-                    提示('网络错误: ' + e.message, true);
+                    if (!fullReply) 提示('未收到回复', true);
                 }
+            } catch (e) {
+                移除加载();
+                提示('网络错误: ' + e.message, true);
             }
 
             正在发送 = false;

@@ -18,7 +18,7 @@ if 系统.maxsize <= 2**32:
 
 def 取版本号() -> str:
     r"""
-    读取版本号 (格式 YY.MM.DD.序号, 由 打包.py 写入)
+    读取版本号 (中文轨: 年二月二 + 月内序标, 如 二六〇七甲; 由 打包.py 写入)
 
     优先绿色根目录 / 运行根旁的 version.txt (与 config.ini 一致的便携心智);
     否则回退包内 / 冻结 _MEIPASS 中的 mybiout/version.txt。
@@ -41,7 +41,7 @@ def 取版本号() -> str:
                     return 文本
         except OSError:
             continue
-    return "0.0.0.0"
+    return "〇〇〇〇甲"
 
 
 __version__: str = 取版本号()
