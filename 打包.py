@@ -2,7 +2,9 @@ r"""
 MyBiOut! 绿色版一键打包脚本（独立维护入口）
 
 用法:
-    python 打包.py
+    python 打包.py          # 正常打包 (本月序标甲…丑 递增)
+    python 打包.py 重来     # 版本计时归零, 下次打包从本月「甲」起算
+    python 打包.py 帮助
 
 流程:
     0) 互斥锁 + 清理半成品残留；计算并写入中文版本号
@@ -10,7 +12,12 @@ MyBiOut! 绿色版一键打包脚本（独立维护入口）
     2) PyInstaller 构建（增量、无 collect-all 全量收集）
     3) 组装绿色目录（先删旧绿包；工具/脱敏配置强制校验）
     4) 调用本机 rar 命令行打 .rar 发布包（PATH 上的 rar / 任意提供 Rar 的安装均可）
+       包内: MyBiOut!/ + README.txt + LICENSE；写出到 打包结果/
     5) 收尾：裁剪过旧发布包
+
+中文版本轨: 年月 + 月内序标 (甲乙丙丁戊己庚辛壬癸子丑, 每月最多 12 包)。
+超过 12 个会提示「受不了版本号溢出来了....」并坠机退出; 可用「重来」从甲重新计。
+发布包名例: 「MyBiOut! 二六〇七甲.rar」(名称中空格 / ! 均保留)。
 
 终端 TUI（有交互控制台时）:
     开场 10→1 → MyBiOut! / 即将开始（快速语法结构检查）
@@ -27,13 +34,16 @@ import math as 数学
 import os as 操作系统
 import random as 随机
 import shutil as 文件工具
+import socket as 套接字
 import subprocess as 子进程
 import sys as 系统
 import threading as 线程
 import time as 时间
+from contextlib import suppress as 忽略异常
 from dataclasses import dataclass as 数据类
 from dataclasses import field as 字段
 from datetime import date as 日期
+from datetime import datetime as 日期时间
 from pathlib import Path as 路径
 
 # ---------- 路径与常量 ----------
@@ -43,10 +53,11 @@ from pathlib import Path as 路径
 版本文件路径: 路径 = 程序包目录 / "version.txt"
 产物显示名: str = "MyBiOut!"
 绿色目录名: str = "MyBiOut-green"
-发布目录名: str = "release"
+# 最终 .rar 直接落在工程根下的本目录 (gitignore 排除, 勿放 dist/)
+发布目录名: str = "打包结果"
 构建缓存目录名: str = "build"
 产物输出目录名: str = "dist"
-# 发布目录中最多保留的历史 zip 个数（含本次；防 dist/release 无限膨胀）
+# 发布目录中最多保留的历史 rar 个数（含本次；防 打包结果/ 无限膨胀）
 发布包保留个数: int = 5
 # Windows 删除被占用目录时的重试
 删除重试次数: int = 6
@@ -113,7 +124,6 @@ _跳过拷贝后缀: frozenset[str] = frozenset(
     "fastapi",
     "uvicorn[standard]",
     "httpx",
-    "biliffm4s",
     "pywebview",
     "pyinstaller",
     "qrcode",
@@ -647,6 +657,28 @@ def 释放打包互斥锁(句柄) -> None:
         pass
 
 
+def 发布包基名(版本: str) -> str:
+    r"""
+    发布包主文件名 (无后缀)。空格与「!」均保留, 例: MyBiOut! 二六〇七甲
+    """
+    return f"{产物显示名} {版本}"
+
+
+def 是否发布包文件(路径点: 路径) -> bool:
+    r"""识别发布目录内的正式包: 「MyBiOut! <版本>.rar」; 兼容旧「MyBiOut!-<版本>.rar」。"""
+    if not 路径点.is_file():
+        return False
+    if 路径点.suffix.lower() not in {".rar", ".zip"}:
+        return False
+    名 = 路径点.name
+    return 名.startswith(f"{产物显示名} ") or 名.startswith(f"{产物显示名}-")
+
+
+def 发布目录路径() -> 路径:
+    r"""最终 rar 输出目录: 工程根/打包结果 (不在 dist 下)。"""
+    return 工程根目录 / 发布目录名
+
+
 def 清理打包残留(
     状态: 打包进度 | None = None,
     *,
@@ -655,11 +687,11 @@ def 清理打包残留(
 ) -> None:
     r"""
     开工: 清半成品 (.part / 临时绿包), 避免上次崩溃污染。
-    收尾: 再清半成品, 并按 mtime 裁剪过旧 zip（保留 发布包保留个数）。
+    收尾: 再清半成品, 并按 mtime 裁剪过旧 rar（保留 发布包保留个数）。
     不删 build/ 与 PyInstaller onedir（增量构建需要）。
     """
     产物根 = 工程根目录 / 产物输出目录名
-    发布目录 = 产物根 / 发布目录名
+    发布目录 = 发布目录路径()
     绿包 = 产物根 / 绿色目录名
 
     if 状态 is None or 状态.纯文本:
@@ -690,13 +722,7 @@ def 清理打包残留(
 
     if 阶段 == "收尾" and 发布目录.is_dir():
         包们 = sorted(
-            (
-                p
-                for p in 发布目录.iterdir()
-                if p.is_file()
-                and p.name.startswith(f"{产物显示名}-")
-                and p.suffix.lower() in {".rar", ".zip"}
-            ),
+            (p for p in 发布目录.iterdir() if 是否发布包文件(p)),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
@@ -1105,7 +1131,7 @@ def _截断显示(文本: str, 最大宽: int) -> str:
     return 出
 
 
-def _等待任意键(提示: str = "按任意键退出…") -> None:
+def _等待任意键(提示: str = "按任意键关机…") -> None:
     r"""结束后停留, 不立刻关掉窗口/退出备用屏。提示为空时不向 stdout 打印 (TUI 帧内已画过)。"""
     if 提示:
         try:
@@ -1130,6 +1156,59 @@ def _等待任意键(提示: str = "按任意键退出…") -> None:
         input(提示 or "")
     except Exception:
         时间.sleep(12.0)
+
+
+def _真关机(
+    *,
+    绘制=None,
+    冲刷=None,
+    行: int = 1,
+    宽度: int = 40,
+    颜色: tuple[int, int, int] = (255, 90, 90),
+) -> None:
+    r"""
+    一点点恶意编程: 打包成功按任意键后真关机。
+    Windows: ``shutdown -s -t 0`` (立即关机, 无倒计时窗口可取消)。
+    """
+    句 = "正在关机… shutdown -s -t 0"
+    if 绘制 is not None and 冲刷 is not None:
+        绘制(行, 1, " " * max(1, 宽度), 颜色=颜色)
+        列 = max(1, (宽度 - _中日韩宽度(句)) // 2)
+        绘制(行, 列, 句, 颜色=颜色, 加粗=True)
+        冲刷()
+    else:
+        try:
+            print(句, flush=True)
+        except Exception:
+            pass
+    时间.sleep(0.25)
+    # 自动化/CI: MYBIOUT_NO_SHUTDOWN=1 跳过真关机
+    if 操作系统.environ.get("MYBIOUT_NO_SHUTDOWN", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        try:
+            print("[打包] MYBIOUT_NO_SHUTDOWN 已设, 跳过真关机", flush=True)
+        except Exception:
+            pass
+        return
+    if 系统.platform == "win32":
+        # shell=False; -s 关机, -t 0 立即 (等同 shutdown /s /t 0)
+        子进程.Popen(
+            ["shutdown", "-s", "-t", "0"],
+            stdin=子进程.DEVNULL,
+            stdout=子进程.DEVNULL,
+            stderr=子进程.DEVNULL,
+            close_fds=True,
+        )
+    else:
+        # 非 Win 不硬关机, 避免误伤开发环境
+        try:
+            print("非 Windows, 跳过真关机。", flush=True)
+        except Exception:
+            pass
 
 
 def _爆发粒子(
@@ -2555,7 +2634,7 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
             角标,
             颜色=_淡化(主题.辅色组[0], 0.8),
         )
-        提示 = "按任意键退出…"
+        提示 = "按任意键退出…"  # 失败老实退出, 不恶搞
         绘制(
             min(高度, 中行 + 4),
             max(1, (宽度 - _中日韩宽度(提示)) // 2),
@@ -2759,7 +2838,7 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
                         绘制(pr, pc, p.字符, 颜色=p.可见颜色)
                 冲刷整帧()
                 时间.sleep(0.07)
-        提示 = "按任意键退出…"
+        提示 = "按任意键关机…"  # 一点点恶意: 真 · shutdown -s -t 0
         提示行 = min(高度, 信息上 + len(行表) + 1)
         绘制(
             提示行,
@@ -2770,6 +2849,13 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
         )
         冲刷整帧()
         _等待任意键("")
+        _真关机(
+            绘制=绘制,
+            冲刷=冲刷整帧,
+            行=提示行,
+            宽度=宽度,
+            颜色=(255, 90, 90),
+        )
 
     原始写出(_进入备用屏 + _隐藏光标 + _清屏)
     try:
@@ -2901,9 +2987,9 @@ def 本月版本前缀(当日: 日期 | None = None) -> str:
 
 def 读取当前版本() -> str:
     if 版本文件路径.is_file():
-        文本 = 版本文件路径.read_text(encoding="utf-8").strip()
-        if 文本:
-            return 文本
+        行列表 = 版本文件路径.read_text(encoding="utf-8").splitlines()
+        if 行列表 and 行列表[0].strip():
+            return 行列表[0].strip()
     return "〇〇〇〇甲"
 
 
@@ -2912,6 +2998,7 @@ def 计算下一版本(旧版本: str, 当日: 日期 | None = None) -> str:
     下一中文版本号 (按月递增, 每月最多 12 个)。
     兼容读取旧式 YY.MM.DD.序号: 同年同月则序标从 1 起重新计中文轨
     (旧轨按日计数, 不直接映射到甲乙, 避免误跳号)。
+    本月无有效序标 / 「重来」哨兵 → 从甲起算。
     """
     天 = 当日 or 日期.today()
     前缀 = 本月版本前缀(天)
@@ -2923,18 +3010,32 @@ def 计算下一版本(旧版本: str, 当日: 日期 | None = None) -> str:
         if 旧序 is not None:
             序号 = 旧序 + 1
     # 旧阿拉伯格式 26.07.19.3 — 仅用于识别「已是本月产物」, 中文轨仍从甲起算
-    # 若已是中文且本月已满 12, 下方抛错
+    # 若已是中文且本月已满 12 → 坠机
     if 序号 > len(_月内序标):
         失败退出(
-            f"本月中文版本已用尽 ({前缀}甲…{_月内序标[-1]} 共 {len(_月内序标)} 个)。\n"
-            f"  当前: {旧}\n"
-            f"  请下月再打包, 或手动改 mybiout/version.txt 后重试。"
+            "受不了版本号溢出来了....\n"
+            "之后的版本下个月再来编译吧~\n"
+            f"  ({前缀}甲…{_月内序标[-1]} 共 {len(_月内序标)} 个已满; 当前 {旧})\n"
+            f"  或先:  python 打包.py 重来  (从甲重新计时)"
         )
     return 前缀 + _序号到月内序标(序号)
 
 
-def 写入版本文件(版本: str) -> None:
-    版本文件路径.write_text(版本 + "\n", encoding="utf-8")
+def 写入版本文件(版本: str, 编译时间: str | None = None) -> None:
+    r"""写入可用于版本递增的首行及本次编译时间。"""
+    时间文本 = 编译时间 or 日期时间.now().strftime("%Y-%m-%d %H:%M:%S")
+    版本文件路径.write_text(f"{版本}\n编译时间：{时间文本}\n", encoding="utf-8")
+
+
+def 重来本月从甲(当日: 日期 | None = None) -> str:
+    r"""
+    版本计时归零: 写入「本月前缀」哨兵 (无序标), 使下次 计算下一版本 得到 本月甲。
+    :return: 下次将产出的版本号 (…甲)
+    """
+    前缀 = 本月版本前缀(当日)
+    下次甲 = 前缀 + _序号到月内序标(1)
+    写入版本文件(前缀)
+    return 下次甲
 
 
 def 检查运行平台() -> None:
@@ -3342,6 +3443,149 @@ def 尝试从系统路径补齐ADB(工具目录: 路径, 状态: 打包进度 | 
         打印成功(f"已从系统 PATH 复制 adb 到绿色包: adb.exe ({源文件})")
 
 
+def 校验绿色包结构(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
+    r"""
+    确认绿色包具备冻结运行所需文件 (无系统 Python 也能起)。
+    特别防止误把 build/ 中间产物当可分发目录。
+    """
+    # (路径, 说明, 最小字节) — 文本可很短; DLL/exe 须够大
+    必备: list[tuple[路径, str, int]] = [
+        (绿色根 / f"{产物显示名}.exe", "主程序 exe", 1024 * 100),
+        (绿色根 / "_internal" / "python314.dll", "内嵌 Python 运行时", 1024 * 100),
+        (绿色根 / "_internal" / "python3.dll", "Python3 DLL", 1024 * 40),
+        (绿色根 / "_internal" / "VCRUNTIME140.dll", "VC 运行库", 1024 * 40),
+        (绿色根 / "version.txt", "版本文件", 2),
+        (绿色根 / "config.ini", "默认配置", 8),
+    ]
+    for 路径点, 说明, 最小 in 必备:
+        if not 路径点.is_file() or 路径点.stat().st_size < 最小:
+            文 = f"绿色包结构不完整: 缺少有效 {说明} ({路径点})"
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(文)
+            失败退出(文)
+    # 中间产物 build/<名>/MyBiOut!.exe 没有完整 _internal, 绝不能当绿包
+    if not (绿色根 / "_internal").is_dir():
+        文 = f"绿色包缺少 _internal 目录: {绿色根}"
+        if 状态 and not 状态.纯文本:
+            状态.标记失败(文)
+        失败退出(文)
+    if 状态 is None or 状态.纯文本:
+        打印成功("绿色包结构校验通过 (exe + _internal/python314.dll …)")
+
+
+def _终止进程树(进程: 子进程.Popen) -> None:
+    r"""结束冒烟进程及其子进程 (内嵌 WebView 可能拉起子进程)。"""
+    if 进程.poll() is not None:
+        return
+    if 系统.platform == "win32":
+        with 忽略异常(Exception):
+            子进程.run(
+                ["taskkill", "/PID", str(进程.pid), "/T", "/F"],
+                stdin=子进程.DEVNULL,
+                stdout=子进程.DEVNULL,
+                stderr=子进程.DEVNULL,
+                check=False,
+            )
+        with 忽略异常(Exception):
+            进程.wait(timeout=5)
+        return
+    with 忽略异常(Exception):
+        进程.terminate()
+    try:
+        进程.wait(timeout=4)
+    except Exception:
+        with 忽略异常(Exception):
+            进程.kill()
+
+
+def 冒烟启动绿色包(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
+    r"""
+    冒烟: 以「默认内嵌窗口」模式启动冻结 exe (不用 --browser),
+    请求 /api/version, 确认 windowed + pywebview 路径在无系统 Python 下可跑。
+    捕获 uvicorn isatty / 缺 DLL / 误走浏览器 等启动问题。
+    """
+    可执行 = 绿色根 / f"{产物显示名}.exe"
+    if not 可执行.is_file():
+        文 = f"冒烟失败: 找不到 {可执行}"
+        if 状态 and not 状态.纯文本:
+            状态.标记失败(文)
+        失败退出(文)
+
+    # 选空闲端口
+    with 套接字.socket(套接字.AF_INET, 套接字.SOCK_STREAM) as 探测:
+        探测.bind(("127.0.0.1", 0))
+        端口 = int(探测.getsockname()[1])
+
+    if 状态 is None or 状态.纯文本:
+        打印信息(f"冒烟启动绿色包 (内嵌窗口模式): 端口 {端口} …")
+    elif 状态:
+        状态.进入阶段("组装", "冒烟启动(内嵌窗)…", 段内=0.96, 明细=f":{端口}")
+
+    错误日志 = 绿色根 / "startup_error.log"
+    with 忽略异常(OSError):
+        if 错误日志.is_file():
+            错误日志.unlink()
+
+    进程: 子进程.Popen | None = None
+    try:
+        # 故意不传 --browser: 绿色包默认应走 pywebview 内嵌窗, 而非系统浏览器
+        进程 = 子进程.Popen(
+            [
+                str(可执行),
+                "--no-animation",
+                "--port",
+                str(端口),
+            ],
+            cwd=str(绿色根),
+            stdin=子进程.DEVNULL,
+            stdout=子进程.DEVNULL,
+            stderr=子进程.DEVNULL,
+        )
+        截止 = 时间.monotonic() + 35.0
+        最后错 = ""
+        while 时间.monotonic() < 截止:
+            if 进程.poll() is not None:
+                详情 = ""
+                if 错误日志.is_file():
+                    with 忽略异常(OSError):
+                        详情 = 错误日志.read_text(encoding="utf-8", errors="replace")[:800]
+                文 = (
+                    f"冒烟失败: 绿色包进程提前退出 (code={进程.returncode})。\n"
+                    f"  默认模式为内嵌窗口 (无 --browser)。\n"
+                    f"  常见原因: windowed 下 stdout 为 None / _internal DLL 缺失 / "
+                    f"WebView2 或 pywebview 初始化失败。\n"
+                    f"  {详情 or '(无 startup_error.log)'}"
+                )
+                if 状态 and not 状态.纯文本:
+                    状态.标记失败(文.replace("\n", " "))
+                失败退出(文)
+            try:
+                import urllib.request as 网络请求库
+
+                with 网络请求库.urlopen(
+                    f"http://127.0.0.1:{端口}/api/version",
+                    timeout=1.5,
+                ) as 响应:
+                    体 = 响应.read().decode("utf-8", errors="replace")
+                if "version" in 体:
+                    if 状态 is None or 状态.纯文本:
+                        打印成功(
+                            f"冒烟通过(内嵌窗口模式): /api/version → {体.strip()[:80]}"
+                        )
+                    return
+            except Exception as 异常:  # noqa: BLE001
+                最后错 = str(异常)
+            时间.sleep(0.45)
+
+        文 = f"冒烟失败: 约 35s 内未响应 /api/version ({最后错 or '超时'})"
+        if 状态 and not 状态.纯文本:
+            状态.标记失败(文)
+        失败退出(文)
+    finally:
+        if 进程 is not None:
+            _终止进程树(进程)
+
+
 def 校验绿色包工具(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
     工具目录 = 绿色根 / "bin"
     if not 工具目录.is_dir():
@@ -3450,6 +3694,7 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
         文件工具.copy2(版本文件路径, 暂存根 / "version.txt")
         写入脱敏默认配置(暂存根 / "config.ini", 状态)
         校验绿色包工具(暂存根, 状态)
+        校验绿色包结构(暂存根, 状态)
     except SystemExit:
         安全移除树(暂存根, 说明="组装失败, 丢弃暂存")
         raise
@@ -3472,23 +3717,29 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
                 状态.标记失败(说明)
             失败退出(说明)
 
+    # 落盘后再冒烟 (需真实路径与完整 _internal)
+    冒烟启动绿色包(绿色根, 状态)
+
     使用说明 = f"""MyBiOut! 绿色版  v{版本}
 
 【启动】
-1. 双击「MyBiOut!.exe」即可启动；关闭窗口即退出程序。
-2. 运行环境：Windows 11 的 64 位系统（亦兼容 Win10 x64，但仅保证 Win11）。
-3. 内嵌窗口依赖「WebView2 运行时」。Windows 11 一般已自带；
-   若无法打开窗口，请安装微软 WebView2 运行时后再试。
+1. 双击「MyBiOut!.exe」→ 内嵌窗口启动（不是浏览器）；关闭窗口即退出。
+2. 只需本绿色目录 (含 _internal/ 与 bin/)，无需安装 Python。
+3. 运行环境：Windows 11 的 64 位系统（亦兼容 Win10 x64，但仅保证 Win11）。
+4. 内嵌窗口依赖「WebView2 运行时」。Windows 11 一般已自带；
+   若窗口打不开，请安装 WebView2 Runtime 后重试（默认不会自动改开浏览器）。
+5. 请勿运行工程 build/ 目录下的中间产物 exe（缺少完整 _internal，会报 Python DLL 错误）。
 
 【目录说明】
 · config.ini     配置文件（本发布包为默认空凭证、无本机路径，可按需填写）
 · bin/           随包分发工具：BBDown.exe、ffmpeg.exe、adb.exe（及 ADB 配套 dll）
+· _internal/     内嵌运行时 (python314.dll 等)，请整夹拷贝，勿单独挪 exe
 · version.txt    版本号（界面底部会读取）
 · 使用说明.txt   本文件
 
 【可选命令行】
 · 指定端口:     MyBiOut!.exe --port 23333
-· 系统浏览器:   MyBiOut!.exe --browser
+· 浏览器调试:   MyBiOut!.exe --browser   （仅调试用；正常请双击用内嵌窗）
 
 【项目主页】
 https://github.com/Water-Run/MyBiOut
@@ -3870,7 +4121,12 @@ def 确保Rar可执行文件(状态: 打包进度 | None = None) -> 路径:
 
 def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | None = None) -> 路径:
     r"""
-    调用本机 rar 兼容命令行生成 .rar；包内顶层目录为 MyBiOut!/。
+    调用本机 rar 兼容命令行生成 .rar。
+    包内顶层:
+      · MyBiOut!/   绿色程序目录
+      · README.txt
+      · LICENSE
+    输出到工程根/打包结果/「MyBiOut! <版本>.rar」(空格与 ! 保留)。
     环境缺 rar 时会自动检测并补齐 (tools/ 或 winget)。
     先写到临时名再替换, 避免半成品被当分发包。
     """
@@ -3883,20 +4139,36 @@ def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | No
             状态.标记失败(说明)
         失败退出(说明)
 
+    说明文件 = 工程根目录 / "README.txt"
+    许可文件 = 工程根目录 / "LICENSE"
+    简短说明 = (
+        f"MyBiOut! v{版本}\n\n"
+        "解压后，保持 MyBiOut! 文件夹完整，双击其中的 MyBiOut!.exe 启动。\n"
+        "无需安装 Python；登录态和导出目录请在设置页自行配置。\n"
+    )
+    说明文件.write_text(简短说明, encoding="utf-8-sig")
+    for 必备, 标签 in ((说明文件, "README.txt"), (许可文件, "LICENSE")):
+        if not 必备.is_file():
+            说明 = f"发布包必备文件缺失: {标签} ({必备})"
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(说明)
+            失败退出(说明)
+
     rar程序 = 确保Rar可执行文件(状态)
 
-    发布目录 = (工程根目录 / 产物输出目录名 / 发布目录名).resolve()
+    发布目录 = 发布目录路径().resolve()
     发布目录.mkdir(parents=True, exist_ok=True)
-    # 绝对路径, 避免 rar 在 OEM 代码页下处理中文版本号相对路径失败
-    归档文件 = (发布目录 / f"{产物显示名}-{版本}.rar").resolve()
-    临时文件 = (发布目录 / f"{产物显示名}-{版本}.rar.part").resolve()
+    # 绝对路径, 避免 rar 在 OEM 代码页下处理中文版本号 / 空格路径失败
+    基名 = 发布包基名(版本)
+    归档文件 = (发布目录 / f"{基名}.rar").resolve()
+    临时文件 = (发布目录 / f"{基名}.rar.part").resolve()
     if 临时文件.exists():
         安全删除文件(临时文件, 说明="清理上次未完成的 rar.part")
     if 归档文件.exists():
         安全删除文件(归档文件, 说明="覆盖同名旧 rar")
 
     文件列表 = 列举待拷文件(绿色根)
-    总数 = max(1, len(文件列表))
+    总数 = max(1, len(文件列表) + 2)  # + README.txt + LICENSE
     if 状态:
         状态.进入阶段(
             "压缩",
@@ -3907,22 +4179,23 @@ def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | No
             计量总共=总数,
         )
 
-    # 标准 rar 语法 (RARLAB / 多数命令行 rar 兼容):
-    # a 添加, -r 递归, -m3 压缩等级, -o+ 覆盖, -ap 包内路径前缀
-    参数: list[str] = [
+    安静开关: list[str] = []
+    if "rar" in rar程序.name.lower():
+        安静开关 = ["-idq"]
+
+    # 1) 绿色目录 → 包内 MyBiOut!/
+    #    a 添加, -r 递归, -m3 压缩, -o+ 覆盖, -ap 包内路径前缀
+    参数绿: list[str] = [
         str(rar程序),
         "a",
         "-r",
         "-m3",
         "-o+",
+        *安静开关,
         f"-ap{产物显示名}",
         str(临时文件),
         "*",
     ]
-    # 安静模式: 支持则加上 (不支持时部分实现会忽略未知开关失败, 故优先精简;
-    # WinRAR 的 -idq 很有用, 有 "rar" 字样时再附上)
-    if "rar" in rar程序.name.lower():
-        参数.insert(4, "-idq")
 
     停止监视 = 线程.Event()
 
@@ -3930,7 +4203,7 @@ def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | No
         饱和 = max(80 * 1024 * 1024, 目录体积字节(绿色根) // 2)
         while not 停止监视.is_set():
             已 = 临时文件.stat().st_size if 临时文件.is_file() else 0
-            段内 = 0.05 + 0.9 * min(1.0, 已 / max(1, 饱和))
+            段内 = 0.05 + 0.85 * min(1.0, 已 / max(1, 饱和))
             if 状态:
                 状态.进入阶段(
                     "压缩",
@@ -3945,7 +4218,27 @@ def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | No
         监视 = 线程.Thread(target=_监视体积, daemon=True)
         监视.start()
     try:
-        执行命令(参数, 工作目录=绿色根, 步骤说明="RAR 压缩", 状态=状态)
+        执行命令(参数绿, 工作目录=绿色根, 步骤说明="RAR 压缩程序目录", 状态=状态)
+        if 状态:
+            状态.进入阶段(
+                "压缩",
+                "附加 README.txt / LICENSE…",
+                段内=0.92,
+                明细="文档",
+            )
+        # 2) 根级文档: -ep1 只保留文件名, 与 MyBiOut!/ 并列
+        参数文: list[str] = [
+            str(rar程序),
+            "a",
+            "-m3",
+            "-o+",
+            *安静开关,
+            "-ep1",
+            str(临时文件),
+            str(说明文件.resolve()),
+            str(许可文件.resolve()),
+        ]
+        执行命令(参数文, 工作目录=工程根目录, 步骤说明="RAR 附加说明与许可", 状态=状态)
     finally:
         停止监视.set()
         if 监视 is not None:
@@ -3973,6 +4266,7 @@ def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | No
     大小兆 = 归档文件.stat().st_size / 1024 / 1024
     if 状态 is None or 状态.纯文本:
         打印成功(f"发布包已生成: {归档文件}")
+        打印信息(f"包内: {产物显示名}/ + README.txt + LICENSE")
         打印信息(f"文件大小约 {大小兆:.1f} MB")
         打印信息(f"压缩工具: {rar程序}")
     if 状态:
@@ -4023,6 +4317,10 @@ def 执行完整打包(状态: 打包进度) -> None:
             print(f"  发布文件: {归档}")
             print(f"  耗时:     {格式化耗时(状态.耗时秒)}")
             print()
+            # 纯文本模式同样: 按任意键 → 真关机
+            if 系统.stdout and getattr(系统.stdout, "isatty", lambda: False)():
+                _等待任意键("按任意键关机…")
+                _真关机()
     except SystemExit as 退出:
         if not 状态.已结束:
             状态.标记失败(f"退出码 {退出.code}")
@@ -4039,21 +4337,50 @@ def 执行完整打包(状态: 打包进度) -> None:
 
 # ---------- 主流程 ----------
 
+_帮助文本: str = (
+    "用法:\n"
+    "  python 打包.py        正常打包 (本月甲…丑 递增, 满 12 坠机)\n"
+    "  python 打包.py 重来   版本计时归零, 下次从本月「甲」起算\n"
+    "  python 打包.py 帮助   显示本说明\n"
+)
 
-def 解析命令行() -> None:
+
+def 解析命令行() -> str:
+    r"""
+    :return: 动作键 — \"打包\" | \"重来\"
+    """
     参数列表 = 系统.argv[1:]
     if not 参数列表:
-        return
+        return "打包"
     if len(参数列表) == 1 and 参数列表[0] in {"-h", "--help", "帮助", "/?"}:
-        print("用法:\n  python 打包.py\n")
+        print(_帮助文本)
         raise SystemExit(0)
-    失败退出("无法识别的参数。\n  用法: python 打包.py")
+    if len(参数列表) == 1 and 参数列表[0] in {"重来", "reset", "--reset"}:
+        return "重来"
+    失败退出(f"无法识别的参数: {' '.join(参数列表)}\n{_帮助文本}")
+    raise AssertionError("不可达")
+
+
+def 执行重来命令() -> None:
+    r"""只改 version.txt, 不跑构建。"""
+    旧版本 = 读取当前版本()
+    下次甲 = 重来本月从甲()
+    打印标题("版本计时 · 重来")
+    打印信息(f"当前: {旧版本}")
+    打印成功(f"已归零, 下次打包将从「{下次甲}」起算")
+    打印信息(f"已写入: {版本文件路径}")
+    打印信息("接着执行:  python 打包.py")
+    print()
 
 
 def 主程序() -> None:
     配置控制台编码()
-    解析命令行()
+    动作 = 解析命令行()
     检查运行平台()
+
+    if 动作 == "重来":
+        执行重来命令()
+        return
 
     旧版本 = 读取当前版本()
     新版本 = 计算下一版本(旧版本)

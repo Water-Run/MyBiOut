@@ -49,6 +49,16 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
             工具.设设置(分区, 键, 值.strip())
             return _成功()
 
+        case ("export", "bilibili_login_enabled"):
+            规范值 = 值.strip().lower()
+            if 规范值 in {"1", "true", "yes", "on", "启用"}:
+                if not 工具.取设置("export", "sessdata").strip():
+                    return _失败("你配启动吗？先填好 SESSDATA，再让我看看怎么个事。")
+                工具.设设置(分区, 键, "true")
+            else:
+                工具.设设置(分区, 键, "false")
+            return _成功()
+
         case ("localout" | "bbdown" | "mdout", "folder"):
             return _校验文件夹(分区, 值)
 
@@ -124,6 +134,10 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
         case ("api", "enabled"):
             规范值 = 值.strip().lower()
             if 规范值 in {"1", "true", "yes", "on", "启用"}:
+                接口密钥 = 工具.取设置("api", "key").strip()
+                接口模型 = 工具.取设置("api", "model").strip()
+                if not 接口密钥 or not 接口模型:
+                    return _失败("你配启动吗？先填好 Key 和 Model，再让我看看怎么个事。")
                 工具.设设置(分区, 键, "true")
             else:
                 工具.设设置(分区, 键, "false")
@@ -283,6 +297,36 @@ _哔哩请求头: dict[str, str] = {
     "Referer": "https://www.bilibili.com",
     "Origin": "https://www.bilibili.com",
 }
+
+
+def 检查B站登录态() -> dict[str, bool | str]:
+    r"""
+    只读检查保存的 SESSDATA 是否仍被 B 站认可。
+    不返回账号资料或凭证内容。
+    """
+    会话数据: str = 工具.取设置("export", "sessdata").strip()
+    已启用: bool = 工具.取B站登录态是否启用()
+    if not 会话数据:
+        return {"ok": True, "logged_in": False, "enabled": 已启用, "message": "还没登呢，先扫码登。"}
+    try:
+        import httpx as 网络请求
+
+        with 网络请求.Client(
+            headers=_哔哩请求头,
+            cookies={"SESSDATA": 会话数据},
+            timeout=15.0,
+            follow_redirects=True,
+        ) as 客户端:
+            响应 = 客户端.get("https://api.bilibili.com/x/web-interface/nav")
+        数据: dict = 响应.json()
+    except Exception as 异常:
+        return {"ok": False, "logged_in": False, "enabled": 已启用, "error": f"老登检查失败: {异常}"}
+
+    已登录: bool = 数据.get("code") == 0 and bool((数据.get("data") or {}).get("isLogin"))
+    if 已登录:
+        消息: str = "老登回来了。" if 已启用 else "登上了，但 B 站登录态还没启用。"
+        return {"ok": True, "logged_in": True, "enabled": 已启用, "message": 消息}
+    return {"ok": True, "logged_in": False, "enabled": 已启用, "message": "还没登上，重新扫码登吧。"}
 
 
 def 生成登录二维码() -> dict:

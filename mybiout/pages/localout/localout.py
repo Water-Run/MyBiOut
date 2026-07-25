@@ -37,14 +37,6 @@ except Exception:
     网络请求 = None
     _有网络请求: bool = False
 
-try:
-    from biliffm4s import biliffm4s as _缓存合并库
-
-    _有合并库: bool = True
-except Exception:
-    _缓存合并库 = None
-    _有合并库: bool = False
-
 _哔哩包列表: list[tuple[str, str]] = [
     ("tv.danmaku.bili", "哔哩哔哩"),
     ("com.bilibili.app.blue", "哔哩哔哩概念版"),
@@ -124,6 +116,16 @@ def _寻找ADB() -> str | None:
     return None
 
 
+def _寻找FFmpeg() -> str | None:
+    r"""优先使用绿色包旁路 ffmpeg，开发态才回退 PATH。"""
+    工具目录: 路径 = 工具.取工具目录()
+    程序名: str = "ffmpeg.exe" if 系统信息.platform == "win32" else "ffmpeg"
+    随包路径: 路径 = 工具目录 / 程序名
+    if 随包路径.is_file():
+        return str(随包路径)
+    return 文件工具.which(程序名) or 文件工具.which("ffmpeg")
+
+
 def _执行ADB(ADB路径: str, 序列号: str, *命令参数: str, 超时秒数: float = 10) -> 子进程.CompletedProcess:
     r"""
     执行 adb [-s serial] <args> 命令
@@ -174,6 +176,46 @@ def _取ADB设备列表() -> list[tuple[str, str]]:
     except Exception:
         pass
     return 设备列表
+
+
+def _取ADB已安装哔哩包(ADB路径: str, 序列号: str) -> list[tuple[str, str]]:
+    r"""返回设备中实际安装的哔哩客户端；查询失败时保守展示全部可支持版本。"""
+    try:
+        结果: 子进程.CompletedProcess = _执行ADB(
+            ADB路径, 序列号, "shell", "pm list packages", 超时秒数=10
+        )
+        if 结果.returncode == 0:
+            已安装: set[str] = {
+                行.strip().removeprefix("package:")
+                for 行 in 结果.stdout.splitlines()
+                if 行.strip().startswith("package:")
+            }
+            return [(包名, 名称) for 包名, 名称 in _哔哩包列表 if 包名 in 已安装]
+    except Exception:
+        pass
+    return list(_哔哩包列表)
+
+
+def _取电脑端缓存路径() -> list[路径]:
+    r"""发现已存在的电脑端哔哩缓存；发布包无本机配置时也能显示默认客户端目录。"""
+    配置路径: str = 工具.取设置("localout", "bilibili_pc_cache_path").strip()
+    候选列表: list[路径] = [
+        路径(配置路径) if 配置路径 else 路径(),
+        路径(工具.取默认哔哩哔哩电脑缓存路径()),
+    ]
+    已见: set[str] = set()
+    可用列表: list[路径] = []
+    for 候选 in 候选列表:
+        if not str(候选) or str(候选) == "." or not 候选.is_dir():
+            continue
+        try:
+            键 = str(候选.resolve()).lower()
+        except OSError:
+            键 = str(候选.absolute()).lower()
+        if 键 not in 已见:
+            已见.add(键)
+            可用列表.append(候选)
+    return 可用列表
 
 
 # ===== 通用工具 =====
@@ -831,6 +873,8 @@ def _扫描ADB文件夹(
     卡片列表: list[视频卡片] = []
     if 状态._扫描取消.is_set():
         return 卡片列表
+    while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
+        时间.sleep(0.2)
     try:
         执行结果: 子进程.CompletedProcess = _执行ADB(
             ADB路径,
@@ -847,6 +891,10 @@ def _扫描ADB文件夹(
                 卡片列表.append(卡片)
         else:
             for 条目 in 条目列表:
+                if 状态._扫描取消.is_set():
+                    break
+                while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
+                    时间.sleep(0.2)
                 if 条目 in (".", ".."):
                     continue
                 卡片列表.extend(
@@ -913,6 +961,21 @@ def _拉取ADB封面(ADB路径: str, 序列号: str, 远端目录: str, 标识�
     return ""
 
 
+def _取ADB元数据目录候选(远端路径: str) -> list[str]:
+    r"""返回 m4s 目录向上的元数据目录候选，优先 ``c_<cid>`` 层。"""
+    当前目录: str = 远端路径.rstrip("/").rsplit("/", 1)[0]
+    候选目录: list[str] = []
+    while 当前目录 and 当前目录 not in 候选目录:
+        候选目录.append(当前目录)
+        if 当前目录.rstrip("/").endswith("/download") or "/download/" not in 当前目录:
+            break
+        上级目录: str = 当前目录.rsplit("/", 1)[0]
+        if 上级目录 == 当前目录:
+            break
+        当前目录 = 上级目录
+    return 候选目录
+
+
 def _制作ADB卡片(
     ADB路径: str,
     序列号: str,
@@ -939,30 +1002,24 @@ def _制作ADB卡片(
     AV号: str = ""
     UP主名称: str = ""
 
-    # 尝试从父目录拉取 entry.json
-    远端父目录: str = 远端路径.rsplit("/", 1)[0] if "/" in 远端路径 else 远端路径
-    # 针对新版 B 站 Android 缓存进行路径智能上移
-    路径片段: list[str] = 远端路径.split("/")
-    if "download" in 路径片段:
-        索引 = 路径片段.index("download")
-        深度 = len(路径片段) - 1 - 索引
-        if 深度 == 3:
-            远端父目录 = "/".join(路径片段[:-2])
-        elif 深度 == 2:
-            远端父目录 = "/".join(路径片段[:-1])
-    临时路径: str = ""
-    try:
-        with 临时文件.NamedTemporaryFile(suffix=".json", delete=False) as 临时对象:
-            临时路径 = 临时对象.name
-        拉取结果: 子进程.CompletedProcess = _执行ADB(
-            ADB路径,
-            序列号,
-            "pull",
-            f"{远端父目录}/entry.json",
-            临时路径,
-            超时秒数=10,
-        )
-        if 拉取结果.returncode == 0 and 路径(临时路径).exists():
+    # Android 普通版常将 entry.json / cover.jpg 放在 c_<cid> 层，
+    # 其他版本则可能放在 AV 目录；从 m4s 所在目录逐层向上探测。
+    远端父目录: str = _取ADB元数据目录候选(远端路径)[0]
+    for 元数据目录 in _取ADB元数据目录候选(远端路径):
+        临时路径: str = ""
+        try:
+            with 临时文件.NamedTemporaryFile(suffix=".json", delete=False) as 临时对象:
+                临时路径 = 临时对象.name
+            拉取结果: 子进程.CompletedProcess = _执行ADB(
+                ADB路径,
+                序列号,
+                "pull",
+                f"{元数据目录}/entry.json",
+                临时路径,
+                超时秒数=10,
+            )
+            if 拉取结果.returncode != 0 or not 路径(临时路径).exists():
+                continue
             数据: dict = 数据交换.loads(路径(临时路径).read_text(encoding="utf-8"))
             标题 = 数据.get("title", 根文件夹) or 根文件夹
             BV号 = 数据.get("bvid", "") or ""
@@ -974,11 +1031,13 @@ def _制作ADB卡片(
             if 宽度 and 高度:
                 分辨率 = f"{宽度}×{高度}"
             字节数 = 数据.get("total_bytes", 0)
-    except Exception:
-        pass
-    finally:
-        if 临时路径:
-            路径(临时路径).unlink(missing_ok=True)
+            远端父目录 = 元数据目录
+            break
+        except Exception:
+            continue
+        finally:
+            if 临时路径:
+                路径(临时路径).unlink(missing_ok=True)
 
     # 尝试拉取 index.json 解析分辨率/帧率（与 m4s 同目录）
     if not 分辨率 or not 帧率:
@@ -1207,22 +1266,52 @@ def _构建文件名(卡片: 视频卡片) -> str:
     return _清理文件名(主文件名) + ".mp4"
 
 
+def _用随包FFmpeg合并(视频文件: str, 音频文件: str, 输出路径: str) -> None:
+    r"""以绿色包中的 ffmpeg 无损封装 B 站 m4s，失败时带回实际错误。"""
+    转码器: str | None = _寻找FFmpeg()
+    if not 转码器:
+        raise RuntimeError("未找到 ffmpeg.exe（请确认绿色包 bin/ 完整）")
+    命令: list[str] = [
+        转码器,
+        "-y",
+        "-i",
+        视频文件,
+        "-i",
+        音频文件,
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-c",
+        "copy",
+        "-movflags",
+        "+faststart",
+        输出路径,
+    ]
+    结果: 子进程.CompletedProcess = 子进程.run(
+        命令,
+        stdin=子进程.DEVNULL,
+        stdout=子进程.PIPE,
+        stderr=子进程.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        **_子进程附加参数,
+    )
+    输出文件: 路径 = 路径(输出路径)
+    if 结果.returncode != 0 or not 输出文件.is_file() or 输出文件.stat().st_size == 0:
+        错误文本: str = (结果.stderr or 结果.stdout or "未知 ffmpeg 错误").strip()
+        raise RuntimeError(f"ffmpeg 合并失败: {错误文本[-500:]}")
+
+
 def _本地合并(卡片: 视频卡片, 输出路径: str) -> None:
     r"""
-    本地文件合并，自动区分两种命名方案：
-
-    - Android 标准命名（video.m4s / audio.m4s）：
-      调用 biliffm4s.combine(parent_dir, output)
-      由 biliffm4s 在父目录中递归查找两个标准命名文件后合并
-
-    - PC codec-id 命名（如 64-1-xxx.m4s / 30280-1-xxx.m4s）：
-      调用 biliffm4s.convert(video_path, audio_path, output)
-      显式指定两个文件路径合并
+    本地文件合并，直接使用随包 FFmpeg 显式指定音视频文件。
 
     :param: card: 视频卡片
     :param: output: 输出 mp4 路径
     :raise: FileNotFoundError: 文件不存在
-    :raise: RuntimeError: biliffm4s 合并失败
+    :raise: RuntimeError: ffmpeg 合并失败
     """
     视频文件: str = 卡片.视频路径
     音频文件: str = 卡片.音频路径
@@ -1230,17 +1319,9 @@ def _本地合并(卡片: 视频卡片, 输出路径: str) -> None:
     if not 视频文件 or not 路径(视频文件).exists():
         raise FileNotFoundError(f"视频文件不存在: {视频文件}")
 
-    if 路径(视频文件).name.lower() == "video.m4s":
-        # Android 标准命名 → combine(父目录, 输出)
-        结果: bool = _缓存合并库.combine(str(路径(视频文件).parent), 输出路径)
-    else:
-        # PC codec-id 命名 → convert(视频, 音频, 输出)
-        if not 音频文件 or not 路径(音频文件).exists():
-            raise FileNotFoundError(f"音频文件不存在: {音频文件}")
-        结果 = _缓存合并库.convert(视频文件, 音频文件, 输出路径)
-
-    if not 结果:
-        raise RuntimeError("biliffm4s 合并失败")
+    if not 音频文件 or not 路径(音频文件).exists():
+        raise FileNotFoundError(f"音频文件不存在: {音频文件}")
+    _用随包FFmpeg合并(视频文件, 音频文件, 输出路径)
 
 
 def _导出单个ADB(卡片: 视频卡片, 输出路径: str) -> None:
@@ -1277,10 +1358,7 @@ def _导出单个ADB(卡片: 视频卡片, 输出路径: str) -> None:
             if 拉取结果.returncode != 0:
                 raise RuntimeError(f"ADB 拉取{名称}失败: {拉取结果.stderr.strip()[:120]}")
 
-        # 拉取后标准命名，直接使用 combine
-        结果: bool = _缓存合并库.combine(临时目录, 输出路径)
-        if not 结果:
-            raise RuntimeError("biliffm4s 合并失败")
+        _用随包FFmpeg合并(本地视频, 本地音频, 输出路径)
 
 
 def _导出单个(卡片: 视频卡片, 输出目录: 路径) -> None:
@@ -1289,8 +1367,8 @@ def _导出单个(卡片: 视频卡片, 输出目录: 路径) -> None:
     :param: card: 视频卡片
     :param: output_dir: 输出目录
     """
-    if not _有合并库:
-        raise RuntimeError("biliffm4s 未安装")
+    if not _寻找FFmpeg():
+        raise RuntimeError("未找到 ffmpeg.exe（请确认绿色包 bin/ 完整）")
 
     文件名文本: str = _构建文件名(卡片)
     if not 文件名文本:
@@ -1383,7 +1461,7 @@ def 取环境状态() -> dict:
     :return: dict: 环境状态
     """
     ADB路径值: str | None = _寻找ADB()
-    有合并库: bool = _有合并库
+    FFmpeg路径值: str | None = _寻找FFmpeg()
     有网络请求: bool = _有网络请求
 
     return {
@@ -1392,9 +1470,10 @@ def 取环境状态() -> dict:
             "path": ADB路径值 or "",
             "hint": "绿色包应自带 bin/adb.exe；若缺失请将 adb.exe 与 AdbWinApi.dll 等放入程序 bin/" if not ADB路径值 else "",
         },
-        "biliffm4s": {
-            "available": 有合并库,
-            "hint": "请运行: pip install biliffm4s" if not 有合并库 else "",
+        "ffmpeg": {
+            "available": FFmpeg路径值 is not None,
+            "path": FFmpeg路径值 or "",
+            "hint": "绿色包应自带 bin/ffmpeg.exe" if not FFmpeg路径值 else "",
         },
         "httpx": {
             "available": 有网络请求,
@@ -1424,29 +1503,26 @@ def 取可用来源() -> dict:
     ]
 
     # 环境检查
-    if not _有合并库:
-        警告列表.append("biliffm4s 未安装，导出功能将不可用")
+    if not _寻找FFmpeg():
+        警告列表.append("ffmpeg 未找到，导出功能将不可用")
 
     ADB路径值: str | None = _寻找ADB()
     if not ADB路径值:
         警告列表.append("ADB 未找到，无法扫描 Android 设备（USB调试模式）")
 
-    # PC 桌面端缓存
-    电脑缓存路径: str = 工具.取设置("localout", "bilibili_pc_cache_path").strip()
-    if 电脑缓存路径:
-        可选路径: bool = 工具.取设置("localout", "bilibili_pc_cache_optional_when_installed") == "true"
-        if not (可选路径 and not 路径(电脑缓存路径).is_dir()):
-            来源列表.append(
-                {
-                    "id": "pc_cache",
-                    "label": "哔哩哔哩桌面端缓存",
-                    "icon": "💻",
-                    "type": "pc",
-                    "path": 电脑缓存路径,
-                    "serial": "",
-                    "package": "",
-                }
-            )
+    # PC 桌面端缓存：即使发布配置不携带本机路径，也会发现默认客户端目录。
+    for 序号, 电脑缓存目录 in enumerate(_取电脑端缓存路径(), start=1):
+        来源列表.append(
+            {
+                "id": f"pc_cache_{序号}",
+                "label": "哔哩哔哩桌面端缓存" if 序号 == 1 else f"哔哩哔哩桌面端缓存 {序号}",
+                "icon": "💻",
+                "type": "pc",
+                "path": str(电脑缓存目录),
+                "serial": "",
+                "package": "",
+            }
+        )
 
     # 挂载为本地驱动器的 Android 设备（MTP / USB 大容量存储）
     # 参考 biliandout DeviceScanner.get_drive_devices
@@ -1486,7 +1562,7 @@ def 取可用来源() -> dict:
         警告列表.append("ADB 已安装但未检测到设备，请确认设备已启用 USB 调试并已授权")
 
     for 序列号, 显示名称 in ADB设备列表:
-        for 包名项, 名称 in _哔哩包列表:
+        for 包名项, 名称 in _取ADB已安装哔哩包(ADB路径值, 序列号):
             来源列表.append(
                 {
                     "id": f"adb_{序列号}_{包名项}",

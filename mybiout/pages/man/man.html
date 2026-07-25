@@ -107,7 +107,7 @@
         .main-split {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 7fr 5fr;
             gap: 16px;
             min-height: 0;
         }
@@ -417,18 +417,7 @@
         }
 
         .chat-welcome {
-            text-align: center;
-            padding: 30px 20px;
-            color: #ccc;
             min-height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .chat-welcome .cw-icon {
-            font-size: 48px;
-            line-height: 1;
         }
 
         .chat-input-bar {
@@ -543,7 +532,7 @@
         <div class="hdr">
             <a class="back" href="/">← 首页</a>
             <h1>Man!</h1>
-            <span class="hdr-sub">ManualScript 手册 & AI 助手</span>
+            <span class="hdr-sub">从缓存导出、在线下载到 Markdown 归档，一处看懂怎么用</span>
         </div>
 
         <!-- MAIN SPLIT -->
@@ -555,15 +544,16 @@
                 </div>
                 <div class="manual-body">
 
-                    <h2>孩子们，先听一句</h2>
-                    <p>Man! What can I say? 能打开这页，说明 MyBiOut! 已经在你机器上起飞了。这里<strong>不讲安装</strong>，只讲怎么用、点哪里、坏了先看哪。别慌，牢大带你一轮一轮打，不搞玄学。</p>
+                    <h2>MyBiOut! 是做什么的</h2>
+                    <p>MyBiOut! 是一个把 B 站内容带回本地的工具箱：电脑或手机里已经有缓存，就把它合成可播放文件；手里只有链接，就交给 BBDown 下载；只想留标题、UP、专栏或图文动态，就导出成 Markdown 文档。</p>
+                    <p>这页把每个入口的适用场景、推荐顺序、登录态和常见报错放在一起。第一次使用按下面的顺序走；之后遇到问题，先对照模块和任务状态，信息不够再在右侧输入具体情况。</p>
                     <p>五个入口，先记牢——选错入口，比凌晨四点起来练错动作还白练：</p>
                     <ul>
                         <li><b>LocalOut!</b> — 视频<strong>已经</strong>在电脑/手机缓存里 → 合成可播文件</li>
                         <li><b>BBDown!</b> — 手里只有链接 / BV / av → 在线下载</li>
                         <li><b>MdOut!</b> — 只要标题、UP、简介这些<strong>文字档案</strong> → Markdown（含专栏 / 图文动态正文）</li>
                         <li><b>OhMyConfig</b> — 导出路径、SESSDATA、大模型开关和 Key 都在这</li>
-                        <li><b>Man!</b>（本页）— 左手册、右助手；助手默认本地通道，整活也行</li>
+                        <li><b>Man!</b>（本页）— 使用说明、排错速查和可选问答入口</li>
                     </ul>
                     <blockquote>先问自己：东西在哪？缓存在本地 → LocalOut；只有链接 → BBDown；只要文档 → MdOut。选错入口，再努力也是在正确的错误上空位打铁。</blockquote>
 
@@ -693,7 +683,7 @@
                         <b>BBDown</b> · <a href="https://github.com/nilaoda/BBDown" target="_blank">nilaoda/BBDown ↗</a> — 下载核心
                     </div>
                     <div class="dep-card">
-                        <b>FFmpeg / biliffm4s</b> — 本地 m4s 合并
+                        <b>FFmpeg</b> — 本地 m4s 合并
                     </div>
                     <div class="dep-card">
                         <b>BullshitGenerator</b> · <a href="https://github.com/menzi11/BullshitGenerator" target="_blank">menzi11 ↗</a> — 本地助手通道的灵感；正式排障以页面真实状态为准
@@ -710,14 +700,7 @@
             <!-- RIGHT: CHAT -->
             <div class="chat-panel">
                 <div class="chat-msgs" id="chat-msgs">
-                    <div class="chat-welcome">
-                        <div class="cw-icon">🚁</div>
-                        <p style="margin-top:12px">孩子们，我是本页助手，牢大待机中。<br>
-                            <b>发送</b>：走大模型（先在 OhMyConfig 启用并填 Key，否则回落本地）；<br>
-                            <b>直接说</b>：强制本地通道，牢大亲自整活——图一乐，别当排障依据。<br>
-                            带上模块名 + 现象 + 页面原文，比只说「寄了」强十倍。
-                        </p>
-                    </div>
+                    <div class="chat-welcome" aria-label="等待提问"></div>
                 </div>
 
                 <div class="chat-input-bar">

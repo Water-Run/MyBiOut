@@ -103,6 +103,7 @@ def 取默认哔哩哔哩电脑缓存路径() -> str:
     "export": {
         "path": r"C:\MyBiOut!",
         "sessdata": "",
+        "bilibili_login_enabled": "false",
     },
     "api": {
         "enabled": "false",
@@ -160,7 +161,8 @@ def _当前保存配置函数():
 
 def 载入配置() -> 配置解析器.ConfigParser:
     r"""
-    读取配置文件, 不存在则使用默认值
+    读取配置文件, 不存在则使用默认值。
+    旧版已保存 SESSDATA 但尚无登录态开关时，兼容为已启用，避免升级后认证能力突然失效。
     :return: configparser.ConfigParser: 加载后的配置解析器
     """
     配置: 配置解析器.ConfigParser = 配置解析器.ConfigParser(interpolation=None)
@@ -168,7 +170,19 @@ def 载入配置() -> 配置解析器.ConfigParser:
         配置[分区] = dict(键值表)
     配置路径: 路径 = _当前配置路径()
     if 配置路径.exists():
+        原始配置: 配置解析器.ConfigParser = 配置解析器.ConfigParser(interpolation=None)
+        try:
+            原始配置.read(配置路径, encoding="utf-8")
+            旧版登录态: bool = (
+                原始配置.has_section("export")
+                and "bilibili_login_enabled" not in 原始配置["export"]
+                and bool((原始配置["export"].get("sessdata") or "").strip())
+            )
+        except 配置解析器.Error:
+            旧版登录态 = False
         配置.read(配置路径, encoding="utf-8")
+        if 旧版登录态:
+            配置["export"]["bilibili_login_enabled"] = "true"
     return 配置
 
 
@@ -270,10 +284,12 @@ def 取导出路径() -> 路径:
 
 def 取接口是否启用() -> bool:
     r"""
-    Man 页大模型是否启用 (关闭时一律走本地助手通道)
+    Man 页大模型是否已完整启用 (缺少 Key 或 Model 时一律走本地通道)
     """
     值 = (取设置("api", "enabled") or "false").strip().lower()
-    return 值 in {"1", "true", "yes", "on", "启用"}
+    if 值 not in {"1", "true", "yes", "on", "启用"}:
+        return False
+    return bool(取接口密钥().strip() and 取接口模型().strip())
 
 
 def 取接口密钥() -> str:
@@ -345,9 +361,11 @@ def 取接口超时秒数() -> float | None:
 
 def 取会话数据() -> str:
     r"""
-    获取统一的 SESSDATA (优先共享设置, 兼容旧分区)
+    获取已启用的统一 SESSDATA (优先共享设置, 兼容旧分区)
     :return: str: SESSDATA 值
     """
+    if not 取B站登录态是否启用():
+        return ""
     共享值: str = 取设置("export", "sessdata").strip()
     if 共享值:
         return 共享值
@@ -357,6 +375,15 @@ def 取会话数据() -> str:
         if 旧值:
             return 旧值
     return ""
+
+
+def 取B站登录态是否启用() -> bool:
+    r"""
+    判断 B 站登录态是否允许供下载和文档导出使用。
+    凭证保存与实际使用分离，避免误带 Cookie 请求外部服务。
+    """
+    值: str = (取设置("export", "bilibili_login_enabled") or "false").strip().lower()
+    return 值 in {"1", "true", "yes", "on", "启用"}
 
 
 def 取爬虫兜底超时() -> float | None:

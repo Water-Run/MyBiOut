@@ -20,9 +20,9 @@
 
 ## 使用
 
-1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut!-*.rar`  
-2. 解压到任意目录  
-3. 双击 **`MyBiOut!.exe`**  
+1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut! *.rar`（例 `MyBiOut! 二六〇七甲.rar`）  
+2. 解压到任意目录（包内含 `MyBiOut!/` 程序目录、`README.md`、`LICENSE`）  
+3. 进入 **`MyBiOut!`** 目录，双击 **`MyBiOut!.exe`**  
 4. 关闭窗口即退出  
 
 内嵌窗口基于系统 **WebView2**. Windows 11 一般已自带; 若窗口无法打开, 安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).  
@@ -31,7 +31,7 @@
 
 若缺工具或 WebView2 起不来：启动时**弹提示即可**，程序仍尽量打开（可回退浏览器）；对应功能可能不可用。  
 
-可选参数: `MyBiOut!.exe --port 2026` / `--browser`  
+可选参数: `MyBiOut!.exe --port 2026`；`--browser` 仅调试用（默认内嵌窗口，绿色包不自动开浏览器）。
 
 | 路径 | 说明 |
 |---|---|
@@ -47,11 +47,13 @@
 
 ```cmd
 python 打包.py
+python 打包.py 重来
 ```
 
 版本号为中文轨 **年月 + 月内序标** (如 `二六〇七甲` = 2026 年 7 月第 1 包; 序标 `甲乙丙丁戊己庚辛壬癸子丑`, 每月最多 12 个), 由打包脚本写入 `mybiout/version.txt`; 页面底部经 `/api/version` 读取 (优先绿色包根目录 `version.txt`).  
+本月满 12 个会提示「受不了版本号溢出来了.... / 之后的版本下个月再来编译吧~」并退出; `python 打包.py 重来` 将计时归零, **下次**打包从本月「甲」起算.  
 发布包内的 `config.ini` 为**脱敏默认配置**, 不会拷贝本机已有凭证.  
-产出: `dist/release/MyBiOut!-<版本>.rar` (例 `MyBiOut!-二六〇七甲.rar`)  
+产出: `打包结果/MyBiOut! <版本>.rar` (例 `MyBiOut! 二六〇七甲.rar`；空格与 `!` 均保留)。包内顶层为 `MyBiOut!/` + `README.md` + `LICENSE`。  
 
 重复打包会复用 PyInstaller 缓存、不强制 `pip -U`, 通常比首次快很多.
 

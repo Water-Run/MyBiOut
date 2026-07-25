@@ -9,6 +9,7 @@ MyBiOut! 主入口模块, 解析命令行参数并启动 FastAPI 服务
 
 import argparse as 参数解析
 import math as 数学
+import os as 操作系统
 import random as 随机
 import shutil as 文件工具
 import socket as 套接字
@@ -26,6 +27,9 @@ import uvicorn as 服务运行器
 from mybiout.pages.utils import 是否冻结运行
 from mybiout.pages.utils import 取工具目录
 from mybiout.pages.utils import 取端口
+
+# PyInstaller --windowed 时 stdout/stderr 常为 None; 须持有打开的 devnull 句柄防 GC 关闭
+_标准流持有: list = []
 
 
 class _中文参数解析器(参数解析.ArgumentParser):
@@ -61,11 +65,87 @@ def _取程序工具目录() -> 路径:
     return 取工具目录()
 
 
+class _非TTY文本流:
+    r"""
+    包装底层流: 永远 isatty=False。
+    Windows 上 open('nul') 的 isatty() 可能为 True, 会误导日志上色等逻辑。
+    """
+
+    def __init__(自身, 底层) -> None:
+        自身._底层 = 底层
+        自身.encoding = getattr(底层, "encoding", None) or "utf-8"
+        自身.errors = getattr(底层, "errors", None) or "replace"
+
+    def write(自身, 数据: object) -> int:
+        try:
+            return int(自身._底层.write(数据))  # type: ignore[arg-type]
+        except Exception:
+            return len(数据) if isinstance(数据, str) else 0
+
+    def flush(自身) -> None:
+        with 忽略异常(Exception):
+            自身._底层.flush()
+
+    def isatty(自身) -> bool:
+        return False
+
+    def reconfigure(自身, **关键字: object) -> None:
+        函数 = getattr(自身._底层, "reconfigure", None)
+        if 函数 is not None:
+            with 忽略异常(TypeError, ValueError, OSError, AttributeError):
+                函数(**关键字)
+
+    def fileno(自身) -> int:
+        return 自身._底层.fileno()
+
+
+def _确保标准流可用() -> None:
+    r"""
+    绿色 windowed 包无控制台时 sys.stdout/stderr 为 None。
+    uvicorn DefaultFormatter 会调用 stream.isatty() → AttributeError 整进程崩。
+    挂到 os.devnull 包装流 (强制 isatty=False), 保证冻结包可在无 Python 环境启动。
+    """
+    for 属性名 in ("stdout", "stderr"):
+        流 = getattr(系统, 属性名, None)
+        if 流 is not None:
+            continue
+        try:
+            底层 = open(  # noqa: SIM115 — 进程级持有, 故意不关
+                操作系统.devnull,
+                "w",
+                encoding="utf-8",
+                errors="replace",
+            )
+            替补: object = _非TTY文本流(底层)
+            _标准流持有.append(底层)
+        except OSError:
+            class _空流:
+                encoding = "utf-8"
+                errors = "replace"
+
+                def write(自身, 数据: object) -> int:
+                    return len(数据) if isinstance(数据, str) else 0
+
+                def flush(自身) -> None:
+                    return None
+
+                def isatty(自身) -> bool:
+                    return False
+
+                def reconfigure(自身, **_关键字: object) -> None:
+                    return None
+
+            替补 = _空流()
+        _标准流持有.append(替补)
+        setattr(系统, 属性名, 替补)
+
+
 def _配置文本输出() -> None:
     r"""
     避免控制台/冻结包 stdout 在 GBK 下打印 ✦ 等字符直接崩掉。
-    windowed 启动时 stdout 可能是包装流, reconfigure 不一定生效, 故打印侧另有 _安全打印。
+    windowed 启动时 stdout 可能是 None 或包装流; 先补流再 reconfigure。
     """
+    _确保标准流可用()
     for 输出流 in (系统.stdout, 系统.stderr):
         if 输出流 is None:
             continue
@@ -80,6 +160,7 @@ def _配置文本输出() -> None:
 
 def _安全打印(*参数: object, **关键字: object) -> None:
     r"""print 的容错包装: 编码失败时降级为 ASCII 可表示文本。"""
+    _确保标准流可用()
     try:
         print(*参数, **关键字)
         return
@@ -236,19 +317,14 @@ def _检查环境() -> list[_环境项]:
         )
     )
 
-    # biliffm4s（打包进 Python 依赖，开发态才可能缺）
-    找到biliffm4s: bool = False
-    try:
-        import biliffm4s  # noqa: F401
-
-        找到biliffm4s = True
-    except ImportError:
-        ...
+    # FFmpeg（LocalOut 合并 m4s，绿色包必须自带）
+    找到FFmpeg: bool = (程序工具目录 / "ffmpeg.exe").is_file() or 文件工具.which("ffmpeg.exe") is not None
     检查结果.append(
         _环境项(
-            "biliffm4s",
-            找到biliffm4s,
-            "安装: pip install biliffm4s\n      仓库: https://github.com/Water-Run/-m4s-Python-biliffm4s",
+            "FFmpeg",
+            找到FFmpeg,
+            "绿色包应自带 bin/ffmpeg.exe。\n"
+            "LocalOut 使用它无损合并 m4s。",
         )
     )
 
@@ -297,7 +373,7 @@ def _检测WebView2运行时() -> bool:
 
     # 2) 常见安装目录
     for 环境键 in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"):
-        根 = 系统.environ.get(环境键) or ""
+        根 = 操作系统.environ.get(环境键) or ""
         if not 根:
             continue
         应用根 = 路径(根) / "Microsoft" / "EdgeWebView" / "Application"
@@ -318,21 +394,21 @@ def _检测WebView2运行时() -> bool:
 
 def _打印环境详情(检查列表: list[_环境项]) -> None:
     r"""
-    在终端打印环境检查详细报告
-    :param 检查列表: 检查结果列表
+    在终端打印环境检查详细报告。
+    一律走 _安全打印 + ASCII 标记, 避免 windowed/GBK 下 emoji 崩进程。
     """
-    print()
-    print("  ── 环境检查 ──")
+    _安全打印()
+    _安全打印("  -- 环境检查 --")
     for 检查项 in 检查列表:
-        图标: str = "✅" if 检查项.可用 else "❌"
+        图标: str = "[OK]" if 检查项.可用 else "[X]"
         状态: str = "就绪" if 检查项.可用 else "未找到"
-        print(f"  {图标} {检查项.名称:<12} {状态}")
+        _安全打印(f"  {图标} {检查项.名称:<12} {状态}")
         if not 检查项.可用:
             for 提示行 in 检查项.提示.split("\n"):
-                print(f"      {提示行.strip()}")
-    print()
-    print("  缺失项仅影响对应功能，程序仍可启动。")
-    print()
+                _安全打印(f"      {提示行.strip()}")
+    _安全打印()
+    _安全打印("  缺失项仅影响对应功能，程序仍可启动。")
+    _安全打印()
 
 
 def _取功能缺失项(检查列表: list[_环境项]) -> list[_环境项]:
@@ -346,7 +422,7 @@ def _取启动阻断项(_检查列表: list[_环境项]) -> list[_环境项]:
     r"""
     返回会阻止 Web 服务启动的环境问题。
 
-    BBDown、ffmpeg、ADB、biliffm4s、WebView2 都只影响具体能力（导出/下载/内嵌窗），
+    BBDown、ffmpeg、ADB、WebView2 都只影响具体能力（导出/下载/内嵌窗），
     不能阻断服务本身。缺了或窗口起不来：只弹提示即可。
     """
     return []
@@ -420,18 +496,30 @@ def _后台启动服务(端口: int) -> _服务启动状态:
     :param 端口: 服务端口号
     :return: _服务启动状态: 启动状态对象
     """
+    # 必须在构造 uvicorn.Config 之前补齐标准流 (windowed 包 None 会炸 logging)
+    _确保标准流可用()
     状态: _服务启动状态 = _服务启动状态()
 
     if 端口错误 := _探测端口绑定错误(端口):
         状态.标记失败(端口错误)
         return 状态
 
-    配置: 服务运行器.Config = 服务运行器.Config(
-        "mybiout.pages.apis:应用",
-        host="127.0.0.1",
-        port=端口,
-        log_level="warning",
-    )
+    try:
+        配置: 服务运行器.Config = 服务运行器.Config(
+            "mybiout.pages.apis:应用",
+            host="127.0.0.1",
+            port=端口,
+            log_level="warning",
+            use_colors=False,
+        )
+    except TypeError:
+        # 旧版 uvicorn 无 use_colors 参数
+        配置 = 服务运行器.Config(
+            "mybiout.pages.apis:应用",
+            host="127.0.0.1",
+            port=端口,
+            log_level="warning",
+        )
     服务: 服务运行器.Server = 服务运行器.Server(配置)
     状态.服务 = 服务
 
@@ -440,6 +528,7 @@ def _后台启动服务(端口: int) -> _服务启动状态:
         后台线程执行 server.run()
         """
         try:
+            _确保标准流可用()
             服务.run()
         except Exception as e:
             状态.标记失败(f"Uvicorn 启动异常: {e}")
@@ -1278,8 +1367,10 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
         "title": "MyBiOut!",
         "url": 地址,
         "width": 1280,
-        "height": 840,
-        "min_size": (960, 640),
+        "height": 860,
+        # 布局以 1200px 画布设计，保留可读下限；不再锁死比例或尺寸。
+        "min_size": (1200, 720),
+        "resizable": True,
         "background_color": "#0b1220",
     }
     if 图标:
@@ -1321,6 +1412,7 @@ def 主程序() -> None:
     默认优先使用内嵌 Web 窗口 (绿色套壳); --browser 回退系统浏览器
     :return: None: 无返回值
     """
+    # 最先补流: 冻结 windowed 包无控制台, 后续 uvicorn/print 都依赖非 None 流
     _配置文本输出()
 
     默认端口: int = 取端口()
@@ -1348,13 +1440,22 @@ def 主程序() -> None:
     参数: 参数解析.Namespace = 解析器.parse_args()
     端口: int = 参数.port
 
-    使用窗口: bool = not 参数.browser
+    # 默认内嵌窗口; 仅显式 --browser 才走系统浏览器 (绿色包不自动回退浏览器)
+    强制浏览器: bool = bool(参数.browser)
+    使用窗口: bool = not 强制浏览器
     if 使用窗口 and not _可否使用窗口壳():
+        if 是否冻结运行():
+            _提示致命错误(
+                "内嵌窗口组件 (pywebview) 不可用。\n\n"
+                "绿色包默认只走内嵌窗口，不会自动打开浏览器。\n"
+                "请重新下载/解压完整发布包；若需浏览器调试可显式：\n"
+                "  MyBiOut!.exe --browser"
+            )
+            return
         使用窗口 = False
-        if not 参数.browser:
-            _安全打印("  提示: 未安装 pywebview, 已回退为系统浏览器模式")
-            _安全打印("        安装: pip install pywebview")
-            _安全打印()
+        _安全打印("  提示: 未安装 pywebview, 开发态回退系统浏览器")
+        _安全打印("        安装: pip install pywebview")
+        _安全打印()
 
     # 冻结绿色包或无可交互终端时跳过动画 (stdout 可能为 None: windowed)
     跳过动画: bool = (
@@ -1429,18 +1530,29 @@ def 主程序() -> None:
         try:
             _启动窗口壳(端口, 启动状态)
         except Exception as e:
-            # 与其它环境依赖同级：提示「哦启动不了」即可，再回退浏览器
             _安全打印(f"  * 内嵌窗口启动不了: {e}")
+            if 是否冻结运行() and not 强制浏览器:
+                # 绿色包: 失败即停, 不偷偷打开系统浏览器
+                _停止服务(启动状态)
+                _提示致命错误(
+                    "内嵌窗口（WebView2）启动失败。\n\n"
+                    f"原因：{e}\n\n"
+                    "绿色包默认只使用内嵌窗口，不会自动打开浏览器。\n"
+                    "请安装 WebView2 Runtime 后重试；仅调试时可用：\n"
+                    "  MyBiOut!.exe --browser"
+                )
+                return
+            # 开发态保留回退, 方便无 WebView2 时调试
             _提示环境警告(
                 "内嵌窗口（WebView2）启动不了。\n\n"
                 f"原因：{e}\n\n"
-                "将尝试用系统浏览器打开界面。\n"
-                "也可安装 WebView2 Runtime，或下次用：\n"
-                "  MyBiOut!.exe --browser"
+                "开发态将尝试用系统浏览器打开界面。\n"
+                "安装 WebView2 Runtime 可恢复内嵌窗。"
             )
             使用窗口 = False
 
     if not 使用窗口:
+        # 仅 --browser 或开发态窗口失败后才会进入
 
         def _打开浏览器() -> None:
             r"""
@@ -1462,6 +1574,8 @@ def 主程序() -> None:
 
 if __name__ == "__main__":
     try:
+        # 模块级兜底: 即便 主程序 前有 import 副作用, 也先钉住标准流
+        _确保标准流可用()
         主程序()
     except Exception as 异常:  # noqa: BLE001
         import traceback as 回溯

@@ -2,7 +2,6 @@
 fastapi
 uvicorn[standard]
 httpx
-biliffm4s
 pywebview
 pyinstaller
 qrcode

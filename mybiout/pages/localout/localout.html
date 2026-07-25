@@ -792,7 +792,10 @@
                     <div class="badge" id="badge-src">0</div>
                     <span class="scan-spin hidden" id="scan-spin">✦</span>
                     <div class="col-hd-right">
-                        <button class="btn btn-or" id="btn-add-src" onclick="切换下拉()">添加源 ▼</button>
+                        <button class="btn btn-dn" id="btn-pause-scan" onclick="暂停扫描()" style="display:none">暂停扫描</button>
+                        <button class="btn btn-gn" id="btn-resume-scan" onclick="继续扫描()" style="display:none">继续扫描</button>
+                        <button class="btn btn-dn" id="btn-cancel-scan" onclick="取消扫描()" style="display:none">取消扫描</button>
+                        <button class="btn btn-or" id="btn-add-src" onclick="切换下拉()">选择源 ▼</button>
                     </div>
                 </div>
                 <div class="col-search"><input placeholder="搜索标题 / UP主 / BV号..." id="src-search"></div>
@@ -862,9 +865,6 @@
             /* ===== 状态 ===== */
             const 已选来源 = new Set(), 已选任务 = new Set();
             let 上次日志长度 = 0, 下拉已开 = false, _上次状态 = null;
-            let _已扫描编号 = new Set();   // 已自动触发过扫描的源 id
-            let _上次设备编号 = new Set();// 上一次检测到的 drive/adb id 集合
-            let _待扫描队列 = [];        // 等待扫描的源队列
             const _已移除编号 = new Set(); // 已消失设备对应的卡片 id
             let _上次可用键 = new Set();
 
@@ -982,68 +982,9 @@
             window.添加来源 = 添加来源;
 
             /* ===== SCAN CONTROLS ===== */
-            function 暂停扫描() { return fetch('/api/localout/pause-scan', { method: 'POST' }); }
-            function 继续扫描() { return fetch('/api/localout/resume-scan', { method: 'POST' }); }
-            function 取消扫描() { return fetch('/api/localout/cancel-scan', { method: 'POST' }); }
-
-            /* ===== AUTO-DETECT DEVICES (drive + ADB) =====
-             * 参考 biliandout MainWindow._auto_refresh_devices / autoDetectDrives：
-             * - 每 1 秒调用一次 available-sources
-             * - 新出现的 drive/adb 源自动入队扫描
-             * - 断开的设备从已扫描集合中移除，再次接入时重新扫描
-             */
-            async function 自动检测设备() {
-                try {
-                    const data = await (await fetch('/api/localout/available-sources')).json();
-                    const srcs = data.sources || [];
-                    const warnings = data.warnings || [];
-
-                    // 更新环境状态栏
-                    const envBar = 取元素('env-bar');
-                    const envBarText = 取元素('env-bar-text');
-                    if (warnings.length > 0) {
-                        envBarText.textContent = warnings.join(' | ') + ' — 部分功能可能不可用';
-                        envBar.style.display = 'block';
-                    } else {
-                        envBar.style.display = 'none';
-                    }
-
-                    // 显示环境警告（仅在首次或变化时）
-                    if (warnings.length > 0) {
-                        const warningKey = warnings.join('|');
-                        if (window._lastWarningKey !== warningKey) {
-                            window._lastWarningKey = warningKey;
-                            warnings.forEach(w => 提示(w, true));
-                        }
-                    }
-
-                    const nowIds = new Set();
-                    for (const s of srcs) {
-                        if (s.type === 'drive' || s.type === 'adb') {
-                            nowIds.add(s.id);
-                            if (!_已扫描编号.has(s.id)) {
-                                _已扫描编号.add(s.id);
-                                _待扫描队列.push(s);
-                            }
-                        }
-                    }
-                    // 已断开的设备从已扫描集合中清除，下次接入可重新自动扫描
-                    for (const id of _上次设备编号) {
-                        if (!nowIds.has(id)) _已扫描编号.delete(id);
-                    }
-                    _上次设备编号 = nowIds;
-                    尝试下个待扫描();
-                } catch (e) { }
-            }
-
-            function 尝试下个待扫描() {
-                if (_待扫描队列.length === 0) return;
-                if (_上次状态 && _上次状态.scan_status !== 'idle') return;
-                const s = _待扫描队列.shift();
-                const typeLabel = s.type === 'adb' ? '(ADB)' : '(MTP)';
-                提示(`发现新设备 ${typeLabel}，正在扫描: ${s.label}`);
-                添加来源(s.type, s.path || '', s.label, s.serial || '', s.package || '');
-            }
+            async function 暂停扫描() { await fetch('/api/localout/pause-scan', { method: 'POST' }); 轮询(); }
+            async function 继续扫描() { await fetch('/api/localout/resume-scan', { method: 'POST' }); 轮询(); }
+            async function 取消扫描() { await fetch('/api/localout/cancel-scan', { method: 'POST' }); 轮询(); }
 
             /* ===== CARD RENDERING ===== */
             function 渲染卡片(c, col) {
@@ -1118,7 +1059,7 @@
 
                 const emptyIcons = { src: '📂', task: '📋', done: '🎉' };
                 const emptyTexts = {
-                    src: '点击上方「添加源」开始',
+                    src: '点击上方「选择源」开始',
                     task: '从源栏添加视频到这里',
                     done: '导出完成的视频将出现在这里',
                 };
@@ -1276,6 +1217,11 @@
                     取元素('st-src').textContent = s.source_cards.length;
                     取元素('st-task').textContent = s.task_cards.length;
                     取元素('st-done').textContent = s.completed_cards.length;
+                    const 扫描中 = s.scan_status === 'scanning';
+                    const 已暂停 = s.scan_status === 'paused';
+                    取元素('btn-pause-scan').style.display = 扫描中 ? '' : 'none';
+                    取元素('btn-resume-scan').style.display = 已暂停 ? '' : 'none';
+                    取元素('btn-cancel-scan').style.display = (扫描中 || 已暂停) ? '' : 'none';
 
                     // 清理失效选择
                     const srcIds = new Set(s.source_cards.map(c => c.id));
@@ -1283,8 +1229,6 @@
                     for (const id of 已选来源) { if (!srcIds.has(id)) 已选来源.delete(id); }
                     for (const id of 已选任务) { if (!taskIds.has(id)) 已选任务.delete(id); }
 
-                    // 有空闲时继续排队扫描
-                    尝试下个待扫描();
                 } catch (e) { }
             }
 
@@ -1351,8 +1295,8 @@
                     if (!env.adb.available) {
                         issues.push('ADB 未找到');
                     }
-                    if (!env.biliffm4s.available) {
-                        issues.push('biliffm4s 未安装');
+                    if (!env.ffmpeg.available) {
+                        issues.push('ffmpeg 未找到');
                     }
 
                     // 更新环境状态栏
@@ -1413,9 +1357,6 @@
             检查环境状态();
             轮询();
             setInterval(轮询, 500);
-            // 每 1 秒检测新接入的 drive/ADB 设备
-            自动检测设备();
-            setInterval(自动检测设备, 1000);
         })();
     </script>
     <script src="/assets/entry.js"></script>

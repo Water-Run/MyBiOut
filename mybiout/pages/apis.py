@@ -225,7 +225,7 @@ async def 本地导出状态() -> dict[str, 任意]:
 @应用.get("/api/localout/env-status")
 async def 本地导出环境状态() -> dict[str, 任意]:
     r"""
-    获取环境状态信息（ADB、biliffm4s 等）
+    获取环境状态信息（ADB、FFmpeg 等）
     :return: dict[str, Any]: 环境状态
     """
     from mybiout.pages.localout.localout import 取环境状态
@@ -716,6 +716,16 @@ async def 生成登录二维码接口() -> dict[str, 任意]:
     from mybiout.pages.ohmyconfig.ohmyconfig import 生成登录二维码
 
     return 生成登录二维码()
+
+
+@应用.get("/api/bilibili-login-status")
+async def B站登录态检查接口() -> dict[str, 任意]:
+    r"""
+    只读检查当前保存的 B 站登录态是否有效。
+    """
+    from mybiout.pages.ohmyconfig.ohmyconfig import 检查B站登录态
+
+    return 检查B站登录态()
 
 
 @应用.post("/api/qrcode/poll")

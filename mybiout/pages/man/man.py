@@ -727,7 +727,7 @@ def _构建产品提示() -> str:
         "【系统功能地图】\n"
         "1. 首页: 进入 LocalOut、BBDown、MdOut、OhMyConfig 和 Man 页面。\n"
         "2. OhMyConfig: 管理导出根目录、B站 SESSDATA、OpenAI 兼容大模型 API、LocalOut/BBDown/MdOut 各自的目录与行为选项。敏感信息会明文保存在 config.ini, 回答时必须提醒风险。\n"
-        "3. LocalOut: 导出已存在的 B 站缓存。支持 PC 桌面端缓存、Android ADB 扫描、自定义本地缓存路径; 扫描后选择卡片、加入任务、导出; 依赖 FFmpeg/biliffm4s 合并 m4s。\n"
+        "3. LocalOut: 导出已存在的 B 站缓存。支持 PC 桌面端缓存、Android ADB 扫描、自定义本地缓存路径; 扫描后选择卡片、加入任务、导出; 使用随包 FFmpeg 合并 m4s。\n"
         "4. BBDown: 对 BBDown 命令行下载能力做网页封装。可输入 BV/av/ep/ss、完整链接或 b23 短链; 支持画质、编码、API 模式、分P、字幕、弹幕、封面等设置; 任务可取消、重试、清空。\n"
         "5. MdOut: 将视频、用户、专栏文章导出为 Markdown。可预览 Rich/Raw, 可导出单项、批量导出、打开导出目录。\n"
         "6. Man: 左侧手册, 右侧助手。设置里「启用大模型」关闭或 Key 无效时走本地助手通道; 打开且配置正确才请求云端。\n"

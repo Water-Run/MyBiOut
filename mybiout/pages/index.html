@@ -84,7 +84,7 @@
             animation: logo-shake .4s ease;
         }
 
-        /* ========== 右上工具条：仓库 + 设置（避开中心卡片） ========== */
+        /* ========== 右上工具条：仓库 ========== */
         .top-right {
             position: absolute;
             top: 28px;
@@ -97,6 +97,10 @@
         }
 
         .settings-link {
+            position: absolute;
+            top: 63px;
+            left: 166px;
+            z-index: 5;
             font-size: 15px;
             font-weight: 900;
             color: #7A1438;
@@ -393,10 +397,10 @@
         <div class="logo">
             <img src="./assets/logo.png" alt="MyBiOut!">
         </div>
+        <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
         <div class="top-right">
             <a class="github-link" id="github-btn" href="https://github.com/Water-Run/MyBiOut" target="_blank"
                 rel="noopener">来仓库点星标 ⭐ 提交问题 🐛</a>
-            <a class="settings-link" href="/ohmyconfig">哦，我的设置 →</a>
         </div>
         <div class="cards">
             <a class="card" href="/localout">

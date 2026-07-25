@@ -549,28 +549,36 @@
             </div>
 
             <div class="setting-row">
-                <div class="setting-label">B站认证 Cookie (SESSDATA)</div>
-                <div class="setting-hint">统一的 B 站登录凭证, 用于 BBDown 下载高画质视频和 MdOut 获取收藏夹等</div>
+                <div class="setting-label">B站登录态 (SESSDATA)</div>
+                <div class="setting-hint">开启后才会将登录态交给 BBDown 高画质下载和 MdOut 收藏夹等需要认证的请求</div>
                 <div class="setting-controls">
+                    <div style="display:flex;align-items:center;gap:12px;width:100%">
+                        <span class="inline-label">启用B站登录态:</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="s-bilibili-login-enabled" onchange="切换B站登录态(this)">
+                            <div class="toggle-track"></div>
+                        </label>
+                        <button class="btn btn-ghost" onclick="检查老登了吗()">老登了吗</button>
+                        <span class="setting-hint" style="margin:0">没配 SESSDATA 就别硬启动，先掏出你的收</span>
+                    </div>
                     <input type="text" id="s-sessdata" style="width:420px" placeholder="留空则不使用认证">
                     <button class="btn btn-orange" onclick="确认会话数据()">保存</button>
-                    <button class="btn btn-pink" onclick="触发扫码登录()">扫码登录获取</button>
+                    <button class="btn btn-pink" onclick="触发扫码登录()">扫码登</button>
                     <button class="btn btn-danger" onclick="清空会话数据()">清空</button>
                 </div>
             </div>
 
             <div class="setting-row">
-                <div class="setting-label">大模型 API (OpenAI 兼容)</div>
+                <div class="setting-label">大模型 API (OAI兼)</div>
                 <div class="setting-hint">只影响 Man! 右侧助手。关闭或未配 Key 时，孩子们走本地「直接说」通道，导出下载不受影响。</div>
                 <div class="setting-controls" style="flex-direction:column;align-items:flex-start;gap:10px">
                     <div style="display:flex;align-items:center;gap:12px">
                         <span class="inline-label">启用大模型:</span>
                         <label class="toggle">
-                            <input type="checkbox" id="s-api-enabled"
-                                onchange="保存开关('api','enabled',this.checked)">
+                            <input type="checkbox" id="s-api-enabled" onchange="切换大模型(this)">
                             <div class="toggle-track"></div>
                         </label>
-                        <span class="setting-hint" style="margin:0">关掉 = 永远本地助手；打开且 Key 有效才真请求云端</span>
+                        <span class="setting-hint" style="margin:0">关掉 = 本地通道；Key 和 Model 配齐后才允许启动</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
                         <span class="inline-label">Key:</span>
@@ -599,7 +607,7 @@
                         </select>
                     </div>
                     <div style="display:flex;gap:10px;margin-top:2px">
-                        <button class="btn btn-orange" onclick="确认接口设置()">保存</button>
+                        <button class="btn btn-orange" onclick="确认接口设置()">让我看看怎么个事</button>
                         <button class="btn btn-danger" onclick="清空接口设置()">清空</button>
                     </div>
                 </div>
@@ -739,11 +747,11 @@
             </div>
 
             <div class="setting-row">
-                <div class="setting-label">画质偏好</div>
-                <div class="setting-hint">按优先级排列，逗号分隔；留空则由 BBDown 自动选择最高画质</div>
+                <div class="setting-label">画质偏好（默认自动最高）</div>
+                <div class="setting-hint">默认留空：由 BBDown 自动识别可用的最高画质；想手动限制时再按优先级用逗号填写</div>
                 <div class="setting-controls">
                     <input type="text" id="s-bbdown-quality" style="width:420px"
-                        placeholder="如: 8K 超高清,1080P 高码率,1080P 高清"
+                        placeholder="留空 = 自动识别最高画质"
                         onchange="保存文本('bbdown','quality_priority',this.value)"
                         onkeydown="if(event.key==='Enter')this.blur()">
                 </div>
@@ -908,10 +916,10 @@
         <div class="section" style="transform:rotate(0deg)">
             <h2 class="section-title">危险操作</h2>
             <div class="setting-row">
-                <div class="setting-label">一键恢复默认设置</div>
-                <div class="setting-hint">将所有设置重置为初始值，包括 API Key、SESSDATA 等敏感信息</div>
+                <div class="setting-label">丢掉大脑</div>
+                <div class="setting-hint">把配置丢掉，恢复初始值；API Key、SESSDATA 等敏感信息也会一起清空</div>
                 <div class="setting-controls">
-                    <button class="btn btn-danger" onclick="确认重置全部()">恢复默认设置</button>
+                    <button class="btn btn-danger" onclick="确认重置全部()">丢配置</button>
                 </div>
             </div>
         </div>
@@ -946,7 +954,7 @@
     <!-- 扫码登录模态框 -->
     <div class="modal-backdrop" id="qr-modal">
         <div class="modal" style="transform:rotate(-0.8deg)">
-            <h3>扫码登录</h3>
+            <h3>登你的哔</h3>
             <div id="qr-box"></div>
             <p id="qr-status">正在生成二维码…</p>
             <div class="modal-btns">
@@ -958,11 +966,11 @@
 
     <!-- 重置确认模态框 -->
     <div class="modal-backdrop" id="reset-modal">
-        <div class="modal" style="transform:rotate(0.5deg)">
-            <h3>⚠ 确认重置</h3>
-            <p>这将把所有设置恢复为默认值。<br>API Key、SESSDATA 等配置将被清空。<br>此操作不可撤销！</p>
+            <div class="modal" style="transform:rotate(0.5deg)">
+            <h3>⚠ 丢掉大脑</h3>
+            <p>这会把配置丢掉，恢复为默认设置。<br>API Key、SESSDATA 等配置将被清空。<br>此操作不可撤销！</p>
             <div class="modal-btns">
-                <button class="btn btn-danger" onclick="执行重置全部()">确认重置</button>
+                <button class="btn btn-danger" onclick="执行重置全部()">丢配置</button>
                 <button class="btn btn-ghost" onclick="关闭重置弹窗()">取消</button>
             </div>
         </div>
@@ -1031,6 +1039,8 @@
 
             document.getElementById('s-export-path').value = s.export?.path ?? '';
             document.getElementById('s-sessdata').value = s.export?.sessdata ?? '';
+            document.getElementById('s-bilibili-login-enabled').checked =
+                (s.export?.bilibili_login_enabled ?? 'false') === 'true';
             document.getElementById('s-api-enabled').checked = (s.api?.enabled ?? 'false') === 'true';
             document.getElementById('s-api-key').value = s.api?.key ?? '';
             document.getElementById('s-api-model').value = s.api?.model ?? '';
@@ -1092,6 +1102,22 @@
             显示提示(data.error || '保存失败', true); return false;
         }
         async function 保存开关(sec, key, checked) { 同步条件显示(); await 保存设置(sec, key, checked ? 'true' : 'false'); }
+        async function 切换B站登录态(开关) {
+            const ok = await 保存设置('export', 'bilibili_login_enabled', 开关.checked ? 'true' : 'false');
+            if (!ok) 开关.checked = false;
+        }
+        async function 检查老登了吗() {
+            try {
+                const 数据 = await 接口读取('/api/bilibili-login-status');
+                显示提示(数据.message || 数据.error || '老登检查没结果', !数据.ok || !数据.logged_in);
+            } catch (异常) {
+                显示提示('老登检查失败: ' + 异常.message, true);
+            }
+        }
+        async function 切换大模型(开关) {
+            const ok = await 保存设置('api', 'enabled', 开关.checked ? 'true' : 'false');
+            if (!ok) 开关.checked = false;
+        }
         async function 保存选择(sec, key, val) { await 保存设置(sec, key, val); }
         async function 保存文本(sec, key, val) { await 保存设置(sec, key, val); }
         async function 保存文件夹(sec, val) {
@@ -1151,14 +1177,15 @@
             const b = document.getElementById('s-api-base-url').value.trim();
             const t = document.getElementById('s-api-timeout').value;
 
-            const en = document.getElementById('s-api-enabled').checked ? 'true' : 'false';
-            await 接口提交('/api/setting', { section: 'api', key: 'enabled', value: en });
-            await 接口提交('/api/setting', { section: 'api', key: 'key', value: k });
-            await 接口提交('/api/setting', { section: 'api', key: 'model', value: m });
-            await 接口提交('/api/setting', { section: 'api', key: 'base_url', value: b || 'https://api.deepseek.com/v1' });
-            await 接口提交('/api/setting', { section: 'api', key: 'timeout', value: t || 'infinite' });
-
-            显示提示('API 设置已保存');
+            const 想要启用 = document.getElementById('s-api-enabled').checked;
+            const 已保存 = await 保存设置('api', 'key', k)
+                && await 保存设置('api', 'model', m)
+                && await 保存设置('api', 'base_url', b || 'https://api.deepseek.com/v1')
+                && await 保存设置('api', 'timeout', t || 'infinite');
+            if (!已保存) return;
+            const 已更新开关 = await 保存设置('api', 'enabled', 想要启用 ? 'true' : 'false');
+            if (!已更新开关) document.getElementById('s-api-enabled').checked = false;
+            if (已更新开关) 显示提示('让我看看怎么个事：配置已保存');
         }
         function 关闭接口弹窗() { document.getElementById('api-modal').classList.remove('show'); }
         async function 清空接口设置() {
@@ -1188,6 +1215,8 @@
             await 保存设置('export', 'sessdata', v);
         }
         async function 清空会话数据() {
+            document.getElementById('s-bilibili-login-enabled').checked = false;
+            await 保存设置('export', 'bilibili_login_enabled', 'false');
             document.getElementById('s-sessdata').value = '';
             await 保存设置('export', 'sessdata', '');
             显示提示('SESSDATA 已清空');
@@ -1218,7 +1247,7 @@
                 if (!数据.ok) { 状态行.textContent = 数据.error || '生成二维码失败'; return; }
                 _扫码键 = 数据.qrcode_key;
                 盒.innerHTML = 数据.qr_svg;
-                状态行.textContent = '请使用哔哩哔哩 App 扫码';
+                状态行.textContent = '掏出你的收';
                 _轮询扫码();
             } catch (异常) {
                 状态行.textContent = '生成二维码异常: ' + 异常.message;
@@ -1238,7 +1267,7 @@
                     关闭扫码弹窗();
                     document.getElementById('s-sessdata').value = 数据.sessdata;
                     await 保存设置('export', 'sessdata', 数据.sessdata);
-                    显示提示('扫码登录成功，已保存 SESSDATA！');
+                    显示提示('扫码成功：已保存 SESSDATA，再打开「启用B站登录态」即可生效。');
                     return;
                 }
                 if (数据.status === 'expired') {
@@ -1249,7 +1278,7 @@
                     状态行.textContent = 数据.error || '轮询出错，请刷新重试';
                     return;
                 }
-                if (数据.status === 'scanned') 状态行.textContent = '已扫码，请在手机上确认登录';
+                if (数据.status === 'scanned') 状态行.textContent = '扫了速登';
             } catch (异常) {
                 状态行.textContent = '轮询异常: ' + 异常.message;
             }
@@ -1268,7 +1297,7 @@
                     const r = await fetch('/api/reset-all-settings', { method: 'POST' });
                     const d = await r.json();
                     if (d.ok) {
-                        显示提示('已恢复默认设置，正在重新加载...');
+                        显示提示('配置已丢，正在重新加载...');
                         setTimeout(() => 载入设置(), 500);
                     } else {
                         显示提示('重置失败', true);
@@ -1291,6 +1320,7 @@
         window.同步条件显示 = 同步条件显示;
         window.保存设置 = 保存设置;
         window.保存开关 = 保存开关;
+        window.检查老登了吗 = 检查老登了吗;
         window.保存选择 = 保存选择;
         window.保存文本 = 保存文本;
         window.保存文件夹 = 保存文件夹;

@@ -251,6 +251,25 @@ def _解析进度(行: str) -> tuple[float | None, str | None]:
     return 进度值, 速度
 
 
+def _估算阶段进度(行: str) -> float | None:
+    r"""BBDown 不总输出百分比，按其稳定的阶段日志提供保守进度。"""
+    if "任务完成" in 行 or "下载" in 行 and "完毕" in 行:
+        return 0.98
+    if "清理临时文件" in 行:
+        return 0.95
+    if "合并" in 行:
+        return 0.88
+    if "开始下载" in 行:
+        return 0.25
+    if "已选择的流" in 行 or "条音频流" in 行 or "条视频流" in 行:
+        return 0.18
+    if "开始解析" in 行:
+        return 0.10
+    if "获取aid" in 行 or "获取视频信息" in 行 or "检测账号登录" in 行:
+        return 0.04
+    return None
+
+
 def _解析标题(行: str) -> str | None:
     for 模式 in (r"视频标题[：:]\s*(.+)", r"标题[：:]\s*(.+)", r"Title[：:]\s*(.+)"):
         if 匹配 := 正则.search(模式, 行):
@@ -297,9 +316,9 @@ def _读取原始行(进程: 子进程.Popen):
         if 字节块 == b"\n" or 字节块 == b"\r":
             if 行缓存:
                 try:
-                    文本: str = bytes(行缓存).decode(_控制台编码, errors="replace")
+                    文本: str = bytes(行缓存).decode("utf-8")
                 except Exception:
-                    文本 = bytes(行缓存).decode("utf-8", errors="replace")
+                    文本 = bytes(行缓存).decode(_控制台编码, errors="replace")
                 行缓存.clear()
                 yield 文本
             continue
@@ -307,9 +326,9 @@ def _读取原始行(进程: 子进程.Popen):
     # 残留内容
     if 行缓存:
         try:
-            yield bytes(行缓存).decode(_控制台编码, errors="replace")
+            yield bytes(行缓存).decode("utf-8")
         except Exception:
-            yield bytes(行缓存).decode("utf-8", errors="replace")
+            yield bytes(行缓存).decode(_控制台编码, errors="replace")
 
 
 def _工作线程函数() -> None:
@@ -353,6 +372,8 @@ def _工作线程函数() -> None:
 
             with 状态.锁:
                 状态._进程 = 进程
+                # 部分 BBDown 下载器不打印百分比，先让界面明确进入工作态。
+                任务.进度 = 0.01
 
             for 原始行 in _读取原始行(进程):
                 干净行: str = _清理文本(原始行)
@@ -371,6 +392,10 @@ def _工作线程函数() -> None:
                             任务.速度 = 速度文本
                     # 进度行不写入日志避免刷屏
                     continue
+
+                if 阶段进度 := _估算阶段进度(干净行):
+                    with 状态.锁:
+                        任务.进度 = max(任务.进度, 阶段进度)
 
                 状态.记录日志("info", 干净行)
 

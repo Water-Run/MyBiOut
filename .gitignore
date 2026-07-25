@@ -18,8 +18,12 @@ coverage.xml
 tests/
 
 # ---------- 构建 / 发布产物 ----------
+.package-smoke-*/
+.bbdown-smoke-*/
 build/
 dist/
+# 最终 rar 发布包输出目录 (打包脚本写入, 勿入库)
+打包结果/
 # 打包脚本自动补齐的 RAR 等本机工具 (勿入库)
 tools/
 # 误落在仓库根的 PyInstaller spec / 半成品
