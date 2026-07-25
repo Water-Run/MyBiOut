@@ -391,16 +391,26 @@ class _服务启动状态:
 
 def _探测端口绑定错误(端口: int) -> str | None:
     r"""
-    预探测端口是否可绑定
+    预探测端口是否可绑定。
+    拒绝 0 (系统随机端口, 但 UI 仍会打开 :0) 与越界值, 避免未捕获 OverflowError。
     :param 端口: 端口号
     :return: str | None: 可用返回 None，不可用返回错误原因
     """
     try:
+        端口号 = int(端口)
+    except (TypeError, ValueError):
+        return f"端口无效: {端口!r}"
+    # 0 虽可 bind 为「随机可用端口」, 但后续仍用字面 0 拼 URL, 必须拒绝
+    if 端口号 < 1 or 端口号 > 65535:
+        return f"端口须在 1~65535 之间, 收到 {端口号}"
+    try:
         with 套接字.socket(套接字.AF_INET, 套接字.SOCK_STREAM) as 套接字对象:
-            套接字对象.bind(("127.0.0.1", 端口))
+            套接字对象.bind(("127.0.0.1", 端口号))
     except OSError as e:
         详细原因: str = e.strerror or str(e)
-        return f"端口 {端口} 不可用: {详细原因}"
+        return f"端口 {端口号} 不可用: {详细原因}"
+    except OverflowError:
+        return f"端口须在 1~65535 之间, 收到 {端口号}"
     return None
 
 

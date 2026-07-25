@@ -45,6 +45,10 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
             工具.设设置(分区, 键, 值.strip())
             return _成功()
 
+        case ("export", "sessdata"):
+            工具.设设置(分区, 键, 值.strip())
+            return _成功()
+
         case ("localout" | "bbdown" | "mdout", "folder"):
             return _校验文件夹(分区, 值)
 
@@ -146,8 +150,8 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
             return _成功()
 
         case _:
-            工具.设设置(分区, 键, str(值))
-            return _成功()
+            # 白名单: 未登记的分区/键一律拒绝, 防止任意写入污染配置
+            return _失败(f"未知设置项: {分区}.{键}")
 
 
 def _保存布尔(分区: str, 键: str, 值: str) -> 设置结果:
@@ -167,7 +171,8 @@ def _保存布尔(分区: str, 键: str, 值: str) -> 设置结果:
 
 def _校验文件夹(分区: str, 值: str) -> 设置结果:
     r"""
-    校验并保存文件夹名称, 检查冲突
+    校验并保存文件夹名称, 检查冲突。
+    仅允许单层相对名, 拒绝路径穿越 / 分隔符 / 盘符。
     :param: 分区: 配置分区名
     :param: 值: 文件夹名称
     :return: 设置结果: 保存结果
@@ -175,6 +180,18 @@ def _校验文件夹(分区: str, 值: str) -> 设置结果:
     名称: str = 值.strip()
     if not 名称:
         return _失败("文件夹名不能空着!")
+
+    # 单层相对名: 禁止 ..、路径分隔、盘符、控制字符与 Windows 非法文件名字符
+    if 名称 in {".", ".."} or ".." in 名称:
+        return _失败("文件夹名不能含路径穿越 (..)")
+    if any(c in 名称 for c in ("/", "\\", ":", "*", "?", '"', "<", ">", "|", "\0", "\n", "\r")):
+        return _失败("文件夹名只能是单层目录名, 不能含路径或非法字符")
+    try:
+        路径点 = 路径(名称)
+    except (OSError, ValueError):
+        return _失败("文件夹名不合法")
+    if 路径点.is_absolute() or len(路径点.parts) != 1 or 路径点.parts[0] != 名称:
+        return _失败("文件夹名只能是单层目录名, 不能含路径或盘符")
 
     for 其他分区 in ("localout", "bbdown", "mdout"):
         if 其他分区 != 分区 and 工具.取设置(其他分区, "folder") == 名称:

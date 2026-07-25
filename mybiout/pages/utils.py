@@ -218,18 +218,43 @@ def 取设置(分区: str, 键: str) -> str:
     return 配置.get(分区, 键, fallback=默认值)
 
 
+def _校验配置标识符(名称: str, *, 角色: str) -> None:
+    r"""
+    拒绝会破坏 INI 结构的分区名/键名 (换行、方括号、等号、空字节等)。
+    """
+    if not 名称 or not str(名称).strip():
+        raise ValueError(f"配置{角色}不能为空")
+    文本 = str(名称)
+    if any(c in 文本 for c in ("\n", "\r", "\0", "[", "]", "=", "#", ";")):
+        raise ValueError(f"配置{角色}含非法字符: {文本!r}")
+    if any(c.isspace() for c in 文本):
+        raise ValueError(f"配置{角色}不能含空白: {文本!r}")
+
+
 def 设设置(分区: str, 键: str, 值: str) -> None:
     r"""
     保存单项设置值
     :param: 分区: 配置分区名
     :param: 键: 配置键名
     :param: 值: 配置值
+    :raises ValueError: 分区/键含控制字符等非法内容时拒绝写入, 避免下次载入 ParsingError
     """
+    _校验配置标识符(分区, 角色="分区")
+    _校验配置标识符(键, 角色="键")
+    文本值 = "" if 值 is None else str(值)
+    # 值中的裸换行会破坏 INI 下一行解析; 折叠为空白
+    if any(c in 文本值 for c in ("\n", "\r", "\0")):
+        文本值 = (
+            文本值.replace("\0", "")
+            .replace("\r\n", " ")
+            .replace("\n", " ")
+            .replace("\r", " ")
+        )
     with _配置锁:
         配置: 配置解析器.ConfigParser = 载入配置()
         if 分区 not in 配置:
             配置[分区] = {}
-        配置[分区][键] = 值
+        配置[分区][键] = 文本值
         _当前保存配置函数()(配置)
 
 
@@ -286,7 +311,7 @@ def 取接口基地址() -> str:
 def 取接口超时秒数() -> float | None:
     r"""
     获取 API 超时时间（秒）
-    :return: float | None: None 表示无限超时
+    :return: float | None: None 仅表示显式 infinite; 未知/旧格式不静默落无限
     """
     模式: str = (取设置("api", "timeout") or "infinite").strip().lower()
     超时映射: dict[str, float | None] = {
@@ -297,7 +322,25 @@ def 取接口超时秒数() -> float | None:
         "100s": 100.0,
         "1000s": 1000.0,
     }
-    return 超时映射.get(模式)
+    if 模式 in 超时映射:
+        return 超时映射[模式]
+    # 兼容旧格式纯数字秒 (如 "60") 与 "60.0"
+    if 模式.endswith("s") and 模式[:-1].replace(".", "", 1).isdigit():
+        try:
+            秒 = float(模式[:-1])
+            if 秒 > 0:
+                return 秒
+        except ValueError:
+            pass
+    if 模式.replace(".", "", 1).isdigit():
+        try:
+            秒 = float(模式)
+            if 秒 > 0:
+                return 秒
+        except ValueError:
+            pass
+    # 未知值: 回落安全默认 60s, 切勿 None (否则请求无限挂起)
+    return 60.0
 
 
 def 取会话数据() -> str:
