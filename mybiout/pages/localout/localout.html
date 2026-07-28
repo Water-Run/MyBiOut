@@ -867,6 +867,7 @@
             let 上次日志长度 = 0, 下拉已开 = false, _上次状态 = null;
             const _已移除编号 = new Set(); // 已消失设备对应的卡片 id
             let _上次可用键 = new Set();
+            let _设备刷新中 = false;
 
             /* ===== TOAST ===== */
             let _提示计时器 = null;
@@ -881,7 +882,7 @@
             /* ===== 辅助工具 ===== */
             const 取元素 = id => document.getElementById(id);
             function 转义网页(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-            function 转义属性(s) { return 转义网页(s || '').replace(/'/g, '&#39;').replace(/\\/g, '\\\\'); }
+            function 转义属性(s) { return 转义网页(s || '').replace(/'/g, '&#39;'); }
 
             /* ===== DROPDOWN ===== */
             async function 切换下拉() {
@@ -915,10 +916,10 @@
                     }
 
                     // 显示源列表
-                    html += srcs.map(s => {
+                    html += srcs.map((s, sourceIndex) => {
                         const icon = 转义网页(s.icon || '📁');
                         if (s.type === 'browse') {
-                            return `<div class="dd-item" onclick="浏览本地()">
+                            return `<div class="dd-item" data-source-index="${sourceIndex}">
                         <span class="dd-icon">${icon}</span>
                         <div class="dd-body"><div class="dd-name">${转义网页(s.label)}</div></div>
                     </div>`;
@@ -928,7 +929,7 @@
                         if (s.type === 'adb') tagHtml = '<span class="dd-tag dd-tag-adb">ADB</span>';
                         if (s.type === 'drive') tagHtml = '<span class="dd-tag dd-tag-drive">MTP</span>';
 
-                        return `<div class="dd-item" onclick="添加来源('${转义属性(s.type)}','${转义属性(s.path || '')}','${转义属性(s.label)}','${转义属性(s.serial || '')}','${转义属性(s.package || '')}')">
+                        return `<div class="dd-item" data-source-index="${sourceIndex}">
                     <span class="dd-icon">${icon}</span>
                     <div class="dd-body">
                         <div class="dd-name">${转义网页(s.label)}</div>
@@ -948,6 +949,23 @@
                     }
 
                     menu.innerHTML = html;
+                    menu.querySelectorAll('[data-source-index]').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const source = srcs[Number(item.dataset.sourceIndex)];
+                            if (!source) return;
+                            if (source.type === 'browse') {
+                                浏览本地();
+                            } else {
+                                添加来源(
+                                    source.type || '',
+                                    source.path || '',
+                                    source.label || '',
+                                    source.serial || '',
+                                    source.package || ''
+                                );
+                            }
+                        });
+                    });
                 } catch (e) {
                     menu.innerHTML = '<div class="dd-item"><span class="dd-icon">❌</span><div class="dd-body"><div class="dd-name" style="color:#e74c3c">加载失败: ' + 转义网页(e.message || '网络错误') + '</div></div></div>';
                 }
@@ -985,6 +1003,17 @@
             async function 暂停扫描() { await fetch('/api/localout/pause-scan', { method: 'POST' }); 轮询(); }
             async function 继续扫描() { await fetch('/api/localout/resume-scan', { method: 'POST' }); 轮询(); }
             async function 取消扫描() { await fetch('/api/localout/cancel-scan', { method: 'POST' }); 轮询(); }
+            async function 刷新设备可用性() {
+                if (_设备刷新中) return;
+                _设备刷新中 = true;
+                try {
+                    await fetch('/api/localout/available-sources', { cache: 'no-store' });
+                } catch (e) {
+                    // 轮询状态会保留最后一次可用结果；下次刷新自动重试。
+                } finally {
+                    _设备刷新中 = false;
+                }
+            }
 
             /* ===== CARD RENDERING ===== */
             function 渲染卡片(c, col) {
@@ -1012,14 +1041,13 @@
                     ? `<img class="card-cover" src="${转义属性(c.cover_url)}" loading="lazy" onerror="this.style.display='none'">`
                     : `<div class="card-cover card-cover-empty">—</div>`;
 
-                const partInfo = (c.part && c.part > 1) ? `粉色${c.part}` : '';
+                const partInfo = (c.part && c.part > 1) ? `P${c.part}` : '';
                 const pathLine = c.path_display
                     ? `<div class="card-path" title="${转义属性(c.path_display)}">${转义网页(c.path_display)}</div>`
                     : '';
 
-                const clickTarget = 转义属性(c.output_path || c.path_display || '');
                 const onClick = col === 'done'
-                    ? `在资源管理器中打开('${clickTarget}')`
+                    ? `在资源管理器中打开卡片('${c.id}')`
                     : `切换卡片('${col}','${c.id}')`;
 
                 return `<div class="card ${typeClass} ${isSel ? 'sel' : ''} ${removed ? 'card-removed' : ''}" data-id="${c.id}" onclick="${onClick}">
@@ -1045,6 +1073,10 @@
                     body: JSON.stringify({ path })
                 })).json();
                 if (!r.ok) 提示(r.error || '无法打开', true);
+            }
+            function 在资源管理器中打开卡片(id) {
+                const card = (_上次状态?.completed_cards || []).find(item => item.id === id);
+                在资源管理器中打开(card?.output_path || card?.path_display || '');
             }
 
             function 渲染列(col, cards) {
@@ -1166,9 +1198,11 @@
             /* ===== PROGRESS ===== */
             function 更新进度(s) {
                 let pct = 0, label = '就绪';
-                if (s.scan_status === 'scanning' || s.scan_status === 'paused') {
+                if (s.scan_status === 'scanning' || s.scan_status === 'paused' || s.scan_status === 'cancelling') {
                     pct = s.scan_progress * 100;
-                    label = s.scan_status === 'paused' ? '扫描暂停' : '扫描中...';
+                    label = s.scan_status === 'paused'
+                        ? '扫描暂停'
+                        : s.scan_status === 'cancelling' ? '正在取消扫描...' : '扫描中...';
                 }
                 if (s.export_status === 'exporting') {
                     pct = s.export_progress * 100;
@@ -1332,6 +1366,7 @@
             window.继续扫描 = 继续扫描;
             window.取消扫描 = 取消扫描;
             window.openInExplorer = 在资源管理器中打开;
+            window.openCardInExplorer = 在资源管理器中打开卡片;
             window.toggleCard = 切换卡片;
             window.deleteCard = 删除卡片;
             window.selAll = 全选;
@@ -1343,6 +1378,7 @@
             window.clearTasks = 清空任务;
             window.clearDone = 清空完成;
             window.在资源管理器中打开 = 在资源管理器中打开;
+            window.在资源管理器中打开卡片 = 在资源管理器中打开卡片;
             window.切换卡片 = 切换卡片;
             window.删除卡片 = 删除卡片;
             window.全选 = 全选;
@@ -1355,8 +1391,10 @@
             window.清空完成 = 清空完成;
             初始化背景星星();
             检查环境状态();
+            刷新设备可用性();
             轮询();
             setInterval(轮询, 500);
+            setInterval(刷新设备可用性, 5000);
         })();
     </script>
     <script src="/assets/entry.js"></script>

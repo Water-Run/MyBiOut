@@ -6,11 +6,14 @@ LocalOut! 本地缓存导出服务层, 负责扫描、解析和导出本地视�
 :time: 2026-04-12
 """
 
+from __future__ import annotations
+
 import ctypes as 系统接口
 import hashlib as 哈希
 import json as 数据交换
 import os as 系统
 import re as 正则
+import shlex as 命令行转义
 import shutil as 文件工具
 import subprocess as 子进程
 import sys as 系统信息
@@ -261,11 +264,22 @@ def _取卷标(盘符: str) -> str:
 
 def _清理文件名(名称: str) -> str:
     名称 = 正则.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", 名称).strip(". ")
-    return 名称[:200] if 名称 else "untitled"
+    名称 = 名称[:200] if 名称 else "untitled"
+    if 正则.fullmatch(r"(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])", 名称):
+        名称 = f"_{名称}"
+    return 名称
 
 
 def _兆字节(字节数: int | float) -> float:
     return round(字节数 / 1048576, 1) if 字节数 else 0
+
+
+def _安全整数(值: object, 默认值: int = 0) -> int:
+    r"""容忍损坏缓存中的空串、None 和非数字字段。"""
+    try:
+        return int(值)
+    except (TypeError, ValueError, OverflowError):
+        return 默认值
 
 
 # ===== 数据模型 =====
@@ -300,14 +314,18 @@ class 视频卡片:
     错误: str = ""
 
     def __post_init__(自身) -> None:
-        自身.AV号 = str(自身.AV号)
-        自身.分集序号 = int(自身.分集序号)
-        自身.字节数 = int(自身.字节数)
+        自身.AV号 = "" if 自身.AV号 is None else str(自身.AV号)
+        自身.分集序号 = _安全整数(自身.分集序号, 1)
+        自身.字节数 = _安全整数(自身.字节数)
 
     def 转字典(自身) -> dict:
         仍存在: bool = True
         if 自身.来源类型 in ("local", "pc", "drive") and 自身.视频路径:
             仍存在 = 路径(自身.视频路径).exists()
+        if 自身.来源类型 == "adb" and 自身.视频路径:
+            显示路径 = 自身.视频路径.rsplit("/", 1)[0]
+        else:
+            显示路径 = str(路径(自身.视频路径).parent if 自身.视频路径 else "")
         return {
             "id": 自身.编号,
             "title": 自身.标题,
@@ -327,7 +345,7 @@ class 视频卡片:
             "cover_url": f"/api/localout/cover/{自身.编号}" if 自身.封面路径 else "",
             "video_path": 自身.视频路径,
             "output_path": 自身.输出路径,
-            "path_display": 自身.输出路径 or str(路径(自身.视频路径).parent if 自身.视频路径 else ""),
+            "path_display": 自身.输出路径 or 显示路径,
             "alive": 仍存在,
             "status": 自身.状态名,
             "error": 自身.错误,
@@ -357,6 +375,8 @@ class _本地状态:
         自身.导出进度: float = 0.0
         自身.导出总数: int = 0
         自身.导出完成数: int = 0
+        自身.导出成功数: int = 0
+        自身.导出失败数: int = 0
         自身._扫描线程: 线程.Thread | None = None
         自身._扫描取消: 线程.Event = 线程.Event()
         自身._扫描暂停: 线程.Event = 线程.Event()
@@ -364,6 +384,7 @@ class _本地状态:
         自身._导出取消: 线程.Event = 线程.Event()
         自身._已知键集合: set[str] = set()
         自身._可用键集合: set[str] = set()
+        自身._输出占用集合: set[str] = set()
         自身._上次可用刷新: float = 0.0
 
     def 记录日志(自身, 级别: str, 消息: str) -> None:
@@ -386,6 +407,8 @@ class _本地状态:
                 "export_progress": round(自身.导出进度, 3),
                 "export_total": 自身.导出总数,
                 "export_done": 自身.导出完成数,
+                "export_success": 自身.导出成功数,
+                "export_failed": 自身.导出失败数,
             }
 
     def _去重键(自身, 卡片项: 视频卡片) -> str:
@@ -408,6 +431,245 @@ class _本地状态:
 # ===== 解析 / 查找函数 =====
 
 
+def _嵌套取值(数据: dict, *候选路径: tuple[str, ...]) -> object:
+    for 键路径 in 候选路径:
+        当前值: object = 数据
+        for 键 in 键路径:
+            if not isinstance(当前值, dict) or 键 not in 当前值:
+                当前值 = None
+                break
+            当前值 = 当前值[键]
+        if 当前值 not in (None, "", [], {}):
+            return 当前值
+    return ""
+
+
+def _格式化元数据时间(值: object) -> str:
+    if 值 in (None, ""):
+        return ""
+    try:
+        时间戳 = float(值)
+        if 时间戳 > 10_000_000_000:
+            时间戳 /= 1000
+        return 日期时间.fromtimestamp(时间戳).strftime("%Y-%m-%d %H:%M")
+    except (TypeError, ValueError, OverflowError, OSError):
+        return str(值) if isinstance(值, str) else ""
+
+
+def _从入口路径推断标识(入口路径: 路径) -> str:
+    r"""从 ``entry.json`` 的相邻目录中提取 AV 数字目录作为元数据回退。"""
+    当前目录 = 入口路径.parent
+    for _ in range(5):
+        目录名 = 当前目录.name
+        if 目录名.isdigit():
+            return 目录名
+        if 匹配 := 正则.fullmatch(r"(?i)av(\d+)", 目录名):
+            return 匹配.group(1)
+        if 当前目录.parent == 当前目录:
+            break
+        当前目录 = 当前目录.parent
+    return ""
+
+
+def _规范化入口元数据(数据: dict, 回退标识: str = "") -> dict:
+    r"""归一化普通版、概念版、国际版及 UGC/PGC 的 entry.json 字段。"""
+    总标题 = str(
+        _嵌套取值(
+            数据,
+            ("title",),
+            ("video_title",),
+            ("videoTitle",),
+            ("name",),
+            ("ep", "season_title"),
+            ("episode", "season_title"),
+        )
+        or ""
+    )
+    分集标题 = str(
+        _嵌套取值(
+            数据,
+            ("page_data", "part"),
+            ("pageData", "part"),
+            ("ep", "long_title"),
+            ("ep", "index_title"),
+            ("ep", "title"),
+            ("episode", "long_title"),
+            ("episode", "index_title"),
+            ("episode", "title"),
+        )
+        or ""
+    )
+    显式合集标题 = str(
+        _嵌套取值(
+            数据,
+            ("group_title",),
+            ("groupTitle",),
+            ("season_title",),
+            ("seasonTitle",),
+            ("ep", "season_title"),
+            ("episode", "season_title"),
+        )
+        or ""
+    )
+    标题 = 总标题 or 分集标题 or 回退标识
+    合集标题 = 显式合集标题
+    if 分集标题 and 总标题 and 分集标题.strip() != 总标题.strip():
+        标题 = 分集标题
+        合集标题 = 合集标题 or 总标题
+
+    BV号 = str(
+        _嵌套取值(
+            数据,
+            ("bvid",),
+            ("bv_id",),
+            ("bvId",),
+            ("page_data", "bvid"),
+            ("pageData", "bvid"),
+            ("ep", "bvid"),
+            ("episode", "bvid"),
+        )
+        or ""
+    )
+    AV原值 = _嵌套取值(
+        数据,
+        ("avid",),
+        ("aid",),
+        ("av_id",),
+        ("page_data", "avid"),
+        ("page_data", "aid"),
+        ("pageData", "avid"),
+        ("pageData", "aid"),
+        ("ep", "avid"),
+        ("ep", "aid"),
+        ("ep", "av_id"),
+        ("episode", "avid"),
+        ("episode", "aid"),
+        ("episode", "av_id"),
+    )
+    AV号 = str(AV原值) if AV原值 not in (None, "") else (
+        回退标识 if 回退标识.isdigit() else ""
+    )
+    if 匹配 := 正则.fullmatch(r"(?i)av(\d+)", AV号):
+        AV号 = 匹配.group(1)
+    UP主名称 = str(
+        _嵌套取值(
+            数据,
+            ("owner_name",),
+            ("up_name",),
+            ("upName",),
+            ("uname",),
+            ("author",),
+            ("owner", "name"),
+            ("upper", "name"),
+            ("up", "name"),
+        )
+        or ""
+    )
+    分集序号 = _安全整数(
+        _嵌套取值(
+            数据,
+            ("page_data", "page"),
+            ("pageData", "page"),
+            ("page",),
+            ("p",),
+            ("ep", "index"),
+            ("ep", "page"),
+            ("episode", "index"),
+            ("episode", "page"),
+        ),
+        1,
+    )
+    清晰度编号 = _安全整数(
+        _嵌套取值(
+            数据,
+            ("video_quality",),
+            ("videoQuality",),
+            ("quality",),
+            ("qn",),
+        )
+    )
+    清晰度 = str(
+        _嵌套取值(
+            数据,
+            ("quality_pithy_description",),
+            ("qualityPithyDescription",),
+            ("quality_description",),
+            ("qualityDescription",),
+        )
+        or ""
+    )
+    清晰度上标 = str(
+        _嵌套取值(
+            数据,
+            ("quality_superscript",),
+            ("qualitySuperscript",),
+        )
+        or ""
+    )
+    if not 清晰度 and 清晰度编号:
+        清晰度 = _清晰度映射.get(清晰度编号, str(清晰度编号))
+    if 清晰度上标 and 清晰度上标 not in 清晰度:
+        清晰度 = f"{清晰度} {清晰度上标}".strip()
+
+    宽度 = _安全整数(
+        _嵌套取值(
+            数据,
+            ("page_data", "width"),
+            ("pageData", "width"),
+            ("dimension", "width"),
+            ("video", "width"),
+            ("ep", "width"),
+            ("episode", "width"),
+        )
+    )
+    高度 = _安全整数(
+        _嵌套取值(
+            数据,
+            ("page_data", "height"),
+            ("pageData", "height"),
+            ("dimension", "height"),
+            ("video", "height"),
+            ("ep", "height"),
+            ("episode", "height"),
+        )
+    )
+    字节数 = _安全整数(
+        _嵌套取值(
+            数据,
+            ("total_bytes",),
+            ("totalBytes",),
+            ("total_size",),
+            ("totalSize",),
+            ("downloaded_bytes",),
+            ("downloadedBytes",),
+            ("size",),
+        )
+    )
+    发布时间 = _格式化元数据时间(
+        _嵌套取值(
+            数据,
+            ("pubdate",),
+            ("publish_time",),
+            ("publishTime",),
+            ("ctime",),
+            ("ep", "pub_time"),
+            ("episode", "pub_time"),
+        )
+    )
+    return {
+        "标题": 标题,
+        "BV号": BV号,
+        "AV号": AV号,
+        "UP主名称": UP主名称,
+        "合集标题": 合集标题,
+        "分集序号": 分集序号,
+        "清晰度": 清晰度,
+        "分辨率": f"{宽度}×{高度}" if 宽度 and 高度 else "",
+        "字节数": 字节数,
+        "发布时间": 发布时间,
+    }
+
+
 def _解析入口JSON(
     路径文本: 路径,
     来源标签: str,
@@ -427,11 +689,19 @@ def _解析入口JSON(
     except Exception:
         return None
 
-    页面数据: dict = 数据.get("page_data") or {}
-    宽度: int = 页面数据.get("width", 0)
-    高度: int = 页面数据.get("height", 0)
-    类型标记: str = str(数据.get("type_tag", ""))
     父目录: 路径 = 路径文本.parent
+    元数据 = _规范化入口元数据(数据, _从入口路径推断标识(路径文本))
+    类型标记 = str(
+        _嵌套取值(
+            数据,
+            ("type_tag",),
+            ("typeTag",),
+            ("video_quality",),
+            ("videoQuality",),
+            ("qn",),
+        )
+        or ""
+    )
 
     视频路径: str = ""
     音频路径: str = ""
@@ -458,14 +728,16 @@ def _解析入口JSON(
         return None
 
     return 视频卡片(
-        标题=数据.get("title", ""),
-        BV号=数据.get("bvid", "") or "",
-        AV号=str(数据.get("avid", "")),
-        UP主名称=数据.get("owner_name", ""),
-        分集序号=页面数据.get("page", 1),
-        清晰度=数据.get("quality_pithy_description", ""),
-        分辨率=f"{宽度}×{高度}" if 宽度 and 高度 else "",
-        字节数=数据.get("total_bytes", 0),
+        标题=元数据["标题"],
+        BV号=元数据["BV号"],
+        AV号=元数据["AV号"],
+        UP主名称=元数据["UP主名称"],
+        合集标题=元数据["合集标题"],
+        分集序号=元数据["分集序号"],
+        清晰度=元数据["清晰度"],
+        分辨率=元数据["分辨率"],
+        字节数=元数据["字节数"],
+        发布时间=元数据["发布时间"],
         文件夹名=父目录.name,
         来源标签=来源标签,
         来源类型=来源类型,
@@ -562,8 +834,8 @@ def _解析视频信息JSON(路径文本: 路径, 来源标签: str) -> 视频�
     except Exception:
         return None
 
-    清晰度编号: int = 数据.get("qn", 0)
-    发布时间戳: int = 数据.get("pubdate", 0)
+    清晰度编号: int = _安全整数(数据.get("qn", 0))
+    发布时间戳: int = _安全整数(数据.get("pubdate", 0))
     发布时间: str = ""
     if 发布时间戳:
         with 忽略异常(Exception):
@@ -577,12 +849,12 @@ def _解析视频信息JSON(路径文本: 路径, 来源标签: str) -> 视频�
     return 视频卡片(
         标题=数据.get("title", "") or 数据.get("groupTitle", ""),
         BV号=数据.get("bvid", "") or "",
-        AV号=str(数据.get("aid", "") or ""),
+        AV号=str(data_avid) if (data_avid := 数据.get("aid")) is not None else "",
         UP主名称=数据.get("uname", ""),
         合集标题=数据.get("groupTitle", "") or "",
-        分集序号=数据.get("p", 1),
+        分集序号=_安全整数(数据.get("p", 1), 1),
         清晰度=_清晰度映射.get(清晰度编号, str(清晰度编号) if 清晰度编号 else ""),
-        字节数=数据.get("totalSize", 0),
+        字节数=_安全整数(数据.get("totalSize", 0)),
         发布时间=发布时间,
         文件夹名=缓存目录.name,
         来源标签=来源标签,
@@ -607,8 +879,8 @@ def _解析索引JSON(路径文本: 路径) -> tuple[str, str, int]:
     if not 视频列表:
         return "", "", 0
     视频项: dict = 视频列表[0]
-    宽度: int = int(视频项.get("width", 0) or 0)
-    高度: int = int(视频项.get("height", 0) or 0)
+    宽度: int = _安全整数(视频项.get("width", 0))
+    高度: int = _安全整数(视频项.get("height", 0))
     分辨率: str = f"{宽度}×{高度}" if 宽度 and 高度 else ""
     帧率: str = ""
     if 帧率值 := 视频项.get("frame_rate"):
@@ -617,7 +889,7 @@ def _解析索引JSON(路径文本: 路径) -> tuple[str, str, int]:
             帧率 = f"{文件:.0f}fps" if 文件 == int(文件) else f"{文件:.1f}fps"
         except (ValueError, TypeError):
             pass
-    return 分辨率, 帧率, int(视频项.get("bandwidth", 0) or 0)
+    return 分辨率, 帧率, _安全整数(视频项.get("bandwidth", 0))
 
 
 def _向上寻找封面(起点: 路径, 最大深度: int = 3) -> str:
@@ -690,25 +962,39 @@ def _爬虫补全(卡片: 视频卡片) -> None:
     超时秒数: float | None = 工具.取爬虫兜底超时()
     if 超时秒数 is None or not _有网络请求:
         return
-    if 卡片.标题 and 卡片.UP主名称:
+    标题为回退值: bool = not 卡片.标题 or 卡片.标题 in {
+        卡片.文件夹名,
+        f"av{卡片.AV号}" if 卡片.AV号 else "",
+        f"缓存视频 av{卡片.AV号}" if 卡片.AV号 else "",
+    }
+    if not 标题为回退值 and 卡片.UP主名称:
         return
-    if not 卡片.BV号:
-        if 匹配 := 正则.search(r"(BV[\w]{10,})", 卡片.文件夹名 or ""):
+    if not 卡片.BV号 and not 卡片.AV号:
+        if 匹配 := 正则.search(r"(BV[\w]{10,})", 卡片.文件夹名 or "", 正则.IGNORECASE):
             卡片.BV号 = 匹配.group(1)
+        elif (卡片.文件夹名 or "").isdigit():
+            卡片.AV号 = 卡片.文件夹名
         else:
             return
     try:
         with 网络请求.Client(headers=_爬虫请求头, timeout=超时秒数) as 卡片项:
+            查询参数: dict[str, str] = (
+                {"bvid": 卡片.BV号} if 卡片.BV号 else {"aid": 卡片.AV号}
+            )
             响应 = 卡片项.get(
                 "https://api.bilibili.com/x/web-interface/view",
-                params={"bvid": 卡片.BV号},
+                params=查询参数,
             )
             数据: dict = 响应.json()
         if 数据.get("code") != 0:
             return
         信息: dict = 数据.get("data", {})
-        if not 卡片.标题:
+        if 标题为回退值:
             卡片.标题 = 信息.get("title", "")
+        if not 卡片.BV号:
+            卡片.BV号 = 信息.get("bvid", "") or ""
+        if not 卡片.AV号 and 信息.get("aid") is not None:
+            卡片.AV号 = str(信息.get("aid"))
         if not 卡片.UP主名称:
             卡片.UP主名称 = 信息.get("owner", {}).get("name", "")
         if not 卡片.发布时间 and (发布时间戳 := 信息.get("pubdate")):
@@ -739,8 +1025,12 @@ def _扫描本地目录(根目录: 路径, 来源标签: str) -> list[视频卡�
             break
         while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
             时间.sleep(0.2)
-        if (卡片项 := _解析入口JSON(入口文件, 来源标签, "local")) and 状态.添加来源卡片(卡片项):
-            卡片列表.append(卡片项)
+        try:
+            卡片项 = _解析入口JSON(入口文件, 来源标签, "local")
+            if 卡片项 and 状态.添加来源卡片(卡片项):
+                卡片列表.append(卡片项)
+        except Exception as e:
+            状态.记录日志("warn", f"跳过损坏缓存元数据: {入口文件} — {e}")
         if 总数:
             with 状态.锁:
                 状态.扫描进度 = (序号 + 1) / 总数
@@ -750,8 +1040,12 @@ def _扫描本地目录(根目录: 路径, 来源标签: str) -> list[视频卡�
             break
         while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
             时间.sleep(0.2)
-        if (卡片项 := _解析视频信息JSON(视频信息文件, 来源标签)) and 状态.添加来源卡片(卡片项):
-            卡片列表.append(卡片项)
+        try:
+            卡片项 = _解析视频信息JSON(视频信息文件, 来源标签)
+            if 卡片项 and 状态.添加来源卡片(卡片项):
+                卡片列表.append(卡片项)
+        except Exception as e:
+            状态.记录日志("warn", f"跳过损坏 PC 缓存元数据: {视频信息文件} — {e}")
         if 总数:
             with 状态.锁:
                 状态.扫描进度 = (len(入口文件列表) + 序号 + 1) / 总数
@@ -787,26 +1081,29 @@ def _扫描电脑缓存(根目录: 路径, 来源标签: str) -> list[视频卡�
         while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
             时间.sleep(0.2)
 
-        if (视频信息文件 := 子目录路径 / "videoInfo.json").exists():
-            if (卡片项 := _解析视频信息JSON(视频信息文件, 来源标签)) and 状态.添加来源卡片(卡片项):
-                卡片列表.append(卡片项)
-        else:
-            视频路径, 音频路径 = _寻找电脑M4S(子目录路径)
-            if 视频路径:
-                卡片项 = 视频卡片(
-                    文件夹名=子目录路径.name,
-                    来源标签=来源标签,
-                    来源类型="pc",
-                    视频路径=视频路径,
-                    音频路径=音频路径,
-                    封面路径=_向上寻找封面(路径(视频路径).parent),
-                )
-                if 状态.添加来源卡片(卡片项):
+        try:
+            if (视频信息文件 := 子目录路径 / "videoInfo.json").exists():
+                if (卡片项 := _解析视频信息JSON(视频信息文件, 来源标签)) and 状态.添加来源卡片(卡片项):
                     卡片列表.append(卡片项)
             else:
-                for 嵌套卡片 in _递归寻找M4S(子目录路径, 来源标签, "pc"):
-                    if 状态.添加来源卡片(嵌套卡片):
-                        卡片列表.append(嵌套卡片)
+                视频路径, 音频路径 = _寻找电脑M4S(子目录路径)
+                if 视频路径:
+                    卡片项 = 视频卡片(
+                        文件夹名=子目录路径.name,
+                        来源标签=来源标签,
+                        来源类型="pc",
+                        视频路径=视频路径,
+                        音频路径=音频路径,
+                        封面路径=_向上寻找封面(路径(视频路径).parent),
+                    )
+                    if 状态.添加来源卡片(卡片项):
+                        卡片列表.append(卡片项)
+                else:
+                    for 嵌套卡片 in _递归寻找M4S(子目录路径, 来源标签, "pc"):
+                        if 状态.添加来源卡片(嵌套卡片):
+                            卡片列表.append(嵌套卡片)
+        except Exception as e:
+            状态.记录日志("warn", f"跳过损坏 PC 缓存目录: {子目录路径} — {e}")
 
         if 总数:
             with 状态.锁:
@@ -835,8 +1132,12 @@ def _扫描磁盘(根目录: 路径, 来源标签: str) -> list[视频卡片]:
             break
         while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
             时间.sleep(0.2)
-        if (卡片项 := _解析入口JSON(入口文件, 来源标签, "drive")) and 状态.添加来源卡片(卡片项):
-            卡片列表.append(卡片项)
+        try:
+            卡片项 = _解析入口JSON(入口文件, 来源标签, "drive")
+            if 卡片项 and 状态.添加来源卡片(卡片项):
+                卡片列表.append(卡片项)
+        except Exception as e:
+            状态.记录日志("warn", f"跳过损坏挂载盘缓存元数据: {入口文件} — {e}")
         if 总数:
             with 状态.锁:
                 状态.扫描进度 = (序号 + 1) / 总数
@@ -851,6 +1152,40 @@ def _扫描磁盘(根目录: 路径, 来源标签: str) -> list[视频卡片]:
     return 卡片列表
 
 
+def _列出ADB文件(ADB路径: str, 序列号: str, 远端根目录: str) -> set[str]:
+    r"""一次 ``find`` 获取整个缓存树，避免逐目录、逐普通文件执行 ``ls``。"""
+    执行结果: 子进程.CompletedProcess = _执行ADB(
+        ADB路径,
+        序列号,
+        "shell",
+        f"find {命令行转义.quote(远端根目录)} -type f",
+        超时秒数=60,
+    )
+    if 执行结果.returncode != 0:
+        错误文本 = (执行结果.stderr or 执行结果.stdout or "未知 ADB 错误").strip()
+        raise RuntimeError(错误文本[:300])
+    return {
+        行.strip()
+        for 行 in 执行结果.stdout.splitlines()
+        if 行.strip().startswith("/") and not 行.strip().startswith("find:")
+    }
+
+
+def _取ADB媒体目录列表(远端文件集合: set[str]) -> list[str]:
+    目录文件名表: dict[str, set[str]] = {}
+    for 文件路径 in 远端文件集合:
+        if "/" not in 文件路径:
+            continue
+        目录文本, 文件名 = 文件路径.rsplit("/", 1)
+        if 文件名 in {"video.m4s", "audio.m4s"}:
+            目录文件名表.setdefault(目录文本, set()).add(文件名)
+    return sorted(
+        目录文本
+        for 目录文本, 文件名集合 in 目录文件名表.items()
+        if {"video.m4s", "audio.m4s"} <= 文件名集合
+    )
+
+
 def _扫描ADB文件夹(
     ADB路径: str,
     序列号: str,
@@ -859,10 +1194,7 @@ def _扫描ADB文件夹(
     来源标签: str,
 ) -> list[视频卡片]:
     r"""
-    递归搜索 ADB 设备目录中的 video.m4s / audio.m4s 文件对
-    逻辑参考 biliandout ScanWorker._find_m4s_adb：
-      - 当前目录同时包含两个文件 → 命中，解析元数据
-      - 否则递归子目录
+    以单次 ``find`` 搜索 ADB 目录中的 video.m4s / audio.m4s 文件对。
     :param: adb: adb 路径
     :param: serial: 设备序列号
     :param: remote_path: 当前远端目录
@@ -871,43 +1203,25 @@ def _扫描ADB文件夹(
     :return: list[VideoCard]
     """
     卡片列表: list[视频卡片] = []
-    if 状态._扫描取消.is_set():
-        return 卡片列表
-    while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
-        时间.sleep(0.2)
     try:
-        执行结果: 子进程.CompletedProcess = _执行ADB(
-            ADB路径,
-            序列号,
-            "shell",
-            f"ls -1a '{远端路径}'",
-            超时秒数=10,
-        )
-        if 执行结果.returncode != 0:
-            return 卡片列表
-        条目列表: list[str] = _解析列表输出(执行结果.stdout)
-        if "video.m4s" in 条目列表 and "audio.m4s" in 条目列表:
-            if 卡片 := _制作ADB卡片(ADB路径, 序列号, 远端路径, 根文件夹, 来源标签):
+        远端文件集合 = _列出ADB文件(ADB路径, 序列号, 远端路径)
+        媒体目录列表 = _取ADB媒体目录列表(远端文件集合)
+        for 媒体目录 in 媒体目录列表:
+            if 状态._扫描取消.is_set():
+                break
+            while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
+                时间.sleep(0.2)
+            if 卡片 := _制作ADB卡片(
+                ADB路径,
+                序列号,
+                媒体目录,
+                根文件夹,
+                来源标签,
+                远端文件集合,
+            ):
                 卡片列表.append(卡片)
-        else:
-            for 条目 in 条目列表:
-                if 状态._扫描取消.is_set():
-                    break
-                while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
-                    时间.sleep(0.2)
-                if 条目 in (".", ".."):
-                    continue
-                卡片列表.extend(
-                    _扫描ADB文件夹(
-                        ADB路径,
-                        序列号,
-                        f"{远端路径}/{条目}",
-                        根文件夹,
-                        来源标签,
-                    )
-                )
-    except Exception:
-        pass
+    except Exception as e:
+        状态.记录日志("warn", f"扫描 ADB 目录失败: {远端路径} — {e}")
     return 卡片列表
 
 
@@ -921,7 +1235,19 @@ def _遍历ADB包(包名: str) -> list[tuple[str, str]]:
     return []
 
 
-def _拉取ADB封面(ADB路径: str, 序列号: str, 远端目录: str, 标识符: str) -> str:
+def _取ADB下载目录候选(包名: str) -> list[str]:
+    r"""兼容普通版、概念版及国际版使用过的两种外置存储布局。"""
+    应用目录 = f"/sdcard/Android/data/{包名}"
+    return [f"{应用目录}/download", f"{应用目录}/files/download"]
+
+
+def _拉取ADB封面(
+    ADB路径: str,
+    序列号: str,
+    远端目录: str,
+    标识符: str,
+    远端文件集合: set[str] | None = None,
+) -> str:
     r"""
     从 ADB 设备拉取 cover.jpg 到本地缓存目录，命中缓存直接返回
     参考 biliandout ScanWorker._pull_cover_adb
@@ -931,7 +1257,9 @@ def _拉取ADB封面(ADB路径: str, 序列号: str, 远端目录: str, 标识�
     :param: identifier: 唯一标识（用于哈希命名）
     :return: str: 本地缓存路径, 失败返回空串
     """
-    安全编号: str = 哈希.md5(f"{远端目录}_{标识符}".encode()).hexdigest()
+    安全编号: str = 哈希.md5(
+        f"{序列号}_{远端目录}_{标识符}".encode()
+    ).hexdigest()
     for 扩展名 in ("jpg", "jpeg", "png"):
         缓存文件: 路径 = _封面缓存目录 / f"{安全编号}.{扩展名}"
         if 缓存文件.exists() and 缓存文件.stat().st_size > 0:
@@ -941,12 +1269,15 @@ def _拉取ADB封面(ADB路径: str, 序列号: str, 远端目录: str, 标识�
     for _ in range(4):
         for 扩展名 in ("jpg", "jpeg", "png"):
             目标文件: 路径 = _封面缓存目录 / f"{安全编号}.{扩展名}"
+            远端封面路径 = f"{当前目录}/cover.{扩展名}"
+            if 远端文件集合 is not None and 远端封面路径 not in 远端文件集合:
+                continue
             try:
                 执行结果: 子进程.CompletedProcess = _执行ADB(
                     ADB路径,
                     序列号,
                     "pull",
-                    f"{当前目录}/cover.{扩展名}",
+                    远端封面路径,
                     str(目标文件),
                     超时秒数=15,
                 )
@@ -982,6 +1313,7 @@ def _制作ADB卡片(
     远端路径: str,
     根文件夹: str,
     来源标签: str,
+    远端文件集合: set[str] | None = None,
 ) -> 视频卡片 | None:
     r"""
     解析 ADB 设备上某 m4s 目录，尝试拉取 entry.json / index.json 获取元数据后生成 VideoCard
@@ -999,13 +1331,19 @@ def _制作ADB卡片(
     帧率: str = ""
     字节数: int = 0
     BV号: str = ""
-    AV号: str = ""
+    AV号: str = 根文件夹 if 根文件夹.isdigit() else ""
     UP主名称: str = ""
+    合集标题: str = ""
+    分集序号: int = 1
+    发布时间: str = ""
 
     # Android 普通版常将 entry.json / cover.jpg 放在 c_<cid> 层，
     # 其他版本则可能放在 AV 目录；从 m4s 所在目录逐层向上探测。
     远端父目录: str = _取ADB元数据目录候选(远端路径)[0]
     for 元数据目录 in _取ADB元数据目录候选(远端路径):
+        远端入口路径 = f"{元数据目录}/entry.json"
+        if 远端文件集合 is not None and 远端入口路径 not in 远端文件集合:
+            continue
         临时路径: str = ""
         try:
             with 临时文件.NamedTemporaryFile(suffix=".json", delete=False) as 临时对象:
@@ -1014,23 +1352,24 @@ def _制作ADB卡片(
                 ADB路径,
                 序列号,
                 "pull",
-                f"{元数据目录}/entry.json",
+                远端入口路径,
                 临时路径,
                 超时秒数=10,
             )
             if 拉取结果.returncode != 0 or not 路径(临时路径).exists():
                 continue
             数据: dict = 数据交换.loads(路径(临时路径).read_text(encoding="utf-8"))
-            标题 = 数据.get("title", 根文件夹) or 根文件夹
-            BV号 = 数据.get("bvid", "") or ""
-            AV号 = str(数据.get("avid", ""))
-            UP主名称 = 数据.get("owner_name", "")
-            清晰度 = 数据.get("quality_pithy_description", "")
-            页面数据: dict = 数据.get("page_data", {})
-            宽度, 高度 = 页面数据.get("width", 0), 页面数据.get("height", 0)
-            if 宽度 and 高度:
-                分辨率 = f"{宽度}×{高度}"
-            字节数 = 数据.get("total_bytes", 0)
+            元数据 = _规范化入口元数据(数据, AV号 or 根文件夹)
+            标题 = 元数据["标题"] or 根文件夹
+            BV号 = 元数据["BV号"]
+            AV号 = 元数据["AV号"] or AV号
+            UP主名称 = 元数据["UP主名称"]
+            合集标题 = 元数据["合集标题"]
+            分集序号 = 元数据["分集序号"]
+            清晰度 = 元数据["清晰度"]
+            分辨率 = 元数据["分辨率"]
+            字节数 = 元数据["字节数"]
+            发布时间 = 元数据["发布时间"]
             远端父目录 = 元数据目录
             break
         except Exception:
@@ -1040,7 +1379,11 @@ def _制作ADB卡片(
                 路径(临时路径).unlink(missing_ok=True)
 
     # 尝试拉取 index.json 解析分辨率/帧率（与 m4s 同目录）
-    if not 分辨率 or not 帧率:
+    远端索引路径 = f"{远端路径}/index.json"
+    if (
+        (not 分辨率 or not 帧率)
+        and (远端文件集合 is None or 远端索引路径 in 远端文件集合)
+    ):
         索引临时路径: str = ""
         try:
             with 临时文件.NamedTemporaryFile(suffix=".json", delete=False) as 临时对象:
@@ -1049,7 +1392,7 @@ def _制作ADB卡片(
                 ADB路径,
                 序列号,
                 "pull",
-                f"{远端路径}/index.json",
+                远端索引路径,
                 索引临时路径,
                 超时秒数=10,
             )
@@ -1072,8 +1415,17 @@ def _制作ADB卡片(
     if 帧率:
         清晰度 = f"{清晰度} {帧率}".strip()
 
+    if 标题 == 根文件夹 and AV号:
+        标题 = f"缓存视频 av{AV号}"
+
     # 拉取封面（向上 4 层查找）
-    封面路径: str = _拉取ADB封面(ADB路径, 序列号, 远端父目录, 根文件夹)
+    封面路径: str = _拉取ADB封面(
+        ADB路径,
+        序列号,
+        远端父目录,
+        根文件夹,
+        远端文件集合,
+    )
 
     # 若 entry.json 未提供大小，通过 stat 获取
     if not 字节数:
@@ -1095,9 +1447,12 @@ def _制作ADB卡片(
         BV号=BV号,
         AV号=AV号,
         UP主名称=UP主名称,
+        合集标题=合集标题,
+        分集序号=分集序号,
         清晰度=清晰度,
         分辨率=分辨率,
         字节数=字节数,
+        发布时间=发布时间,
         文件夹名=根文件夹,
         来源标签=来源标签,
         来源类型="adb",
@@ -1121,40 +1476,79 @@ def _扫描ADB设备(序列号: str, 来源标签: str, 包名: str = "") -> lis
     if not ADB路径:
         状态.记录日志("error", "未找到 ADB 可执行文件，请安装 ADB 并将其加入 PATH")
         return 卡片列表
+    在线序列号集合 = {设备序列号 for 设备序列号, _ in _取ADB设备列表()}
+    if 序列号 not in 在线序列号集合:
+        raise RuntimeError(f"ADB 设备已离线或未授权: {序列号}")
 
     for 包名项, 包显示名 in _遍历ADB包(包名):
-        远端根目录: str = f"/sdcard/Android/data/{包名项}/download"
-        try:
-            执行结果: 子进程.CompletedProcess = _执行ADB(
+        扫描项目列表: list[tuple[str, str, set[str]]] = []
+        目录可访问 = False
+        for 远端根目录 in _取ADB下载目录候选(包名项):
+            try:
+                远端文件集合 = _列出ADB文件(ADB路径, 序列号, 远端根目录)
+                目录可访问 = True
+                扫描项目列表.extend(
+                    (媒体目录, 远端根目录, 远端文件集合)
+                    for 媒体目录 in _取ADB媒体目录列表(远端文件集合)
+                )
+            except Exception as e:
+                错误文本 = str(e)
+                小写错误 = 错误文本.lower()
+                if "no such file or directory" in 小写错误:
+                    continue
+                if "device" in 小写错误 and (
+                    "not found" in 小写错误
+                    or "offline" in 小写错误
+                    or "unauthorized" in 小写错误
+                ):
+                    raise RuntimeError(f"ADB 设备连接中断: {序列号}") from e
+                状态.记录日志("warn", f"扫描 {包显示名} 目录失败: {远端根目录} — {e}")
+
+        if not 扫描项目列表:
+            if 目录可访问 or not 状态._扫描取消.is_set():
+                状态.记录日志("info", f"{包显示名}暂无本地缓存")
+            continue
+
+        总数 = len(扫描项目列表)
+
+        def _制作目录卡片(扫描项目: tuple[str, str, set[str]]) -> 视频卡片 | None:
+            媒体目录, 远端根目录, 远端文件集合 = 扫描项目
+            if 状态._扫描取消.is_set():
+                return None
+            while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
+                时间.sleep(0.2)
+            相对路径 = 媒体目录.removeprefix(f"{远端根目录}/")
+            根文件夹 = (
+                相对路径.split("/", 1)[0]
+                if 相对路径
+                else 媒体目录.rsplit("/", 1)[-1]
+            )
+            return _制作ADB卡片(
                 ADB路径,
                 序列号,
-                "shell",
-                f"ls -1a '{远端根目录}'",
-                超时秒数=15,
+                媒体目录,
+                根文件夹,
+                来源标签,
+                远端文件集合,
             )
-            if 执行结果.returncode != 0:
-                continue
-            文件夹列表: list[str] = _解析列表输出(执行结果.stdout)
-            总数: int = len(文件夹列表)
-            for 序号, 文件夹名 in enumerate(文件夹列表):
-                if 状态._扫描取消.is_set():
-                    break
-                while 状态._扫描暂停.is_set() and not 状态._扫描取消.is_set():
-                    时间.sleep(0.2)
-                for 卡片项 in _扫描ADB文件夹(
-                    ADB路径,
-                    序列号,
-                    f"{远端根目录}/{文件夹名}",
-                    文件夹名,
-                    来源标签,
-                ):
-                    if 状态.添加来源卡片(卡片项):
+
+        with 线程池执行器(max_workers=min(4, 总数)) as 扫描池:
+            扫描任务表 = {
+                扫描池.submit(_制作目录卡片, 扫描项目): 扫描项目[0]
+                for 扫描项目 in 扫描项目列表
+            }
+            for 完成序号, 扫描任务 in enumerate(逐个完成(扫描任务表), start=1):
+                try:
+                    卡片项 = 扫描任务.result()
+                    if 卡片项 and 状态.添加来源卡片(卡片项):
                         卡片列表.append(卡片项)
-                if 总数:
-                    with 状态.锁:
-                        状态.扫描进度 = (序号 + 1) / 总数
-        except Exception as e:
-            状态.记录日志("warn", f"扫描 {包显示名} 失败: {e}")
+                except Exception as e:
+                    状态.记录日志(
+                        "warn",
+                        f"跳过损坏 ADB 缓存: {扫描任务表[扫描任务]} — {e}",
+                    )
+                with 状态.锁:
+                    状态.扫描进度 = 完成序号 / 总数
 
     return 卡片列表
 
@@ -1174,11 +1568,10 @@ def _扫描线程函数(
     :param: serial: ADB 设备序列号
     :param: package: 保留参数
     """
+    发现列表: list[视频卡片] = []
+    已取消: bool = False
     try:
         状态.记录日志("info", f"开始扫描: {标签}")
-        with 状态.锁:
-            状态.扫描状态 = "scanning"
-            状态.扫描进度 = 0.0
 
         match 来源类型:
             case "pc":
@@ -1191,28 +1584,27 @@ def _扫描线程函数(
                 发现列表 = _扫描本地目录(路径(路径文本), 标签)
 
         if 工具.取爬虫兜底超时() is not None and not 状态._扫描取消.is_set():
-            with 状态.锁:
-                待补全列表: list[视频卡片] = [卡片项 for 卡片项 in 状态.来源卡片列表 if not (卡片项.标题 and 卡片项.UP主名称)]
-            for 卡片项 in 待补全列表:
+            for 卡片项 in 发现列表:
                 if 状态._扫描取消.is_set():
                     break
-                _爬虫补全(卡片项)
+                if not (卡片项.标题 and 卡片项.UP主名称):
+                    _爬虫补全(卡片项)
 
-        with 状态.锁:
-            状态.扫描状态 = "idle"
-            状态.扫描进度 = 1.0
-
-        if 状态._扫描取消.is_set():
+        已取消 = 状态._扫描取消.is_set()
+        if 已取消:
             状态.记录日志("warn", "扫描已取消")
         else:
             状态.记录日志("success", f"扫描完成: 发现 {len(发现列表)} 个视频")
     except Exception as e:
         状态.记录日志("error", f"扫描异常: {e}")
+    finally:
+        已取消 = 已取消 or 状态._扫描取消.is_set()
         with 状态.锁:
             状态.扫描状态 = "idle"
-    finally:
-        状态._扫描取消.clear()
-        状态._扫描暂停.clear()
+            if not 已取消:
+                状态.扫描进度 = 1.0
+            状态._扫描取消.clear()
+            状态._扫描暂停.clear()
 
 
 # ===== 导出函数 =====
@@ -1266,42 +1658,115 @@ def _构建文件名(卡片: 视频卡片) -> str:
     return _清理文件名(主文件名) + ".mp4"
 
 
+def _取PC缓存前缀长度(文件路径: str) -> int:
+    r"""识别桌面端缓存写在 MP4 ``ftyp`` 盒之前的九字节占位头。"""
+    try:
+        with open(文件路径, "rb") as 输入流:
+            文件头 = 输入流.read(17)
+    except OSError:
+        return 0
+    if 文件头.startswith(b"000000000") and 文件头[13:17] == b"ftyp":
+        return 9
+    return 0
+
+
+def _复制并移除前缀(源文件: str, 目标文件: 路径, 前缀长度: int) -> None:
+    with open(源文件, "rb") as 输入流, open(目标文件, "wb") as 输出流:
+        输入流.seek(前缀长度)
+        文件工具.copyfileobj(输入流, 输出流, length=8 * 1024 * 1024)
+
+
 def _用随包FFmpeg合并(视频文件: str, 音频文件: str, 输出路径: str) -> None:
-    r"""以绿色包中的 ffmpeg 无损封装 B 站 m4s，失败时带回实际错误。"""
+    r"""兼容桌面端占位头，以临时文件无损封装并原子替换最终 MP4。"""
     转码器: str | None = _寻找FFmpeg()
     if not 转码器:
         raise RuntimeError("未找到 ffmpeg.exe（请确认绿色包 bin/ 完整）")
-    命令: list[str] = [
-        转码器,
-        "-y",
-        "-i",
-        视频文件,
-        "-i",
-        音频文件,
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
-        "-c",
-        "copy",
-        "-movflags",
-        "+faststart",
-        输出路径,
-    ]
-    结果: 子进程.CompletedProcess = 子进程.run(
-        命令,
-        stdin=子进程.DEVNULL,
-        stdout=子进程.PIPE,
-        stderr=子进程.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        **_子进程附加参数,
+    最终输出: 路径 = 路径(输出路径)
+    最终输出.parent.mkdir(parents=True, exist_ok=True)
+    临时输出: 路径 = 最终输出.parent / (
+        f".{最终输出.stem}.{唯一编号.uuid4().hex}.part{最终输出.suffix or '.mp4'}"
     )
-    输出文件: 路径 = 路径(输出路径)
-    if 结果.returncode != 0 or not 输出文件.is_file() or 输出文件.stat().st_size == 0:
-        错误文本: str = (结果.stderr or 结果.stdout or "未知 ffmpeg 错误").strip()
-        raise RuntimeError(f"ffmpeg 合并失败: {错误文本[-500:]}")
+
+    with 临时文件.TemporaryDirectory(prefix="mybiout_pc_m4s_") as 兼容目录文本:
+        兼容目录: 路径 = 路径(兼容目录文本)
+        实际输入列表: list[str] = []
+        for 序号, 原始文件 in enumerate((视频文件, 音频文件)):
+            前缀长度: int = _取PC缓存前缀长度(原始文件)
+            if 前缀长度:
+                兼容文件: 路径 = 兼容目录 / f"{序号}.m4s"
+                _复制并移除前缀(原始文件, 兼容文件, 前缀长度)
+                实际输入列表.append(str(兼容文件))
+            else:
+                实际输入列表.append(原始文件)
+
+        命令: list[str] = [
+            转码器,
+            "-y",
+            "-i",
+            实际输入列表[0],
+            "-i",
+            实际输入列表[1],
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            str(临时输出),
+        ]
+        try:
+            结果: 子进程.CompletedProcess = 子进程.run(
+                命令,
+                stdin=子进程.DEVNULL,
+                stdout=子进程.PIPE,
+                stderr=子进程.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                **_子进程附加参数,
+            )
+            if (
+                结果.returncode != 0
+                or not 临时输出.is_file()
+                or 临时输出.stat().st_size == 0
+            ):
+                错误文本: str = (
+                    getattr(结果, "stderr", "")
+                    or getattr(结果, "stdout", "")
+                    or "未知 ffmpeg 错误"
+                ).strip()
+                raise RuntimeError(f"ffmpeg 合并失败: {错误文本[-500:]}")
+            系统.replace(临时输出, 最终输出)
+        finally:
+            临时输出.unlink(missing_ok=True)
+
+
+def _输出路径键(文件路径: 路径) -> str:
+    return 系统.path.normcase(系统.path.abspath(str(文件路径)))
+
+
+def _预留输出路径(输出目录: 路径, 文件名文本: str) -> 路径:
+    基础路径: 路径 = 输出目录 / 文件名文本
+    with 状态.锁:
+        计数器: int = 0
+        while True:
+            候选路径: 路径 = (
+                基础路径
+                if 计数器 == 0
+                else 输出目录 / f"{基础路径.stem}_{计数器}{基础路径.suffix}"
+            )
+            路径键: str = _输出路径键(候选路径)
+            if not 候选路径.exists() and 路径键 not in 状态._输出占用集合:
+                状态._输出占用集合.add(路径键)
+                return 候选路径
+            计数器 += 1
+
+
+def _释放输出路径(文件路径: 路径) -> None:
+    with 状态.锁:
+        状态._输出占用集合.discard(_输出路径键(文件路径))
 
 
 def _本地合并(卡片: 视频卡片, 输出路径: str) -> None:
@@ -1374,17 +1839,18 @@ def _导出单个(卡片: 视频卡片, 输出目录: 路径) -> None:
     if not 文件名文本:
         raise RuntimeError("标题不完整且策略为跳过")
 
-    输出路径: 路径 = 输出目录 / 文件名文本
-    计数器: int = 1
-    while 输出路径.exists():
-        输出路径 = 输出目录 / f"{输出路径.stem}_{计数器}.mp4"
-        计数器 += 1
-
-    if 卡片.来源类型 == "adb":
-        _导出单个ADB(卡片, str(输出路径))
-    else:
-        _本地合并(卡片, str(输出路径))
-    卡片.输出路径 = str(输出路径)
+    输出路径: 路径 = _预留输出路径(输出目录, 文件名文本)
+    try:
+        if 卡片.来源类型 == "adb":
+            _导出单个ADB(卡片, str(输出路径))
+        else:
+            _本地合并(卡片, str(输出路径))
+        卡片.输出路径 = str(输出路径)
+    except Exception:
+        输出路径.unlink(missing_ok=True)
+        raise
+    finally:
+        _释放输出路径(输出路径)
 
 
 def _导出线程函数(卡片编号列表: list[str]) -> None:
@@ -1392,56 +1858,89 @@ def _导出线程函数(卡片编号列表: list[str]) -> None:
     导出线程入口函数
     :param: card_ids: 待导出的卡片 ID 列表
     """
-    输出目录: 路径 = 工具.取导出路径() / 工具.取设置("localout", "folder")
-    输出目录.mkdir(parents=True, exist_ok=True)
+    try:
+        输出目录: 路径 = 工具.取导出路径() / 工具.取设置("localout", "folder")
+        输出目录.mkdir(parents=True, exist_ok=True)
+        并发数: int = max(
+            1,
+            min(_安全整数(工具.取设置("localout", "ffmpeg_concurrent") or "3", 3), 32),
+        )
 
-    并发数: int = max(1, min(int(工具.取设置("localout", "ffmpeg_concurrent") or "3"), 32))
-
-    with 状态.锁:
-        目标列表: list[视频卡片] = [卡片项 for 卡片项 in 状态.任务卡片列表 if 卡片项.编号 in 卡片编号列表]
-        状态.导出总数 = len(目标列表)
-        状态.导出完成数 = 0
-        状态.导出进度 = 0.0
-        状态.导出状态 = "exporting"
-
-    状态.记录日志("info", f"开始导出 {len(目标列表)} 个视频 (并发 {并发数})")
-
-    def _导出一个(卡片: 视频卡片) -> None:
-        if 状态._导出取消.is_set():
-            return
         with 状态.锁:
-            卡片.状态名 = "exporting"
-        状态.记录日志("info", f"导出中: {卡片.标题 or 卡片.文件夹名}")
-        try:
-            _导出单个(卡片, 输出目录)
-            with 状态.锁:
-                卡片.状态名 = "success"
-                状态.任务卡片列表 = [卡片项 for 卡片项 in 状态.任务卡片列表 if 卡片项.编号 != 卡片.编号]
-                状态.完成卡片列表.append(卡片)
-                状态.导出完成数 += 1
-                状态.导出进度 = 状态.导出完成数 / 状态.导出总数 if 状态.导出总数 else 1
-            状态.记录日志("success", f"导出完成: {卡片.标题 or 卡片.文件夹名}")
-        except Exception as e:
-            with 状态.锁:
-                卡片.状态名 = "failed"
-                卡片.错误 = str(e)
-                状态.导出完成数 += 1
-                状态.导出进度 = 状态.导出完成数 / 状态.导出总数 if 状态.导出总数 else 1
-            状态.记录日志("error", f"导出失败: {卡片.标题 or 卡片.文件夹名} — {e}")
+            编号集合 = set(卡片编号列表)
+            目标列表: list[视频卡片] = [
+                卡片项
+                for 卡片项 in 状态.任务卡片列表
+                if 卡片项.编号 in 编号集合 and 卡片项.状态名 in {"queued", "failed"}
+            ]
+            状态.导出总数 = len(目标列表)
 
-    with 线程池执行器(max_workers=并发数) as 卡片池:
-        任务映射: dict = {卡片池.submit(_导出一个, 卡片项): 卡片项 for 卡片项 in 目标列表}
-        for _ in 逐个完成(任务映射):
+        状态.记录日志("info", f"开始导出 {len(目标列表)} 个视频 (并发 {并发数})")
+
+        def _导出一个(卡片: 视频卡片) -> None:
             if 状态._导出取消.is_set():
-                break
+                return
+            with 状态.锁:
+                卡片.状态名 = "exporting"
+                卡片.错误 = ""
+            状态.记录日志("info", f"导出中: {卡片.标题 or 卡片.文件夹名}")
+            try:
+                _导出单个(卡片, 输出目录)
+                with 状态.锁:
+                    卡片.状态名 = "success"
+                    状态.任务卡片列表 = [
+                        卡片项
+                        for 卡片项 in 状态.任务卡片列表
+                        if 卡片项.编号 != 卡片.编号
+                    ]
+                    状态.完成卡片列表.append(卡片)
+                    状态.导出完成数 += 1
+                    状态.导出成功数 += 1
+                    状态.导出进度 = (
+                        状态.导出完成数 / 状态.导出总数 if 状态.导出总数 else 1
+                    )
+                状态.记录日志("success", f"导出完成: {卡片.标题 or 卡片.文件夹名}")
+            except Exception as e:
+                with 状态.锁:
+                    卡片.状态名 = "failed"
+                    卡片.错误 = str(e)
+                    状态.导出完成数 += 1
+                    状态.导出失败数 += 1
+                    状态.导出进度 = (
+                        状态.导出完成数 / 状态.导出总数 if 状态.导出总数 else 1
+                    )
+                状态.记录日志("error", f"导出失败: {卡片.标题 or 卡片.文件夹名} — {e}")
 
-    with 状态.锁:
-        状态.导出状态 = "idle"
-    if 状态._导出取消.is_set():
-        状态.记录日志("warn", "导出已取消")
-    else:
-        状态.记录日志("success", f"全部导出任务结束 (成功 {状态.导出完成数}/{状态.导出总数})")
-    状态._导出取消.clear()
+        with 线程池执行器(max_workers=并发数) as 卡片池:
+            任务映射: dict = {
+                卡片池.submit(_导出一个, 卡片项): 卡片项 for 卡片项 in 目标列表
+            }
+            for _ in 逐个完成(任务映射):
+                pass
+
+        with 状态.锁:
+            成功数 = 状态.导出成功数
+            失败数 = 状态.导出失败数
+            总数 = 状态.导出总数
+            未开始数 = max(0, 总数 - 状态.导出完成数)
+        if 状态._导出取消.is_set():
+            状态.记录日志(
+                "warn",
+                f"导出已取消 (成功 {成功数}，失败 {失败数}，未开始 {未开始数})",
+            )
+        elif 失败数:
+            状态.记录日志(
+                "warn",
+                f"导出结束 (成功 {成功数}，失败 {失败数}，共 {总数})",
+            )
+        else:
+            状态.记录日志("success", f"全部导出任务结束 (成功 {成功数}/{总数})")
+    except Exception as e:
+        状态.记录日志("error", f"导出线程异常: {e}")
+    finally:
+        with 状态.锁:
+            状态.导出状态 = "idle"
+            状态._导出取消.clear()
 
 
 # ===== 公开 API =====
@@ -1627,10 +2126,6 @@ def 添加来源(
     序列号 = 序列号.strip()
     包名 = 包名.strip()
 
-    with 状态.锁:
-        if 状态.扫描状态 == "scanning":
-            return {"ok": False, "error": "已有扫描在进行中"}
-
     if 来源类型 not in {"pc", "drive", "adb", "local"}:
         return {"ok": False, "error": f"未知扫描源类型: {来源类型}"}
 
@@ -1639,44 +2134,79 @@ def 添加来源(
             return {"ok": False, "error": "ADB 设备序列号为空"}
         if 包名 and 包名 not in _哔哩包名表:
             return {"ok": False, "error": f"未知 B 站包名: {包名}"}
+        ADB路径值: str | None = _寻找ADB()
+        if not ADB路径值:
+            return {"ok": False, "error": "未找到 ADB 可执行文件"}
+        在线序列号集合 = {设备序列号 for 设备序列号, _ in _取ADB设备列表()}
+        if 序列号 not in 在线序列号集合:
+            return {"ok": False, "error": f"ADB 设备已离线或未授权: {序列号}"}
+        if 包名:
+            已安装包集合 = {
+                已安装包名 for 已安装包名, _ in _取ADB已安装哔哩包(ADB路径值, 序列号)
+            }
+            if 包名 not in 已安装包集合:
+                return {"ok": False, "error": f"设备未安装对应 B 站客户端: {包名}"}
     else:
         if not 路径文本 or not 路径(路径文本).is_dir():
             return {"ok": False, "error": f"路径不存在: {路径文本 or '(空)'}"}
 
-    状态._扫描取消.clear()
-    状态._扫描暂停.clear()
     线程对象: 线程.Thread = 线程.Thread(
         target=_扫描线程函数,
         args=(来源类型, 路径文本, 标签 or 路径文本 or 来源类型, 序列号, 包名),
         daemon=True,
     )
     with 状态.锁:
+        if 状态.扫描状态 != "idle" or (
+            状态._扫描线程 is not None and 状态._扫描线程.is_alive()
+        ):
+            return {"ok": False, "error": "已有扫描在进行中或正在取消"}
+        状态._扫描取消.clear()
+        状态._扫描暂停.clear()
+        状态.扫描状态 = "scanning"
+        状态.扫描进度 = 0.0
         状态._扫描线程 = 线程对象
-    线程对象.start()
+    try:
+        线程对象.start()
+    except Exception:
+        with 状态.锁:
+            状态.扫描状态 = "idle"
+            状态._扫描线程 = None
+        raise
     return {"ok": True}
 
 
 def 暂停扫描() -> None:
-    状态._扫描暂停.set()
+    已暂停: bool = False
     with 状态.锁:
         if 状态.扫描状态 == "scanning":
+            状态._扫描暂停.set()
             状态.扫描状态 = "paused"
-    状态.记录日志("info", "扫描已暂停")
+            已暂停 = True
+    if 已暂停:
+        状态.记录日志("info", "扫描已暂停")
 
 
 def 继续扫描() -> None:
-    状态._扫描暂停.clear()
+    已继续: bool = False
     with 状态.锁:
         if 状态.扫描状态 == "paused":
+            状态._扫描暂停.clear()
             状态.扫描状态 = "scanning"
-    状态.记录日志("info", "扫描已继续")
+            已继续 = True
+    if 已继续:
+        状态.记录日志("info", "扫描已继续")
 
 
 def 取消扫描() -> None:
-    状态._扫描取消.set()
-    状态._扫描暂停.clear()
+    正在取消: bool = False
     with 状态.锁:
-        状态.扫描状态 = "idle"
+        if 状态.扫描状态 != "idle":
+            状态._扫描取消.set()
+            状态._扫描暂停.clear()
+            状态.扫描状态 = "cancelling"
+            正在取消 = True
+    if 正在取消:
+        状态.记录日志("info", "正在取消扫描...")
 
 
 def 加入任务(卡片编号列表: list[str]) -> dict:
@@ -1687,11 +2217,11 @@ def 加入任务(卡片编号列表: list[str]) -> dict:
     """
     添加数量: int = 0
     with 状态.锁:
-        已有集合: set[tuple[str, str]] = {(卡片项.视频路径, 卡片项.音频路径) for 卡片项 in 状态.任务卡片列表}
+        已有集合: set[str] = {状态._去重键(卡片项) for 卡片项 in 状态.任务卡片列表}
         for 来源编号 in 卡片编号列表:
             for 来源卡片 in 状态.来源卡片列表:
                 if 来源卡片.编号 == 来源编号:
-                    键: tuple[str, str] = (来源卡片.视频路径, 来源卡片.音频路径)
+                    键: str = 状态._去重键(来源卡片)
                     if 键 not in 已有集合:
                         状态.任务卡片列表.append(来源卡片.克隆())
                         已有集合.add(键)
@@ -1750,29 +2280,51 @@ def 开始导出(卡片编号列表: list[str]) -> dict:
     :return: dict
     """
     with 状态.锁:
-        if 状态.导出状态 == "exporting":
+        if 状态.导出状态 != "idle" or (
+            状态._导出线程 is not None and 状态._导出线程.is_alive()
+        ):
             return {"ok": False, "error": "导出正在进行中"}
-    if not 卡片编号列表:
-        with 状态.锁:
+        if not 卡片编号列表:
             卡片编号列表 = [卡片项.编号 for 卡片项 in 状态.任务卡片列表 if 卡片项.状态名 == "queued"]
-    if not 卡片编号列表:
-        return {"ok": False, "error": "没有可导出的任务"}
-
-    状态._导出取消.clear()
-    线程对象: 线程.Thread = 线程.Thread(
-        target=_导出线程函数,
-        args=(卡片编号列表,),
-        daemon=True,
-    )
-    with 状态.锁:
+        可导出编号集合 = {
+            卡片项.编号
+            for 卡片项 in 状态.任务卡片列表
+            if 卡片项.编号 in set(卡片编号列表)
+            and 卡片项.状态名 in {"queued", "failed"}
+        }
+        卡片编号列表 = [编号 for 编号 in 卡片编号列表 if 编号 in 可导出编号集合]
+        if not 卡片编号列表:
+            return {"ok": False, "error": "没有可导出的任务"}
+        状态._导出取消.clear()
+        状态.导出状态 = "exporting"
+        状态.导出总数 = len(卡片编号列表)
+        状态.导出完成数 = 0
+        状态.导出成功数 = 0
+        状态.导出失败数 = 0
+        状态.导出进度 = 0.0
+        线程对象: 线程.Thread = 线程.Thread(
+            target=_导出线程函数,
+            args=(卡片编号列表,),
+            daemon=True,
+        )
         状态._导出线程 = 线程对象
-    线程对象.start()
+    try:
+        线程对象.start()
+    except Exception:
+        with 状态.锁:
+            状态.导出状态 = "idle"
+            状态._导出线程 = None
+        raise
     return {"ok": True}
 
 
 def 取消导出() -> None:
-    状态._导出取消.set()
-    状态.记录日志("info", "正在取消导出...")
+    with 状态.锁:
+        正在导出 = 状态.导出状态 == "exporting"
+        if 正在导出:
+            状态._导出取消.set()
+    if 正在导出:
+        状态.记录日志("info", "正在取消导出...")
 
 
 def 取封面字节(卡片编号: str) -> tuple[bytes, str] | None:
