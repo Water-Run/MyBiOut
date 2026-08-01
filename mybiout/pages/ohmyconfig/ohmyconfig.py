@@ -143,8 +143,12 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
                 工具.设设置(分区, 键, "false")
             return _成功()
 
-        case ("api", "key" | "model"):
+        case ("api", "key"):
             工具.设设置(分区, 键, 值.strip())
+            return _成功()
+
+        case ("api", "model"):
+            工具.设设置(分区, 键, 工具.规范化接口模型(值))
             return _成功()
 
         case ("api", "base_url"):

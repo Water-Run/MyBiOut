@@ -578,7 +578,7 @@
                             <input type="checkbox" id="s-api-enabled" onchange="切换大模型(this)">
                             <div class="toggle-track"></div>
                         </label>
-                        <span class="setting-hint" style="margin:0">关掉 = 本地通道；Key 和 Model 配齐后才允许启动</span>
+                        <span class="setting-hint" style="margin:0">这是唯一启停开关；Key 和 Model 非空即可启动</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
                         <span class="inline-label">Key:</span>
@@ -586,7 +586,7 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
                         <span class="inline-label">Model:</span>
-                        <input type="text" id="s-api-model" style="width:380px" placeholder="deepseek-chat">
+                        <input type="text" id="s-api-model" style="width:380px" placeholder="deepseek-v4-flash">
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
                         <span class="inline-label">Base:</span>
@@ -1114,9 +1114,23 @@
                 显示提示('老登检查失败: ' + 异常.message, true);
             }
         }
+        let _接口启用待确认 = false;
         async function 切换大模型(开关) {
-            const ok = await 保存设置('api', 'enabled', 开关.checked ? 'true' : 'false');
-            if (!ok) 开关.checked = false;
+            if (!开关.checked) {
+                _接口启用待确认 = false;
+                await 保存设置('api', 'enabled', 'false');
+                return;
+            }
+            const k = document.getElementById('s-api-key').value.trim();
+            const m = document.getElementById('s-api-model').value.trim();
+            if (!k || !m) {
+                开关.checked = false;
+                显示提示('Key 和 Model 不能为空；填好后再打开启用开关', true);
+                return;
+            }
+            // 输入框可能尚未保存：在同一次确认中先落盘整组配置，再启用。
+            _接口启用待确认 = true;
+            document.getElementById('api-modal').classList.add('show');
         }
         async function 保存选择(sec, key, val) { await 保存设置(sec, key, val); }
         async function 保存文本(sec, key, val) { await 保存设置(sec, key, val); }
@@ -1168,10 +1182,10 @@
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
             if (!k && !m) { 显示提示('请至少填写一项', true); return; }
+            _接口启用待确认 = false;
             document.getElementById('api-modal').classList.add('show');
         }
         async function 保存接口设置() {
-            关闭接口弹窗();
             const k = document.getElementById('s-api-key').value.trim();
             const m = document.getElementById('s-api-model').value.trim();
             const b = document.getElementById('s-api-base-url').value.trim();
@@ -1185,9 +1199,20 @@
             if (!已保存) return;
             const 已更新开关 = await 保存设置('api', 'enabled', 想要启用 ? 'true' : 'false');
             if (!已更新开关) document.getElementById('s-api-enabled').checked = false;
-            if (已更新开关) 显示提示('让我看看怎么个事：配置已保存');
+            if (已更新开关) {
+                // 后端会把 DeepSeek 展示名规范成真实 API 标识，回读以同步界面。
+                const s = await 接口读取('/api/settings');
+                document.getElementById('s-api-model').value = s.api?.model ?? m;
+                _接口启用待确认 = false;
+                关闭接口弹窗();
+                显示提示(想要启用 ? '大模型已启用' : '接口配置已保存（大模型未启用）');
+            }
         }
-        function 关闭接口弹窗() { document.getElementById('api-modal').classList.remove('show'); }
+        function 关闭接口弹窗() {
+            document.getElementById('api-modal').classList.remove('show');
+            if (_接口启用待确认) document.getElementById('s-api-enabled').checked = false;
+            _接口启用待确认 = false;
+        }
         async function 清空接口设置() {
             document.getElementById('s-api-enabled').checked = false;
             document.getElementById('s-api-key').value = '';

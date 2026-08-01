@@ -108,7 +108,7 @@ def 取默认哔哩哔哩电脑缓存路径() -> str:
     "api": {
         "enabled": "false",
         "key": "",
-        "model": "",
+        "model": "deepseek-v4-flash",
         "base_url": "https://api.deepseek.com/v1",
         "timeout": "infinite",
     },
@@ -306,6 +306,25 @@ def 取接口模型() -> str:
     :return: str: 模型名称
     """
     return 取设置("api", "model")
+
+
+def 规范化接口模型(模型: str) -> str:
+    r"""
+    将 DeepSeek 的常见展示名转换成 API 模型标识符。
+    其他 OpenAI 兼容服务的模型名保持原样。
+    """
+    文本: str = (模型 or "").strip()
+    if not 文本:
+        return ""
+    DeepSeek别名: dict[str, str] = {
+        "deepseek v4 flash": "deepseek-v4-flash",
+        "deepseek_v4_flash": "deepseek-v4-flash",
+        "deepseek-v4-flash": "deepseek-v4-flash",
+        "deepseek v4 pro": "deepseek-v4-pro",
+        "deepseek_v4_pro": "deepseek-v4-pro",
+        "deepseek-v4-pro": "deepseek-v4-pro",
+    }
+    return DeepSeek别名.get(文本.lower(), 文本)
 
 
 def 取端口() -> int:

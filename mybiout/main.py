@@ -30,6 +30,7 @@ from mybiout.pages.utils import 取端口
 
 # PyInstaller --windowed 时 stdout/stderr 常为 None; 须持有打开的 devnull 句柄防 GC 关闭
 _标准流持有: list = []
+_窗口冒烟状态环境键: str = "MYBIOOUT_WINDOW_SMOKE_STATUS"
 
 
 class _中文参数解析器(参数解析.ArgumentParser):
@@ -1324,6 +1325,38 @@ def _停止服务(启动状态: _服务启动状态) -> None:
         启动状态.线程对象.join(timeout=5.0)
 
 
+def _写窗口冒烟状态(状态名: str, 详情: str = "") -> None:
+    r"""仅在打包冒烟注入状态文件时，汇报内嵌窗口真实加载结果。"""
+    状态路径文本 = 操作系统.environ.get(_窗口冒烟状态环境键, "").strip()
+    if not 状态路径文本:
+        return
+    try:
+        内容 = 状态名 if not 详情 else f"{状态名}\n{详情}"
+        路径(状态路径文本).write_text(内容, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _格式化冻结窗口启动错误(异常: Exception) -> str:
+    原因 = str(异常)
+    if "Python.Runtime" in 原因 or "Loader.Initialize" in 原因:
+        return (
+            "内嵌窗口运行组件加载失败。\n\n"
+            f"原因：{原因}\n\n"
+            "请确认 MyBiOut!.exe.config 与 MyBiOut!.exe 位于同一目录。\n"
+            "若使用的是旧发布包，请先在压缩包属性中解除锁定，再重新解压。\n"
+            "仅调试时可用：\n"
+            "  MyBiOut!.exe --browser"
+        )
+    return (
+        "内嵌窗口（WebView2）启动失败。\n\n"
+        f"原因：{原因}\n\n"
+        "绿色包默认只使用内嵌窗口，不会自动打开浏览器。\n"
+        "请安装 WebView2 Runtime 后重试；仅调试时可用：\n"
+        "  MyBiOut!.exe --browser"
+    )
+
+
 def _取窗口图标路径() -> str | None:
     r"""
     窗口/任务栏图标: 优先 logo.ico, 其次 logo.png (包内 assets)
@@ -1363,6 +1396,9 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
         """
         _停止服务(启动状态)
 
+    def _窗口加载完成(*_参数: object) -> None:
+        _写窗口冒烟状态("loaded")
+
     窗口参数: dict = {
         "title": "MyBiOut!",
         "url": 地址,
@@ -1383,6 +1419,8 @@ def _启动窗口壳(端口: int, 启动状态: _服务启动状态) -> None:
         窗口 = 网页视图.create_window(**窗口参数)
     with 忽略异常(Exception):
         窗口.events.closed += _窗口关闭
+    with 忽略异常(Exception):
+        窗口.events.loaded += _窗口加载完成
     try:
         网页视图.start(debug=False)
     finally:
@@ -1445,6 +1483,7 @@ def 主程序() -> None:
     使用窗口: bool = not 强制浏览器
     if 使用窗口 and not _可否使用窗口壳():
         if 是否冻结运行():
+            _写窗口冒烟状态("error", "内嵌窗口组件 pywebview 不可用")
             _提示致命错误(
                 "内嵌窗口组件 (pywebview) 不可用。\n\n"
                 "绿色包默认只走内嵌窗口，不会自动打开浏览器。\n"
@@ -1531,16 +1570,11 @@ def 主程序() -> None:
             _启动窗口壳(端口, 启动状态)
         except Exception as e:
             _安全打印(f"  * 内嵌窗口启动不了: {e}")
+            _写窗口冒烟状态("error", str(e))
             if 是否冻结运行() and not 强制浏览器:
                 # 绿色包: 失败即停, 不偷偷打开系统浏览器
                 _停止服务(启动状态)
-                _提示致命错误(
-                    "内嵌窗口（WebView2）启动失败。\n\n"
-                    f"原因：{e}\n\n"
-                    "绿色包默认只使用内嵌窗口，不会自动打开浏览器。\n"
-                    "请安装 WebView2 Runtime 后重试；仅调试时可用：\n"
-                    "  MyBiOut!.exe --browser"
-                )
+                _提示致命错误(_格式化冻结窗口启动错误(e))
                 return
             # 开发态保留回退, 方便无 WebView2 时调试
             _提示环境警告(

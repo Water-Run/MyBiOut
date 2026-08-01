@@ -53,6 +53,14 @@ from pathlib import Path as 路径
 版本文件路径: 路径 = 程序包目录 / "version.txt"
 产物显示名: str = "MyBiOut!"
 绿色目录名: str = "MyBiOut-green"
+_CLR远程加载配置: str = """<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <runtime>
+    <loadFromRemoteSources enabled="true" />
+  </runtime>
+</configuration>
+"""
+_窗口冒烟状态环境键: str = "MYBIOOUT_WINDOW_SMOKE_STATUS"
 # 最终 .rar 直接落在工程根下的本目录 (gitignore 排除, 勿放 dist/)
 发布目录名: str = "打包结果"
 构建缓存目录名: str = "build"
@@ -3292,7 +3300,7 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
             "api": {
                 "enabled": "false",
                 "key": "",
-                "model": "",
+                "model": "deepseek-v4-flash",
                 "base_url": "https://api.deepseek.com/v1",
                 "timeout": "infinite",
             },
@@ -3456,6 +3464,11 @@ def 校验绿色包结构(绿色根: 路径, 状态: 打包进度 | None = None)
         (绿色根 / "_internal" / "VCRUNTIME140.dll", "VC 运行库", 1024 * 40),
         (绿色根 / "version.txt", "版本文件", 2),
         (绿色根 / "config.ini", "默认配置", 8),
+        (
+            绿色根 / f"{产物显示名}.exe.config",
+            ".NET Internet 区域程序集加载配置",
+            64,
+        ),
     ]
     for 路径点, 说明, 最小 in 必备:
         if not 路径点.is_file() or 路径点.stat().st_size < 最小:
@@ -3498,10 +3511,16 @@ def _终止进程树(进程: 子进程.Popen) -> None:
             进程.kill()
 
 
-def 冒烟启动绿色包(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
+def 冒烟启动绿色包(
+    绿色根: 路径,
+    状态: 打包进度 | None = None,
+    *,
+    模拟Internet区域: bool = False,
+) -> None:
     r"""
     冒烟: 以「默认内嵌窗口」模式启动冻结 exe (不用 --browser),
-    请求 /api/version, 确认 windowed + pywebview 路径在无系统 Python 下可跑。
+    同时等待 /api/version 与 WebView loaded 事件，确认后端和真实内嵌窗口均可用。
+    可给 Python.Runtime.dll 写入 ZoneId=3，复现浏览器下载后解压的安全区域标记。
     捕获 uvicorn isatty / 缺 DLL / 误走浏览器 等启动问题。
     """
     可执行 = 绿色根 / f"{产物显示名}.exe"
@@ -3516,19 +3535,43 @@ def 冒烟启动绿色包(绿色根: 路径, 状态: 打包进度 | None = None)
         探测.bind(("127.0.0.1", 0))
         端口 = int(探测.getsockname()[1])
 
+    模拟标记流: 路径 | None = None
+    if 模拟Internet区域 and 操作系统.name == "nt":
+        CLR组件 = 绿色根 / "_internal" / "pythonnet" / "runtime" / "Python.Runtime.dll"
+        if not CLR组件.is_file():
+            文 = f"下载场景冒烟失败: 找不到 CLR 组件 ({CLR组件})"
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(文)
+            失败退出(文)
+        模拟标记流 = 路径(f"{CLR组件}:Zone.Identifier")
+        try:
+            模拟标记流.write_text("[ZoneTransfer]\nZoneId=3\n", encoding="ascii")
+        except OSError as 异常:
+            文 = f"下载场景冒烟失败: 无法写入 Internet 区域标记 ({异常})"
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(文)
+            失败退出(文)
+
+    场景 = "下载后 Internet 区域" if 模拟标记流 is not None else "本地"
     if 状态 is None or 状态.纯文本:
-        打印信息(f"冒烟启动绿色包 (内嵌窗口模式): 端口 {端口} …")
+        打印信息(f"冒烟启动绿色包 ({场景} / 内嵌窗口): 端口 {端口} …")
     elif 状态:
         状态.进入阶段("组装", "冒烟启动(内嵌窗)…", 段内=0.96, 明细=f":{端口}")
 
     错误日志 = 绿色根 / "startup_error.log"
+    窗口状态文件 = 绿色根 / ".mybiout_window_smoke.status"
     with 忽略异常(OSError):
         if 错误日志.is_file():
             错误日志.unlink()
+    with 忽略异常(OSError):
+        if 窗口状态文件.is_file():
+            窗口状态文件.unlink()
 
     进程: 子进程.Popen | None = None
     try:
         # 故意不传 --browser: 绿色包默认应走 pywebview 内嵌窗, 而非系统浏览器
+        冒烟环境 = 操作系统.environ.copy()
+        冒烟环境[_窗口冒烟状态环境键] = str(窗口状态文件.resolve())
         进程 = 子进程.Popen(
             [
                 str(可执行),
@@ -3540,10 +3583,25 @@ def 冒烟启动绿色包(绿色根: 路径, 状态: 打包进度 | None = None)
             stdin=子进程.DEVNULL,
             stdout=子进程.DEVNULL,
             stderr=子进程.DEVNULL,
+            env=冒烟环境,
         )
         截止 = 时间.monotonic() + 35.0
         最后错 = ""
+        后端响应 = ""
         while 时间.monotonic() < 截止:
+            窗口状态 = ""
+            if 窗口状态文件.is_file():
+                with 忽略异常(OSError):
+                    窗口状态 = 窗口状态文件.read_text(
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+            if 窗口状态.startswith("error"):
+                详情 = 窗口状态.partition("\n")[2].strip() or "未知窗口初始化错误"
+                文 = f"冒烟失败: 内嵌窗口初始化失败。\n  {详情}"
+                if 状态 and not 状态.纯文本:
+                    状态.标记失败(文.replace("\n", " "))
+                失败退出(文)
             if 进程.poll() is not None:
                 详情 = ""
                 if 错误日志.is_file():
@@ -3568,22 +3626,35 @@ def 冒烟启动绿色包(绿色根: 路径, 状态: 打包进度 | None = None)
                 ) as 响应:
                     体 = 响应.read().decode("utf-8", errors="replace")
                 if "version" in 体:
-                    if 状态 is None or 状态.纯文本:
-                        打印成功(
-                            f"冒烟通过(内嵌窗口模式): /api/version → {体.strip()[:80]}"
-                        )
-                    return
+                    后端响应 = 体.strip()[:80]
             except Exception as 异常:  # noqa: BLE001
                 最后错 = str(异常)
+            if 后端响应 and 窗口状态.startswith("loaded"):
+                if 状态 is None or 状态.纯文本:
+                    打印成功(
+                        "冒烟通过(真实内嵌窗口 + 后端): "
+                        f"WebView loaded; /api/version → {后端响应}"
+                    )
+                return
             时间.sleep(0.45)
 
-        文 = f"冒烟失败: 约 35s 内未响应 /api/version ({最后错 or '超时'})"
+        缺失项: list[str] = []
+        if not 后端响应:
+            缺失项.append(f"/api/version 未响应 ({最后错 or '超时'})")
+        if not 窗口状态文件.is_file():
+            缺失项.append("未收到 WebView loaded 事件")
+        文 = f"冒烟失败: 约 35s 内未就绪 ({'; '.join(缺失项) or '未知状态'})"
         if 状态 and not 状态.纯文本:
             状态.标记失败(文)
         失败退出(文)
     finally:
         if 进程 is not None:
             _终止进程树(进程)
+        with 忽略异常(OSError):
+            窗口状态文件.unlink()
+        if 模拟标记流 is not None:
+            with 忽略异常(OSError):
+                模拟标记流.unlink()
 
 
 def 校验绿色包工具(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
@@ -3693,6 +3764,10 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
             失败退出(说明)
         文件工具.copy2(版本文件路径, 暂存根 / "version.txt")
         写入脱敏默认配置(暂存根 / "config.ini", 状态)
+        (暂存根 / f"{产物显示名}.exe.config").write_text(
+            _CLR远程加载配置,
+            encoding="utf-8",
+        )
         校验绿色包工具(暂存根, 状态)
         校验绿色包结构(暂存根, 状态)
     except SystemExit:
@@ -3718,7 +3793,7 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
             失败退出(说明)
 
     # 落盘后再冒烟 (需真实路径与完整 _internal)
-    冒烟启动绿色包(绿色根, 状态)
+    冒烟启动绿色包(绿色根, 状态, 模拟Internet区域=True)
 
     使用说明 = f"""MyBiOut! 绿色版  v{版本}
 
@@ -3729,9 +3804,11 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
 4. 内嵌窗口依赖「WebView2 运行时」。Windows 11 一般已自带；
    若窗口打不开，请安装 WebView2 Runtime 后重试（默认不会自动改开浏览器）。
 5. 请勿运行工程 build/ 目录下的中间产物 exe（缺少完整 _internal，会报 Python DLL 错误）。
+6. 请保留 MyBiOut!.exe.config；它用于兼容浏览器下载文件的 Internet 区域标记。
 
 【目录说明】
 · config.ini     配置文件（本发布包为默认空凭证、无本机路径，可按需填写）
+· MyBiOut!.exe.config  下载包内嵌窗口运行兼容配置，请勿删除
 · bin/           随包分发工具：BBDown.exe、ffmpeg.exe、adb.exe（及 ADB 配套 dll）
 · _internal/     内嵌运行时 (python314.dll 等)，请整夹拷贝，勿单独挪 exe
 · version.txt    版本号（界面底部会读取）
