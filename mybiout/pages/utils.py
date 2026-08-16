@@ -8,6 +8,7 @@ MyBiOut! 基础工具模块, 负责配置文件的读写、便携路径与通用
 
 import configparser as 配置解析器
 import os as 系统
+import subprocess as 子进程
 import sys as 系统信息
 import tempfile as 临时文件
 import threading as 线程
@@ -99,9 +100,84 @@ def 取默认哔哩哔哩电脑缓存路径() -> str:
     return str(路径.home() / "Videos" / "bilibili")
 
 
+def 取默认导出路径() -> str:
+    r"""
+    获取发布/首次运行的默认导出根目录。
+    Windows 沿用 C:\\MyBiOut!；Linux 用家目录下的 MyBiOut!。
+    """
+    if 系统信息.platform == "win32":
+        return r"C:\MyBiOut!"
+    return str(路径.home() / "MyBiOut!")
+
+
+def 取桌面目录() -> 路径:
+    r"""
+    桌面目录。Linux 优先读 user-dirs.dirs 的 XDG_DESKTOP_DIR。
+    """
+    if 系统信息.platform != "win32":
+        配置文件: 路径 = 路径.home() / ".config" / "user-dirs.dirs"
+        try:
+            for 行 in 配置文件.read_text(encoding="utf-8").splitlines():
+                if not 行.startswith("XDG_DESKTOP_DIR="):
+                    continue
+                值: str = 行.split("=", 1)[1].strip().strip('"')
+                值 = 值.replace("$HOME", str(路径.home()))
+                if 值:
+                    return 路径(值)
+        except OSError:
+            pass
+    return 路径.home() / "Desktop"
+
+
+def 确保文件可执行(目标: 路径) -> None:
+    r"""Linux 绿色包旁路二进制补执行位。Windows 无操作。"""
+    if 系统信息.platform == "win32":
+        return
+    try:
+        if 目标.is_file():
+            目标.chmod(目标.stat().st_mode | 0o111)
+    except OSError:
+        pass
+
+
+def 打开本地路径(文件路径: str) -> dict[str, bool | str]:
+    r"""
+    用系统文件管理器打开目录, 或定位到文件。
+    Windows: explorer; Linux: xdg-open。
+    """
+    if not 文件路径:
+        return {"ok": False, "error": "路径为空"}
+    候选路径: 路径 = 路径(文件路径)
+    try:
+        if 候选路径.is_file():
+            打开目标: 路径 = 候选路径 if 系统信息.platform == "win32" else 候选路径.parent
+            选中文件: bool = 系统信息.platform == "win32"
+        elif 候选路径.is_dir():
+            打开目标 = 候选路径
+            选中文件 = False
+        elif 候选路径.parent.is_dir():
+            打开目标 = 候选路径.parent
+            选中文件 = False
+        else:
+            return {"ok": False, "error": "路径不存在"}
+
+        附加: dict = {}
+        if 系统信息.platform == "win32":
+            附加["creationflags"] = 0x08000000
+            if 选中文件 and 候选路径.is_file():
+                子进程.Popen(["explorer", "/select,", str(候选路径)], **附加)
+            else:
+                子进程.Popen(["explorer", str(打开目标)], **附加)
+        else:
+            子进程.Popen(["xdg-open", str(打开目标)], start_new_session=True)
+        return {"ok": True}
+    except Exception as 异常:
+        return {"ok": False, "error": str(异常)}
+
+
 默认设置: dict[str, dict[str, str]] = {
     "export": {
-        "path": r"C:\MyBiOut!",
+        "path": 取默认导出路径(),
         "sessdata": "",
         "bilibili_login_enabled": "false",
     },
@@ -140,6 +216,7 @@ def 取默认哔哩哔哩电脑缓存路径() -> str:
         "include_tags": "true",
         "include_stats": "true",
         "favorite_detail": "basic",
+        "favorite_complete": "true",
         "request_delay": "0.5",
     },
 }

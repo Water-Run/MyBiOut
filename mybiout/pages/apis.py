@@ -589,10 +589,11 @@ async def 文档导出添加(请求对象: 请求) -> 响应:
     """
     请求体: dict[str, 任意] = await _读取数据字典(请求对象)
     文本: str = _转字符串(请求体.get("text", ""))
+    期望类型: str = _转字符串(请求体.get("expect_type", "")).strip()
 
     from mybiout.pages.mdout.mdout import 添加并获取
 
-    结果: dict[str, 任意] = 添加并获取(文本)
+    结果: dict[str, 任意] = 添加并获取(文本, 期望类型=期望类型 or None)
     状态码: int = 200 if bool(结果.get("ok")) else 400
     return 数据响应(status_code=状态码, content=结果)
 
@@ -693,6 +694,20 @@ async def 手册对话(请求对象: 请求) -> dict[str, 任意]:
     from mybiout.pages.man.man import 对话
 
     return 对话(提示词, 直接说=直接说)
+
+
+@应用.post("/api/parse-batch")
+async def 解析批量输入接口(请求对象: 请求) -> dict[str, 任意]:
+    r"""
+    将混排粘贴拆成条目, 并给出每行一条的回填文本。
+    """
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+    文本: str = _转字符串(请求体.get("text", ""))
+    from mybiout.pages.batch_input import 构建批量文本
+    from mybiout.pages.batch_input import 解析批量输入
+
+    项们: list[str] = 解析批量输入(文本)
+    return {"ok": True, "items": 项们, "built": 构建批量文本(项们)}
 
 
 @应用.post("/api/open-explorer")

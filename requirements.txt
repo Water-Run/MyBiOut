@@ -1,4 +1,4 @@
-# MyBiOut! 运行与打包依赖 (Windows x64 / Python 3.14+)
+# MyBiOut! 运行与打包依赖 (Windows / Linux x64, Python 3.14+)
 fastapi
 uvicorn[standard]
 httpx

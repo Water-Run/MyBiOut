@@ -264,6 +264,79 @@ def _获取收藏内容(收藏夹编号: int, 页码: int = 1, 每页数量: int
     return _安全接口读取("/x/v3/fav/resource/list", {"media_id": 收藏夹编号, "pn": 页码, "ps": 每页数量})
 
 
+def _获取收藏全部内容(
+    收藏夹编号: int,
+    *,
+    每页数量: int = 20,
+    取消事件: 线程.Event | None = None,
+) -> dict:
+    r"""
+    分页拉完一个收藏夹的全部媒体项 (默认每页 20, 直到 media_count 或空页)。
+    """
+    首包: dict = _获取收藏内容(收藏夹编号, 页码=1, 每页数量=每页数量)
+    if not 首包:
+        return {}
+    媒体列表: list = list(首包.get("medias") or [])
+    信息: dict = 首包.get("info") or {}
+    try:
+        总数: int = int(信息.get("media_count") or 0)
+    except (TypeError, ValueError):
+        总数 = 0
+    已见: set[object] = set()
+    去重后: list = []
+    for 媒体 in 媒体列表:
+        键 = 媒体.get("id") if isinstance(媒体, dict) else None
+        if 键 is None and isinstance(媒体, dict):
+            键 = 媒体.get("bvid")
+        if 键 in 已见:
+            continue
+        if 键 is not None:
+            已见.add(键)
+        去重后.append(媒体)
+    媒体列表 = 去重后
+    页码: int = 2
+    while (总数 <= 0 or len(媒体列表) < 总数) and 页码 <= 500:
+        if 取消事件 is not None and 取消事件.is_set():
+            break
+        if 总数 > 0 and len(媒体列表) >= 总数:
+            break
+        _延迟()
+        包: dict = _获取收藏内容(收藏夹编号, 页码=页码, 每页数量=每页数量)
+        本页: list = list((包 or {}).get("medias") or [])
+        if not 本页:
+            break
+        新增: int = 0
+        for 媒体 in 本页:
+            键 = 媒体.get("id") if isinstance(媒体, dict) else None
+            if 键 is None and isinstance(媒体, dict):
+                键 = 媒体.get("bvid")
+            if 键 in 已见:
+                continue
+            if 键 is not None:
+                已见.add(键)
+            媒体列表.append(媒体)
+            新增 += 1
+        if 新增 == 0:
+            break
+        页码 += 1
+    return {"info": 信息, "medias": 媒体列表}
+
+
+def 拉取收藏夹内容(
+    收藏夹编号: int,
+    *,
+    完整: bool,
+    取消事件: 线程.Event | None = None,
+) -> dict:
+    r"""
+    用户页导出用的收藏夹拉取入口。
+    完整=True 逐页拉全量; 完整=False 只取第 1 页 20 条。
+    """
+    if 完整:
+        return _获取收藏全部内容(收藏夹编号, 取消事件=取消事件)
+    return _获取收藏内容(收藏夹编号, 页码=1, 每页数量=20)
+
+
 def _获取专栏(专栏号: str) -> dict:
     r"""
     获取专栏文章信息
@@ -603,10 +676,12 @@ def _用户Markdown(卡片数据: dict, 用户统计: dict, 收藏夹列表: lis
     if 收藏夹列表:
         行列表.append("## 收藏夹\n")
         详细模式: str = 配置.get("favorite_detail", "basic")
+        完整导出: bool = 配置.get("favorite_complete", "true") == "true"
+        要列出内容: bool = 完整导出 or 详细模式 == "full"
         for 收藏夹 in 收藏夹列表:
             收藏夹编号值: int = 收藏夹.get("id", 0)
             行列表.extend([f"### {收藏夹.get('title', '未命名')}\n", f"共 {收藏夹.get('media_count', 0)} 个内容\n"])
-            if 详细模式 == "full" and 收藏夹编号值 in 收藏内容:
+            if 要列出内容 and 收藏夹编号值 in 收藏内容:
                 媒体列表: list = 收藏内容[收藏夹编号值].get("medias") or []
                 if 媒体列表:
                     行列表.extend(["| # | 标题 | UP主 | BV号 |", "|---|------|------|------|"])
@@ -783,6 +858,7 @@ def _设置字典() -> dict[str, str]:
         "include_tags": 工具.取设置("mdout", "include_tags"),
         "include_stats": 工具.取设置("mdout", "include_stats"),
         "favorite_detail": 工具.取设置("mdout", "favorite_detail"),
+        "favorite_complete": 工具.取设置("mdout", "favorite_complete") or "true",
     }
 
 
@@ -822,15 +898,28 @@ def _执行获取用户(卡片: 文档卡片) -> None:
     _延迟()
     收藏夹列表: list = _获取收藏夹列表(卡片.编号值)
     收藏内容: dict[int, dict] = {}
-    if 配置.get("favorite_detail") == "full" and 收藏夹列表:
-        最大收藏夹数: int = 20
-        for 序号, 收藏夹 in enumerate(收藏夹列表[:最大收藏夹数]):
+    完整导出: bool = 配置.get("favorite_complete", "true") == "true"
+    要内容: bool = 完整导出 or 配置.get("favorite_detail") == "full"
+    if 要内容 and 收藏夹列表:
+        夹们: list = 收藏夹列表 if 完整导出 else 收藏夹列表[:20]
+        for 序号, 收藏夹 in enumerate(夹们):
             if 状态._取消标记.is_set():
                 break
             _延迟()
-            if (收藏夹编号值 := 收藏夹.get("id", 0)) and (收藏夹内容 := _获取收藏内容(收藏夹编号值, 页码=1, 每页数量=20)):
+            收藏夹编号值: int = 收藏夹.get("id", 0)
+            if not 收藏夹编号值:
+                continue
+            收藏夹内容: dict = 拉取收藏夹内容(
+                收藏夹编号值,
+                完整=完整导出,
+                取消事件=状态._取消标记,
+            )
+            if 收藏夹内容:
                 收藏内容[收藏夹编号值] = 收藏夹内容
-            状态.记录日志("info", f"获取收藏夹 ({序号 + 1}/{min(len(收藏夹列表), 最大收藏夹数)}): {收藏夹.get('title', '')}")
+            状态.记录日志(
+                "info",
+                f"获取收藏夹 ({序号 + 1}/{len(夹们)}): {收藏夹.get('title', '')}",
+            )
     卡片.Markdown文本 = _用户Markdown(卡片数据, 用户统计, 收藏夹列表, 收藏内容, 配置)
 
 
@@ -921,15 +1010,13 @@ def 执行解析(文本: str) -> dict[str, str]:
     return 解析输入(文本)
 
 
-def 添加并获取(输入文本: str) -> dict:
-    r"""
-    添加获取任务并启动异步获取
-    :param: input_text: 用户输入文本
-    :return: dict: 添加结果
-    """
+def _添加单项(输入文本: str, 期望类型: str | None = None) -> dict:
+    r"""解析并入队单条输入。"""
     解析结果: dict[str, str] = 解析输入(输入文本)
     if 解析结果["type"] == "unknown":
         return {"ok": False, "error": f"无法识别: {输入文本}"}
+    if 期望类型 and 解析结果["type"] != 期望类型:
+        return {"ok": False, "error": "类型不符"}
     卡片: 文档卡片 = 文档卡片(
         输入文本=输入文本,
         项目类型=解析结果["type"],
@@ -945,6 +1032,54 @@ def 添加并获取(输入文本: str) -> dict:
     状态.记录日志("info", f"已添加: {输入文本} → {_类型标签表.get(解析结果['type'], '?')}")
     _确保工作线程()
     return {"ok": True, "card_id": 卡片.编号}
+
+
+def 添加并获取(输入文本: str, 期望类型: str | None = None) -> dict:
+    r"""
+    添加获取任务并启动异步获取。支持混排批量粘贴。
+    :param: input_text: 用户输入文本
+    :param: 期望类型: 面板类型 video/user/article, 不符则跳过
+    :return: dict: 添加结果
+    """
+    from mybiout.pages.batch_input import 解析批量输入
+
+    项们: list[str] = 解析批量输入(输入文本)
+    if not 项们 and 输入文本.strip():
+        项们 = [输入文本.strip()]
+    if not 项们:
+        return {"ok": False, "error": "无法识别: 空输入"}
+    if len(项们) == 1:
+        return _添加单项(项们[0], 期望类型)
+
+    成功: int = 0
+    错类: int = 0
+    不识: int = 0
+    首个编号: str = ""
+    for 项 in 项们:
+        结果: dict = _添加单项(项, 期望类型)
+        if 结果.get("ok"):
+            成功 += 1
+            if not 首个编号:
+                首个编号 = str(结果.get("card_id") or "")
+        elif 结果.get("error") == "类型不符":
+            错类 += 1
+        else:
+            不识 += 1
+    if 成功 == 0:
+        return {
+            "ok": False,
+            "error": f"没有可添加的项（类型不符 {错类}，无法识别 {不识}）",
+            "added": 0,
+            "wrong_type": 错类,
+            "unknown": 不识,
+        }
+    return {
+        "ok": True,
+        "added": 成功,
+        "wrong_type": 错类,
+        "unknown": 不识,
+        "card_id": 首个编号,
+    }
 
 
 def 选择卡片(卡片编号: str) -> None:

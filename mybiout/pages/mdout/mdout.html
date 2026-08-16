@@ -345,6 +345,7 @@
 
         .panel-input {
             display: flex;
+            align-items: flex-start;
             gap: 10px;
             flex-shrink: 0;
             background: rgba(255, 255, 255, .92);
@@ -354,7 +355,8 @@
             padding: 10px 16px;
         }
 
-        .panel-input input {
+        .panel-input input,
+        .panel-input textarea {
             flex: 1;
             padding: 8px 12px;
             border: 2px solid #F5A623;
@@ -365,8 +367,45 @@
             transition: border-color .2s;
         }
 
-        .panel-input input:focus {
+        .panel-input input:focus,
+        .panel-input textarea:focus {
             border-color: #E85B8A;
+        }
+
+        .input-stack {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .panel-input textarea {
+            min-height: 88px;
+            max-height: 160px;
+            resize: vertical;
+            line-height: 1.45;
+        }
+
+        .input-count {
+            font-size: 11px;
+            font-weight: 700;
+            color: #E85B8A;
+            min-height: 14px;
+        }
+
+        .btn-plus {
+            min-width: 40px;
+            min-height: 40px;
+            align-self: flex-start;
+            font-size: 20px;
+            line-height: 1;
+            padding: 6px 10px;
+        }
+
+        .panel-input > .btn-or {
+            align-self: flex-start;
+            min-height: 40px;
         }
 
         .panel-body {
@@ -906,8 +945,15 @@
 
                 <!-- Input Bar -->
                 <div class="panel-input">
-                    <input type="text" id="url-input" placeholder="输入链接或ID..."
-                        onkeydown="if(event.key==='Enter')添加并获取()">
+                    <div class="input-stack">
+                        <input type="text" id="url-input" placeholder="输入链接或ID..."
+                            onkeydown="if(event.key==='Enter')添加并获取()">
+                        <textarea id="url-multi" style="display:none"
+                            placeholder="每行一条；也可粘贴混排（逗号 / 分号 / 空格 / 回车）自动拆分。Ctrl+Enter 提交"></textarea>
+                        <div class="input-count" id="url-count"></div>
+                    </div>
+                    <button class="btn btn-gh btn-plus" id="btn-multi" type="button" title="展开多行输入"
+                        aria-expanded="false">+</button>
                     <button class="btn btn-or" onclick="添加并获取()">添加并获取</button>
                 </div>
 
@@ -959,6 +1005,7 @@
 
     <div class="toast" id="toast"></div>
 
+    <script src="/assets/batch.js"></script>
     <script>
         (function () {
             /* ===== 状态 ===== */
@@ -995,7 +1042,8 @@
                 取元素('p-title').textContent = cfg.title;
                 取元素('p-hint').textContent = cfg.hint;
                 取元素('url-input').placeholder = cfg.placeholder;
-                取元素('url-input').value = '';
+                批量框.设文本('');
+                if (批量框.是否展开()) 批量框.设展开(false);
                 取元素('view-grid').style.display = 'none';
                 取元素('view-panel').style.display = '';
                 取元素('hdr-back').href = 'javascript:void(0)';
@@ -1015,31 +1063,31 @@
             };
 
             /* ===== ADD ===== */
-            async function 添加并获取() {
-                const v = 取元素('url-input').value.trim();
-                if (!v) { 提示('请输入链接或ID', true); return; }
+            const 批量框 = 挂载批量输入({
+                inputId: 'url-input',
+                textareaId: 'url-multi',
+                toggleId: 'btn-multi',
+                countId: 'url-count',
+                onSubmit: () => 添加并获取(),
+            });
 
-                // 预先识别类型
-                try {
-                    const pr = await (await fetch('/api/mdout/parse', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: v })
-                    })).json();
-                    if (pr.type === 'unknown') { 提示('无法识别该链接', true); return; }
-                    if (pr.type !== 当前面板) {
-                        const labels = { video: '视频', user: '用户', article: '专栏' };
-                        提示(`这是${labels[pr.type] || '其他'}链接，请去对应卡片操作`, true);
-                        return;
-                    }
-                } catch (e) { }
+            async function 添加并获取() {
+                const v = 批量框.当前文本().trim();
+                if (!v) { 提示('请输入链接或ID', true); return; }
 
                 const r = await (await fetch('/api/mdout/add', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: v })
+                    body: JSON.stringify({ text: v, expect_type: 当前面板 })
                 })).json();
                 if (!r.ok) { 提示(r.error || '添加失败', true); return; }
-                取元素('url-input').value = '';
-                提示('已添加');
+                批量框.设文本('');
+                if (r.added && r.added > 1) {
+                    let msg = '已添加 ' + r.added + ' 条';
+                    if (r.wrong_type) msg += '，跳过类型不符 ' + r.wrong_type;
+                    提示(msg);
+                } else {
+                    提示('已添加');
+                }
             };
 
             /* ===== ITEM CLICK / SELECT ===== */

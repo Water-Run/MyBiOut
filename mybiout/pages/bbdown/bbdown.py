@@ -50,8 +50,12 @@ def _寻找BBDown() -> str | None:
     ]
     for 候选路径 in 候选路径列表:
         if 候选路径.exists():
+            工具.确保文件可执行(候选路径)
             return str(候选路径)
-    return 文件工具.which("BBDown") or 文件工具.which("bbdown")
+    系统路径 = 文件工具.which("BBDown") or 文件工具.which("bbdown")
+    if 系统路径:
+        工具.确保文件可执行(路径(系统路径))
+    return 系统路径
 
 
 def _寻找FFmpeg() -> str | None:
@@ -70,8 +74,12 @@ def _寻找FFmpeg() -> str | None:
     ]
     for 候选路径 in 候选路径列表:
         if 候选路径.exists():
+            工具.确保文件可执行(候选路径)
             return str(候选路径)
-    return 文件工具.which("ffmpeg")
+    系统路径 = 文件工具.which("ffmpeg")
+    if 系统路径:
+        工具.确保文件可执行(路径(系统路径))
+    return 系统路径
 
 
 def _生成编号() -> str:
@@ -472,19 +480,34 @@ def 环境检查() -> dict[str, bool | str]:
     }
 
 
-def 添加任务(链接: str, 选项: dict | None = None) -> dict:
-    链接 = 链接.strip()
-    if not 链接:
-        return {"ok": False, "error": "URL 不能为空"}
-    if not _寻找BBDown():
-        return {"ok": False, "error": "BBDown 未找到"}
-
+def _添加单任务(链接: str, 选项: dict | None = None) -> dict:
     任务: 下载任务 = 下载任务(链接=链接, 选项=选项 or {})
     with 状态.锁:
         状态.任务列表.append(任务)
     状态.记录日志("info", f"已添加任务: {链接}")
     _确保工作线程()
-    return {"ok": True, "task_id": 任务.编号}
+    return {"ok": True, "task_id": 任务.编号, "added": 1}
+
+
+def 添加任务(链接: str, 选项: dict | None = None) -> dict:
+    from mybiout.pages.batch_input import 解析批量输入
+
+    原文: str = (链接 or "").strip()
+    项们: list[str] = 解析批量输入(原文)
+    if not 项们 and 原文:
+        项们 = [原文]
+    if not 项们:
+        return {"ok": False, "error": "URL 不能为空"}
+    if not _寻找BBDown():
+        return {"ok": False, "error": "BBDown 未找到"}
+    if len(项们) == 1:
+        return _添加单任务(项们[0], 选项)
+    编号们: list[str] = []
+    for 项 in 项们:
+        结果: dict = _添加单任务(项, 选项)
+        if 结果.get("ok"):
+            编号们.append(str(结果.get("task_id") or ""))
+    return {"ok": True, "added": len(编号们), "task_ids": 编号们, "task_id": 编号们[0] if 编号们 else ""}
 
 
 def 取消当前() -> None:
@@ -534,22 +557,6 @@ def 清空队列() -> None:
 
 def 在资源管理器中打开(文件路径: str) -> dict[str, bool | str]:
     r"""
-    在资源管理器中定位文件或打开目录
+    在系统文件管理器中定位文件或打开目录
     """
-    if not 文件路径:
-        return {"ok": False, "error": "路径为空"}
-    候选路径: 路径 = 路径(文件路径)
-    try:
-        if 候选路径.is_file():
-            子进程.Popen(["explorer", "/select,", str(候选路径)], **_子进程附加参数)
-        elif 候选路径.is_dir():
-            子进程.Popen(["explorer", str(候选路径)], **_子进程附加参数)
-        else:
-            父目录 = 候选路径.父目录
-            if 父目录.is_dir():
-                子进程.Popen(["explorer", str(父目录)], **_子进程附加参数)
-            else:
-                return {"ok": False, "error": "路径不存在"}
-        return {"ok": True}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    return 工具.打开本地路径(文件路径)

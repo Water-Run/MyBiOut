@@ -91,10 +91,14 @@ def _寻找ADB() -> str | None:
     工具目录: 路径 = 工具.取工具目录()
     for 候选路径 in (
         工具目录 / "adb.exe",
+        工具目录 / "adb",
         工具目录 / "platform-tools" / "adb.exe",
+        工具目录 / "platform-tools" / "adb",
         工具目录 / "adb" / "adb.exe",
+        工具目录 / "adb" / "adb",
     ):
         if 候选路径.is_file():
+            工具.确保文件可执行(候选路径)
             return str(候选路径)
     程序名: str = "adb.exe" if 系统信息.platform == "win32" else "adb"
     which路径 = 文件工具.which(程序名) or 文件工具.which("adb")
@@ -123,9 +127,10 @@ def _寻找FFmpeg() -> str | None:
     r"""优先使用绿色包旁路 ffmpeg，开发态才回退 PATH。"""
     工具目录: 路径 = 工具.取工具目录()
     程序名: str = "ffmpeg.exe" if 系统信息.platform == "win32" else "ffmpeg"
-    随包路径: 路径 = 工具目录 / 程序名
-    if 随包路径.is_file():
-        return str(随包路径)
+    for 随包路径 in (工具目录 / 程序名, 工具目录 / "ffmpeg", 工具目录 / "ffmpeg.exe"):
+        if 随包路径.is_file():
+            工具.确保文件可执行(随包路径)
+            return str(随包路径)
     return 文件工具.which(程序名) or 文件工具.which("ffmpeg")
 
 

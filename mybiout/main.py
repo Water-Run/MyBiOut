@@ -13,6 +13,7 @@ import os as 操作系统
 import random as 随机
 import shutil as 文件工具
 import socket as 套接字
+import subprocess as 子进程
 import sys as 系统
 import threading as 线程
 import time as 时间
@@ -191,6 +192,49 @@ def _是否有交互控制台() -> bool:
         return False
 
 
+def _启动示例(额外: str = "") -> str:
+    r"""平台相关的启动命令示例。"""
+    程序: str = "MyBiOut!.exe" if 系统.platform == "win32" else "./MyBiOut!"
+    return f"{程序} {额外}".strip() if 额外 else 程序
+
+
+def _系统消息框(标题: str, 消息: str, *, 警告: bool = False) -> None:
+    r"""Windows MessageBox; Linux zenity/kdialog/notify-send。"""
+    if 系统.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(0, 消息, 标题, 0x30 if 警告 else 0x10)
+        except Exception:
+            pass
+        return
+    命令们: tuple[list[str], ...] = (
+        [
+            "zenity",
+            "--warning" if 警告 else "--error",
+            "--title",
+            标题,
+            "--text",
+            消息,
+            "--no-wrap",
+        ],
+        [
+            "kdialog",
+            "--title",
+            标题,
+            "--sorry" if 警告 else "--error",
+            消息,
+        ],
+        ["notify-send", 标题, 消息],
+    )
+    for 命令 in 命令们:
+        try:
+            子进程.run(命令, check=False, timeout=12)
+            return
+        except Exception:
+            continue
+
+
 def _提示致命错误(消息: str, *, 标题: str = "MyBiOut!") -> None:
     r"""
     输出致命错误; 冻结且无控制台时用系统消息框, 避免 --windowed 静默失败
@@ -199,12 +243,7 @@ def _提示致命错误(消息: str, *, 标题: str = "MyBiOut!") -> None:
         _安全打印(消息)
     if not 是否冻结运行() or _是否有交互控制台():
         return
-    try:
-        import ctypes
-
-        ctypes.windll.user32.MessageBoxW(0, 消息, 标题, 0x10)
-    except Exception:
-        pass
+    _系统消息框(标题, 消息, 警告=False)
 
 
 def _提示环境警告(消息: str, *, 标题: str = "MyBiOut! 环境提示") -> None:
@@ -219,13 +258,7 @@ def _提示环境警告(消息: str, *, 标题: str = "MyBiOut! 环境提示") -
         return
     if _是否有交互控制台():
         return
-    try:
-        import ctypes
-
-        # 0x30 = MB_ICONWARNING
-        ctypes.windll.user32.MessageBoxW(0, 消息, 标题, 0x30)
-    except Exception:
-        pass
+    _系统消息框(标题, 消息, 警告=True)
 
 
 # ===== 环境检查 =====
@@ -258,6 +291,7 @@ def _检查环境() -> list[_环境项]:
         程序工具目录 / "ffmpeg",
         程序工具目录 / "ffmpeg" / "ffmpeg.exe",
         程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
+        程序工具目录 / "ffmpeg" / "bin" / "ffmpeg",
         程序工具目录 / "BBDown" / "ffmpeg.exe",
         程序工具目录 / "BBDown" / "ffmpeg",
     ):
@@ -270,8 +304,8 @@ def _检查环境() -> list[_环境项]:
         _环境项(
             "ffmpeg",
             找到FFmpeg,
-            "绿色包应自带 bin/ffmpeg.exe。\n"
-            "若缺失：将 ffmpeg.exe 放入程序目录 bin/ 下（Win11 x64）",
+            "绿色包应自带 bin/ffmpeg（Windows 为 ffmpeg.exe）。\n"
+            "若缺失：将 ffmpeg 放入程序目录 bin/ 下，或保证 PATH 可找到",
         )
     )
 
@@ -292,8 +326,8 @@ def _检查环境() -> list[_环境项]:
         _环境项(
             "BBDown",
             找到BBDown,
-            "绿色包应自带 bin/BBDown.exe。\n"
-            "若缺失：将 BBDown.exe 放入程序目录 bin/ 下",
+            "绿色包应自带 bin/BBDown（Windows 为 BBDown.exe）。\n"
+            "若缺失：将 BBDown 放入程序目录 bin/ 下，或保证 PATH 可找到",
         )
     )
 
@@ -301,8 +335,11 @@ def _检查环境() -> list[_环境项]:
     找到ADB: bool = False
     for 候选路径 in (
         程序工具目录 / "adb.exe",
+        程序工具目录 / "adb",
         程序工具目录 / "platform-tools" / "adb.exe",
+        程序工具目录 / "platform-tools" / "adb",
         程序工具目录 / "adb" / "adb.exe",
+        程序工具目录 / "adb" / "adb",
     ):
         if 候选路径.is_file():
             找到ADB = True
@@ -313,33 +350,33 @@ def _检查环境() -> list[_环境项]:
         _环境项(
             "ADB",
             找到ADB,
-            "绿色包应自带 bin/adb.exe（及配套 dll）。\n"
+            "绿色包应自带 bin/adb（Windows 另含配套 dll）。\n"
             "仅扫手机缓存需要；没有则 PC 本地缓存仍可用",
         )
     )
 
-    # FFmpeg（LocalOut 合并 m4s，绿色包必须自带）
-    找到FFmpeg: bool = (程序工具目录 / "ffmpeg.exe").is_file() or 文件工具.which("ffmpeg.exe") is not None
-    检查结果.append(
-        _环境项(
-            "FFmpeg",
-            找到FFmpeg,
-            "绿色包应自带 bin/ffmpeg.exe。\n"
-            "LocalOut 使用它无损合并 m4s。",
+    # 内嵌窗口：Win=WebView2；Linux=pywebview + WebKit/GTK
+    if 系统.platform == "win32":
+        找到窗口: bool = _检测WebView2运行时()
+        检查结果.append(
+            _环境项(
+                "WebView2",
+                找到窗口,
+                "内嵌窗口需要 Microsoft Edge WebView2 Runtime。\n"
+                "Win11 一般自带；若缺：装 WebView2 Runtime，或启动时加 --browser 用系统浏览器。\n"
+                "下载: https://developer.microsoft.com/microsoft-edge/webview2/",
+            )
         )
-    )
-
-    # WebView2：内嵌窗口依赖；缺了不拦启动，提示即可（可 --browser）
-    找到WebView2: bool = _检测WebView2运行时()
-    检查结果.append(
-        _环境项(
-            "WebView2",
-            找到WebView2,
-            "内嵌窗口需要 Microsoft Edge WebView2 Runtime。\n"
-            "Win11 一般自带；若缺：装 WebView2 Runtime，或启动时加 --browser 用系统浏览器。\n"
-            "下载: https://developer.microsoft.com/microsoft-edge/webview2/",
+    else:
+        找到窗口 = _可否使用窗口壳()
+        检查结果.append(
+            _环境项(
+                "内嵌窗口",
+                找到窗口,
+                "Linux 内嵌窗口需要 pywebview 以及 GTK/WebKit（如 webkit2gtk）。\n"
+                "没有则可: " + _启动示例("--browser"),
+            )
         )
-    )
 
     return 检查结果
 
@@ -1343,17 +1380,18 @@ def _格式化冻结窗口启动错误(异常: Exception) -> str:
         return (
             "内嵌窗口运行组件加载失败。\n\n"
             f"原因：{原因}\n\n"
-            "请确认 MyBiOut!.exe.config 与 MyBiOut!.exe 位于同一目录。\n"
+            "请确认 MyBiOut!.exe.config 与主程序位于同一目录。\n"
             "若使用的是旧发布包，请先在压缩包属性中解除锁定，再重新解压。\n"
             "仅调试时可用：\n"
-            "  MyBiOut!.exe --browser"
+            f"  {_启动示例('--browser')}"
         )
+    窗口名 = "WebView2" if 系统.platform == "win32" else "GTK/WebKit"
     return (
-        "内嵌窗口（WebView2）启动失败。\n\n"
+        f"内嵌窗口（{窗口名}）启动失败。\n\n"
         f"原因：{原因}\n\n"
         "绿色包默认只使用内嵌窗口，不会自动打开浏览器。\n"
-        "请安装 WebView2 Runtime 后重试；仅调试时可用：\n"
-        "  MyBiOut!.exe --browser"
+        f"请检查窗口运行时后重试；仅调试时可用：\n"
+        f"  {_启动示例('--browser')}"
     )
 
 
@@ -1488,7 +1526,7 @@ def 主程序() -> None:
                 "内嵌窗口组件 (pywebview) 不可用。\n\n"
                 "绿色包默认只走内嵌窗口，不会自动打开浏览器。\n"
                 "请重新下载/解压完整发布包；若需浏览器调试可显式：\n"
-                "  MyBiOut!.exe --browser"
+                f"  {_启动示例('--browser')}"
             )
             return
         使用窗口 = False
@@ -1515,9 +1553,9 @@ def 主程序() -> None:
         提示正文: str = (
             f"以下组件未找到：{缺失名称}\n\n"
             "程序仍会启动，但对应功能可能不可用。\n\n"
-            "· BBDown / ffmpeg / ADB：应在程序目录 bin/ 下（Win11 x64 绿色包随发）\n"
-            "· WebView2：内嵌窗口需要；Win11 一般自带。没有可装 Runtime，\n"
-            "  或用 MyBiOut!.exe --browser 走系统浏览器\n\n"
+            "· BBDown / ffmpeg / ADB：应在程序目录 bin/ 下（绿色包随发）\n"
+            "· 内嵌窗口：Windows 需 WebView2；Linux 需 GTK/WebKit\n"
+            f"  或用 {_启动示例('--browser')} 走系统浏览器\n\n"
             "缺啥就提示一下，哦启动不了对应能力即可。"
         )
         _提示环境警告(提示正文)
@@ -1578,10 +1616,10 @@ def 主程序() -> None:
                 return
             # 开发态保留回退, 方便无 WebView2 时调试
             _提示环境警告(
-                "内嵌窗口（WebView2）启动不了。\n\n"
+                "内嵌窗口启动不了。\n\n"
                 f"原因：{e}\n\n"
                 "开发态将尝试用系统浏览器打开界面。\n"
-                "安装 WebView2 Runtime 可恢复内嵌窗。"
+                "Windows 可装 WebView2；Linux 需 pywebview + GTK/WebKit。"
             )
             使用窗口 = False
 

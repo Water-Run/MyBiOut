@@ -110,7 +110,7 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
             工具.设设置(分区, 键, 值.strip())
             return _成功()
 
-        case ("mdout", "include_cover" | "include_tags" | "include_stats"):
+        case ("mdout", "include_cover" | "include_tags" | "include_stats" | "favorite_complete"):
             return _保存布尔(分区, 键, 值)
 
         case ("mdout", "sessdata"):
@@ -255,7 +255,7 @@ def 取桌面路径() -> str:
     获取桌面下的 MyBiOut! 路径
     :return: str: 桌面导出路径
     """
-    return str(路径.home() / "Desktop" / "MyBiOut!")
+    return str(工具.取桌面目录() / "MyBiOut!")
 
 
 def 取默认哔哩电脑缓存路径() -> str:

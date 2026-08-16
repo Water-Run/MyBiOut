@@ -16,36 +16,48 @@
 - [BBDown](https://github.com/nilaoda/BBDown): 知名哔哩哔哩下载工具  
 - [pywebview](https://pywebview.flowrl.com/): 内嵌 Web 窗口套壳  
 
-> 发布形态面向 **Windows 11 x64** 绿色包（亦可能在 Win10 x64 上运行，但不作保证）  
+> 发布形态：**Windows 11 x64** 绿色包（`.rar`）与 **Linux x64** 绿色包（`.tar.gz`）。Win10 x64 / 常见发行版也可跑，但不作保证。  
 
 ## 使用
 
-1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut! *.rar`（例 `MyBiOut! 二六〇七甲.rar`）  
-2. 解压到任意目录（包内含 `MyBiOut!/` 程序目录、`README.md`、`LICENSE`）  
+### Windows
+
+1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut! *.rar`（例 `MyBiOut! 二六〇八丙.rar`）  
+2. 解压到任意目录（包内含 `MyBiOut!/` 程序目录、`README.txt`、`LICENSE`）  
 3. 进入 **`MyBiOut!`** 目录，双击 **`MyBiOut!.exe`**  
 4. 关闭窗口即退出  
 
-内嵌窗口基于系统 **WebView2**. Windows 11 一般已自带; 若窗口无法打开, 安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).  
+内嵌窗口基于系统 **WebView2**。Windows 11 一般已自带; 若窗口无法打开, 安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).  
 
-绿色包 `bin/` **随程序分发** `BBDown.exe`、`ffmpeg.exe`、`adb.exe`（及 ADB 配套 dll），一般无需再装系统 PATH 工具。内嵌窗口依赖系统 **WebView2**（Win11 一般自带）。  
+绿色包 `bin/` **随程序分发** `BBDown.exe`、`ffmpeg.exe`、`adb.exe`（及 ADB 配套 dll）。  
 
-若缺工具或 WebView2 起不来：启动时**弹提示即可**，程序仍尽量打开（可回退浏览器）；对应功能可能不可用。  
+可选参数: `MyBiOut!.exe --port 2026`；`--browser` 仅调试用。
 
-可选参数: `MyBiOut!.exe --port 2026`；`--browser` 仅调试用（默认内嵌窗口，绿色包不自动开浏览器）。
+### Linux
+
+1. 下载 `MyBiOut! *.tar.gz`，解压后进入 `MyBiOut!/`  
+2. 执行 `./MyBiOut!`（需可执行位；内嵌窗口依赖 GTK + WebKit，如 `webkit2gtk`）  
+3. 若窗口起不来：`./MyBiOut! --browser`  
+
+开发态：`pip install -r requirements.txt` 后 `python -m mybiout`（无 pywebview 时自动回退系统浏览器）。  
+
+绿色包 `bin/` 随发 `BBDown`、`ffmpeg`、`adb`（无 `.exe` 后缀）。也可使用系统 PATH 中的同名工具。  
+
+若缺工具或窗口运行时：启动时**弹提示即可**，程序仍尽量打开；对应功能可能不可用。
 
 | 路径 | 说明 |
 |---|---|
 | `config.ini` | 配置文件 |
-| `bin/` | 随包工具：`BBDown.exe` / `ffmpeg.exe` / `adb.exe` |
+| `bin/` | 随包工具：BBDown / ffmpeg / adb |
 | `auth_profile/` | 扫码登录可选资料目录 |
 | `version.txt` | 版本号 (界面底部优先读此文件) |
 | `使用说明.txt` | 简要说明 |
 
 ## 打包
 
-维护者在本机执行 (Python 3.14+)。发布包固定为 **`.rar`**：脚本会探测 PATH / 常见目录 / `tools/rar`；若没有可用的 `rar a` 创建端，会尝试 winget 或下载安装到工程 `tools/rar`（本机缓存，不进 git）。  
+维护者在本机执行 (Python 3.14+)。Windows 发布包为 **`.rar`**（脚本会探测 / 补齐 `rar a`）；Linux 发布包为 **`.tar.gz`**。  
 
-```cmd
+```
 python 打包.py
 python 打包.py 重来
 ```

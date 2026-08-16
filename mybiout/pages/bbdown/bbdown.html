@@ -148,6 +148,7 @@
         .input-bar {
             flex-shrink: 0;
             display: flex;
+            align-items: flex-start;
             gap: 10px;
             margin-bottom: 12px;
             background: rgba(255, 255, 255, .92);
@@ -157,7 +158,8 @@
             padding: 12px 16px;
         }
 
-        .input-bar input {
+        .input-bar input,
+        .input-bar textarea {
             flex: 1;
             padding: 9px 14px;
             border: 2px solid #F5A623;
@@ -168,8 +170,45 @@
             transition: border-color .2s;
         }
 
-        .input-bar input:focus {
+        .input-bar input:focus,
+        .input-bar textarea:focus {
             border-color: #E85B8A;
+        }
+
+        .input-stack {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .input-bar textarea {
+            min-height: 96px;
+            max-height: 180px;
+            resize: vertical;
+            line-height: 1.45;
+        }
+
+        .input-count {
+            font-size: 11px;
+            font-weight: 700;
+            color: #E85B8A;
+            min-height: 14px;
+        }
+
+        .btn-plus {
+            min-width: 40px;
+            min-height: 42px;
+            align-self: flex-start;
+            font-size: 20px;
+            line-height: 1;
+            padding: 6px 10px;
+        }
+
+        .input-bar > .btn-gn {
+            align-self: flex-start;
+            min-height: 42px;
         }
 
         /* ===== COLUMNS ===== */
@@ -732,8 +771,15 @@
 
         <!-- INPUT BAR -->
         <div class="input-bar">
-            <input type="text" id="url-input" placeholder="输入 BV号 / av号 / ep号 / ss号 / 视频链接 / b23短链..."
-                onkeydown="if(event.key==='Enter')添加任务()">
+            <div class="input-stack">
+                <input type="text" id="url-input" placeholder="输入 BV号 / av号 / ep号 / ss号 / 视频链接 / b23短链..."
+                    onkeydown="if(event.key==='Enter')添加任务()">
+                <textarea id="url-multi" style="display:none"
+                    placeholder="每行一条；也可粘贴混排（逗号 / 分号 / 空格 / 回车）自动拆分。Ctrl+Enter 提交"></textarea>
+                <div class="input-count" id="url-count"></div>
+            </div>
+            <button class="btn btn-gh btn-plus" id="btn-multi" type="button" title="展开多行输入"
+                aria-expanded="false">+</button>
             <button class="btn btn-gn" onclick="添加任务()" id="btn-add">▶ 下载</button>
         </div>
 
@@ -829,6 +875,7 @@
 
     <div class="toast" id="toast"></div>
 
+<script src="/assets/batch.js"></script>
 <script>
     (function () {
         const 取元素 = id => document.getElementById(id);
@@ -853,9 +900,9 @@
                 ff.className = 'env-tag ' + (r.ffmpeg_available ? 'env-ok' : 'env-err');
                 let html = '';
                 if (r.bbdown_available) html += '<span class="e-ok">✅ BBDown 就绪</span><br>';
-                else html += '<span class="e-err">❌ BBDown 未找到</span>（请把 BBDown.exe 放到程序 bin/）<br>';
+                else html += '<span class="e-err">❌ BBDown 未找到</span>（请把 BBDown 放到程序 bin/）<br>';
                 if (r.ffmpeg_available) html += '<span class="e-ok">✅ ffmpeg 就绪</span>';
-                else { html += '<span class="e-err">❌ ffmpeg 未找到</span>（绿色包应自带 bin/ffmpeg.exe）<br>'; html += '<a href="https://ffmpeg.org/download.html" target="_blank">官方下载 ffmpeg ↗</a>'; }
+                else { html += '<span class="e-err">❌ ffmpeg 未找到</span>（绿色包应自带 bin/ffmpeg）<br>'; html += '<a href="https://ffmpeg.org/download.html" target="_blank">官方下载 ffmpeg ↗</a>'; }
                 const sess = 取元素('env-sess');
                 if (r.has_sessdata) {
                     sess.textContent = '✅ Session'; sess.className = 'env-tag env-ok';
@@ -871,8 +918,16 @@
             }
         }
 
+        const 批量框 = 挂载批量输入({
+            inputId: 'url-input',
+            textareaId: 'url-multi',
+            toggleId: 'btn-multi',
+            countId: 'url-count',
+            onSubmit: () => 添加任务(),
+        });
+
         async function 添加任务() {
-            const url = 取元素('url-input').value.trim();
+            const url = 批量框.当前文本().trim();
             if (!url) { 提示('请输入链接', true); return; }
             const options = {
                 api_mode: 取元素('opt-api').value,
@@ -888,7 +943,10 @@
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url, options })
             })).json();
-            if (r.ok) { 取元素('url-input').value = ''; 提示('已添加下载任务'); }
+            if (r.ok) {
+                批量框.设文本('');
+                提示((r.added && r.added > 1) ? ('已添加 ' + r.added + ' 条任务') : '已添加下载任务');
+            }
             else 提示(r.error || '添加失败', true);
         }
 

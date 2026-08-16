@@ -11,7 +11,7 @@ MyBiOut! 绿色版一键打包脚本（独立维护入口）
     1) 安装依赖（已装则跳过升级, 加快重复打包）
     2) PyInstaller 构建（增量、无 collect-all 全量收集）
     3) 组装绿色目录（先删旧绿包；工具/脱敏配置强制校验）
-    4) 调用本机 rar 命令行打 .rar 发布包（PATH 上的 rar / 任意提供 Rar 的安装均可）
+    4) Windows 打 .rar；Linux 打 .tar.gz
        包内: MyBiOut!/ + README.txt + LICENSE；写出到 打包结果/
     5) 收尾：裁剪过旧发布包
 
@@ -159,6 +159,7 @@ _跳过拷贝后缀: frozenset[str] = frozenset(
     "mybiout.pages.mdout.mdout",
     "mybiout.pages.man.man",
     "mybiout.pages.ohmyconfig.ohmyconfig",
+    "mybiout.pages.batch_input",
 ]
 
 # 不再 --collect-all（极慢）; 靠 hidden-import 即可, 缺模块再补
@@ -445,6 +446,17 @@ def _检测占用中的绿色版进程() -> str:
     :return: str: 占用提示文本, 未检测到或非 Win 返回空串
     """
     if 系统.platform != "win32":
+        try:
+            结果 = 子进程.run(
+                ["pgrep", "-x", 产物显示名],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return ""
+        if 结果.returncode == 0 and (结果.stdout or "").strip():
+            return f"检测到 {产物显示名} 正在运行, 它会锁住产物目录。"
         return ""
     try:
         结果 = 子进程.run(
@@ -475,7 +487,18 @@ def _终止占用中的绿色版进程() -> tuple[bool, str]:
     :return: (是否执行了终止, 状态消息)
     """
     if 系统.platform != "win32":
-        return False, ""
+        try:
+            终止结果 = 子进程.run(
+                ["pkill", "-x", 产物显示名],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return False, ""
+        if 终止结果.returncode == 0:
+            return True, f"已终止占用中的 {产物显示名}"
+        return False, "未找到运行中的绿色版进程 (无需终止)"
     try:
         终止结果: 子进程.CompletedProcess = 子进程.run(
             ["taskkill", "/F", "/T", "/IM", f"{产物显示名}.exe"],
@@ -595,7 +618,7 @@ def 强制脱敏配置分区(
                 值 = ""
             elif 键小 in {"path", "folder"} and _路径含本机用户痕迹(值):
                 # export.path 回落通用目录; folder 类相对名一般不含 Users
-                值 = r"C:\MyBiOut!" if 键小 == "path" else ""
+                值 = (r"C:\MyBiOut!" if 系统.platform == "win32" else str(路径.home() / "MyBiOut!")) if 键小 == "path" else ""
             elif _路径含本机用户痕迹(值) and (
                 "path" in 键小 or "dir" in 键小 or "folder" in 键小 or "cache" in 键小
             ):
@@ -607,13 +630,6 @@ def 强制脱敏配置分区(
 
 def 获取打包互斥锁(状态: 打包进度 | None = None):
     r"""防止并发打包互相 rmtree / 写同一 zip。句柄需在 finally 中释放。"""
-    if 系统.platform != "win32":
-        return None
-    try:
-        import msvcrt as 微软运行时
-    except ImportError:
-        return None
-
     目录 = 工程根目录 / 产物输出目录名
     目录.mkdir(parents=True, exist_ok=True)
     锁路径 = 目录 / ".pack.lock"
@@ -626,7 +642,14 @@ def 获取打包互斥锁(状态: 打包进度 | None = None):
         失败退出(说明)
     try:
         句柄.seek(0)
-        微软运行时.locking(句柄.fileno(), 微软运行时.LK_NBLCK, 1)
+        if 系统.platform == "win32":
+            import msvcrt as 微软运行时
+
+            微软运行时.locking(句柄.fileno(), 微软运行时.LK_NBLCK, 1)
+        else:
+            import fcntl as 文件锁
+
+            文件锁.flock(句柄.fileno(), 文件锁.LOCK_EX | 文件锁.LOCK_NB)
     except OSError:
         try:
             句柄.close()
@@ -653,10 +676,15 @@ def 释放打包互斥锁(句柄) -> None:
     if 句柄 is None:
         return
     try:
-        import msvcrt as 微软运行时
+        if 系统.platform == "win32":
+            import msvcrt as 微软运行时
 
-        句柄.seek(0)
-        微软运行时.locking(句柄.fileno(), 微软运行时.LK_UNLCK, 1)
+            句柄.seek(0)
+            微软运行时.locking(句柄.fileno(), 微软运行时.LK_UNLCK, 1)
+        else:
+            import fcntl as 文件锁
+
+            文件锁.flock(句柄.fileno(), 文件锁.LOCK_UN)
     except Exception:  # noqa: BLE001
         pass
     try:
@@ -1382,6 +1410,7 @@ def 快速代码检查(状态回调=None) -> tuple[bool, str]:
         程序包目录 / "pages" / "mdout" / "mdout.py",
         程序包目录 / "pages" / "man" / "man.py",
         程序包目录 / "pages" / "ohmyconfig" / "ohmyconfig.py",
+        程序包目录 / "pages" / "batch_input.py",
     ]
     必备路径: list[路径] = [
         程序包目录 / "assets",
@@ -3047,10 +3076,10 @@ def 重来本月从甲(当日: 日期 | None = None) -> str:
 
 
 def 检查运行平台() -> None:
-    if 系统.platform != "win32":
-        失败退出("本打包脚本仅支持 Windows 系统。")
+    if 系统.platform not in {"win32", "linux"}:
+        失败退出("本打包脚本目前支持 Windows 与 Linux。")
     if 系统.maxsize <= 2**32:
-        失败退出("本打包脚本仅支持 64 位 Windows。")
+        失败退出("本打包脚本仅支持 64 位系统。")
     if not 程序包目录.is_dir():
         失败退出(f"未找到程序包目录: {程序包目录}")
     if not (程序包目录 / "main.py").is_file():
@@ -3213,9 +3242,19 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
     if 图标文件.is_file():
         参数 += ["--icon", str(图标文件)]
     for 源路径, 目标标记 in 内嵌数据项:
-        参数 += ["--add-data", f"{源路径};{目标标记}"]
+        参数 += ["--add-data", f"{源路径}{操作系统.pathsep}{目标标记}"]
     for 模块名 in 隐藏导入列表:
         参数 += ["--hidden-import", 模块名]
+    if 系统.platform != "win32":
+        for 模块名 in (
+            "webview.platforms.gtk",
+            "gi",
+            "gi.repository",
+            "gi.repository.Gtk",
+            "gi.repository.GLib",
+            "gi.repository.WebKit2",
+        ):
+            参数 += ["--hidden-import", 模块名]
     # webview 需要少量数据文件, 比 collect-all 轻得多
     参数 += ["--collect-data", "webview"]
     参数.append(str(程序包目录 / "main.py"))
@@ -3243,13 +3282,13 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
             体积 = 目录体积字节(构建目录) + 目录体积字节(产物目录)
             # 0.05~0.92 映射到体积, 完成仍由主线程收口
             段内 = 0.05 + 0.87 * min(1.0, 体积 / 饱和字节)
-            有exe = (产物目录 / f"{产物显示名}.exe").is_file()
+            有产物 = (产物目录 / f"{产物显示名}.exe").is_file() or (产物目录 / 产物显示名).is_file()
             文案 = "PyInstaller 分析/链接中…"
             if 体积 > 8 * 1024 * 1024:
                 文案 = "PyInstaller 写出产物…"
-            if 有exe:
+            if 有产物:
                 段内 = max(段内, 0.9)
-                文案 = "产物 exe 已生成, 收尾中…"
+                文案 = "产物已生成, 收尾中…"
             if 状态:
                 状态.进入阶段(
                     "构建",
@@ -3332,6 +3371,7 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
                 "include_tags": "true",
                 "include_stats": "true",
                 "favorite_detail": "basic",
+                "favorite_complete": "true",
                 "request_delay": "0.5",
             },
         }
@@ -3369,12 +3409,31 @@ def 目录内是否有FFmpeg(工具目录: 路径) -> bool:
 def 目录内是否有ADB(工具目录: 路径) -> bool:
     for 候选 in (
         工具目录 / "adb.exe",
+        工具目录 / "adb",
         工具目录 / "platform-tools" / "adb.exe",
+        工具目录 / "platform-tools" / "adb",
         工具目录 / "adb" / "adb.exe",
+        工具目录 / "adb" / "adb",
     ):
         if 候选.is_file():
             return True
     return False
+
+
+def 目录内是否有BBDown(工具目录: 路径) -> bool:
+    return any(
+        候选.is_file()
+        for 候选 in (工具目录 / "BBDown.exe", 工具目录 / "BBDown", 工具目录 / "bbdown")
+    )
+
+
+def 确保路径可执行(路径对象: 路径) -> None:
+    if 系统.platform == "win32" or not 路径对象.is_file():
+        return
+    try:
+        路径对象.chmod(路径对象.stat().st_mode | 0o111)
+    except OSError:
+        pass
 
 
 def _解析真实可执行文件(which路径: str | 路径) -> 路径 | None:
@@ -3418,8 +3477,9 @@ def 尝试从系统路径补齐FFmpeg(工具目录: 路径, 状态: 打包进度
     if 源文件 is None or not 源文件.is_file():
         return
     工具目录.mkdir(parents=True, exist_ok=True)
-    目标文件 = 工具目录 / "ffmpeg.exe"
+    目标文件 = 工具目录 / ("ffmpeg.exe" if 系统.platform == "win32" else "ffmpeg")
     文件工具.copy2(源文件, 目标文件)
+    确保路径可执行(目标文件)
     if 状态 is None or 状态.纯文本:
         打印成功(f"已从系统 PATH 复制 ffmpeg 到绿色包: {目标文件.name} ({源文件})")
 
@@ -3441,14 +3501,17 @@ def 尝试从系统路径补齐ADB(工具目录: 路径, 状态: 打包进度 | 
     if 源文件 is None or not 源文件.is_file():
         return
     工具目录.mkdir(parents=True, exist_ok=True)
-    文件工具.copy2(源文件, 工具目录 / "adb.exe")
+    目标名 = "adb.exe" if 系统.platform == "win32" else "adb"
+    文件工具.copy2(源文件, 工具目录 / 目标名)
+    确保路径可执行(工具目录 / 目标名)
     # 同目录配套库（缺了 adb 可能启动失败）
-    for 名 in ("AdbWinApi.dll", "AdbWinUsbApi.dll", "libwinpthread-1.dll"):
-        旁 = 源文件.parent / 名
-        if 旁.is_file():
-            文件工具.copy2(旁, 工具目录 / 名)
+    if 系统.platform == "win32":
+        for 名 in ("AdbWinApi.dll", "AdbWinUsbApi.dll", "libwinpthread-1.dll"):
+            旁 = 源文件.parent / 名
+            if 旁.is_file():
+                文件工具.copy2(旁, 工具目录 / 名)
     if 状态 is None or 状态.纯文本:
-        打印成功(f"已从系统 PATH 复制 adb 到绿色包: adb.exe ({源文件})")
+        打印成功(f"已从系统 PATH 复制 adb 到绿色包: {目标名} ({源文件})")
 
 
 def 校验绿色包结构(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
@@ -3456,34 +3519,42 @@ def 校验绿色包结构(绿色根: 路径, 状态: 打包进度 | None = None)
     确认绿色包具备冻结运行所需文件 (无系统 Python 也能起)。
     特别防止误把 build/ 中间产物当可分发目录。
     """
-    # (路径, 说明, 最小字节) — 文本可很短; DLL/exe 须够大
-    必备: list[tuple[路径, str, int]] = [
-        (绿色根 / f"{产物显示名}.exe", "主程序 exe", 1024 * 100),
-        (绿色根 / "_internal" / "python314.dll", "内嵌 Python 运行时", 1024 * 100),
-        (绿色根 / "_internal" / "python3.dll", "Python3 DLL", 1024 * 40),
-        (绿色根 / "_internal" / "VCRUNTIME140.dll", "VC 运行库", 1024 * 40),
-        (绿色根 / "version.txt", "版本文件", 2),
-        (绿色根 / "config.ini", "默认配置", 8),
-        (
-            绿色根 / f"{产物显示名}.exe.config",
-            ".NET Internet 区域程序集加载配置",
-            64,
-        ),
-    ]
+    if 系统.platform == "win32":
+        必备: list[tuple[路径, str, int]] = [
+            (绿色根 / f"{产物显示名}.exe", "主程序 exe", 1024 * 100),
+            (绿色根 / "_internal" / "python314.dll", "内嵌 Python 运行时", 1024 * 100),
+            (绿色根 / "_internal" / "python3.dll", "Python3 DLL", 1024 * 40),
+            (绿色根 / "_internal" / "VCRUNTIME140.dll", "VC 运行库", 1024 * 40),
+            (绿色根 / "version.txt", "版本文件", 2),
+            (绿色根 / "config.ini", "默认配置", 8),
+            (
+                绿色根 / f"{产物显示名}.exe.config",
+                ".NET Internet 区域程序集加载配置",
+                64,
+            ),
+        ]
+    else:
+        必备 = [
+            (绿色根 / 产物显示名, "主程序", 1024 * 50),
+            (绿色根 / "version.txt", "版本文件", 2),
+            (绿色根 / "config.ini", "默认配置", 8),
+        ]
     for 路径点, 说明, 最小 in 必备:
         if not 路径点.is_file() or 路径点.stat().st_size < 最小:
             文 = f"绿色包结构不完整: 缺少有效 {说明} ({路径点})"
             if 状态 and not 状态.纯文本:
                 状态.标记失败(文)
             失败退出(文)
-    # 中间产物 build/<名>/MyBiOut!.exe 没有完整 _internal, 绝不能当绿包
+    # 中间产物 build/<名>/MyBiOut! 没有完整 _internal, 绝不能当绿包
     if not (绿色根 / "_internal").is_dir():
         文 = f"绿色包缺少 _internal 目录: {绿色根}"
         if 状态 and not 状态.纯文本:
             状态.标记失败(文)
         失败退出(文)
+    确保路径可执行(绿色根 / 产物显示名)
+    确保路径可执行(绿色根 / f"{产物显示名}.exe")
     if 状态 is None or 状态.纯文本:
-        打印成功("绿色包结构校验通过 (exe + _internal/python314.dll …)")
+        打印成功("绿色包结构校验通过")
 
 
 def _终止进程树(进程: 子进程.Popen) -> None:
@@ -3523,7 +3594,7 @@ def 冒烟启动绿色包(
     可给 Python.Runtime.dll 写入 ZoneId=3，复现浏览器下载后解压的安全区域标记。
     捕获 uvicorn isatty / 缺 DLL / 误走浏览器 等启动问题。
     """
-    可执行 = 绿色根 / f"{产物显示名}.exe"
+    可执行 = 绿色根 / (f"{产物显示名}.exe" if 系统.platform == "win32" else 产物显示名)
     if not 可执行.is_file():
         文 = f"冒烟失败: 找不到 {可执行}"
         if 状态 and not 状态.纯文本:
@@ -3664,21 +3735,24 @@ def 校验绿色包工具(绿色根: 路径, 状态: 打包进度 | None = None)
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
-    bbdown = 工具目录 / "BBDown.exe"
-    if not bbdown.is_file():
-        说明 = f"组装失败：缺少 BBDown.exe，请放到 {程序包目录 / 'bin'}"
+    if not 目录内是否有BBDown(工具目录):
+        说明 = (
+            f"组装失败：缺少 BBDown，请放到 {程序包目录 / 'bin'}"
+            + ("（Windows 为 BBDown.exe）" if 系统.platform == "win32" else "（Linux 可执行文件名为 BBDown）")
+            + "\n  发布页: https://github.com/nilaoda/BBDown/releases"
+        )
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
     尝试从系统路径补齐FFmpeg(工具目录, 状态)
     if not 目录内是否有FFmpeg(工具目录):
-        说明 = "组装失败：绿色包中无 ffmpeg，且 PATH 中也没有（Win11 x64 请准备 ffmpeg.exe）"
+        说明 = "组装失败：绿色包中无 ffmpeg，且 PATH 中也没有（请准备 ffmpeg 并放入 bin/）"
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
     尝试从系统路径补齐ADB(工具目录, 状态)
     if not 目录内是否有ADB(工具目录):
-        说明 = "组装失败：绿色包中无 adb，且 PATH 中也没有（Win11 x64 请准备 platform-tools/adb.exe）"
+        说明 = "组装失败：绿色包中无 adb，且 PATH 中也没有（请准备 platform-tools/adb）"
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
@@ -3764,12 +3838,17 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
             失败退出(说明)
         文件工具.copy2(版本文件路径, 暂存根 / "version.txt")
         写入脱敏默认配置(暂存根 / "config.ini", 状态)
-        (暂存根 / f"{产物显示名}.exe.config").write_text(
-            _CLR远程加载配置,
-            encoding="utf-8",
-        )
+        if 系统.platform == "win32":
+            (暂存根 / f"{产物显示名}.exe.config").write_text(
+                _CLR远程加载配置,
+                encoding="utf-8",
+            )
         校验绿色包工具(暂存根, 状态)
         校验绿色包结构(暂存根, 状态)
+        工具目录 = 暂存根 / "bin"
+        if 工具目录.is_dir():
+            for 工具名 in ("BBDown", "bbdown", "ffmpeg", "adb"):
+                确保路径可执行(工具目录 / 工具名)
     except SystemExit:
         安全移除树(暂存根, 说明="组装失败, 丢弃暂存")
         raise
@@ -3793,9 +3872,10 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
             失败退出(说明)
 
     # 落盘后再冒烟 (需真实路径与完整 _internal)
-    冒烟启动绿色包(绿色根, 状态, 模拟Internet区域=True)
+    冒烟启动绿色包(绿色根, 状态, 模拟Internet区域=系统.platform == "win32")
 
-    使用说明 = f"""MyBiOut! 绿色版  v{版本}
+    if 系统.platform == "win32":
+        使用说明 = f"""MyBiOut! 绿色版  v{版本}
 
 【启动】
 1. 双击「MyBiOut!.exe」→ 内嵌窗口启动（不是浏览器）；关闭窗口即退出。
@@ -3817,6 +3897,32 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
 【可选命令行】
 · 指定端口:     MyBiOut!.exe --port 23333
 · 浏览器调试:   MyBiOut!.exe --browser   （仅调试用；正常请双击用内嵌窗）
+
+【项目主页】
+https://github.com/Water-Run/MyBiOut
+"""
+    else:
+        使用说明 = f"""MyBiOut! 绿色版  v{版本}
+
+【启动】
+1. 在本目录执行：./MyBiOut!
+   内嵌窗口启动（不是浏览器）；关闭窗口即退出。
+2. 只需本绿色目录 (含 _internal/ 与 bin/)，无需安装系统 Python。
+3. 运行环境：64 位 Linux。内嵌窗口需要 GTK + WebKit（如 webkit2gtk）。
+4. 若窗口打不开，可：./MyBiOut! --browser
+5. 请整夹拷贝，勿单独挪走主程序。
+
+【目录说明】
+· config.ini     配置文件（本发布包为默认空凭证、无本机路径，可按需填写）
+· bin/           随包分发工具：BBDown、ffmpeg、adb
+· _internal/     内嵌运行时，请整夹拷贝
+· version.txt    版本号（界面底部会读取）
+· 使用说明.txt   本文件
+
+【可选命令行】
+· 指定端口:     ./MyBiOut! --port 23333
+· 浏览器调试:   ./MyBiOut! --browser
+· 跳过动画:     ./MyBiOut! --no-animation
 
 【项目主页】
 https://github.com/Water-Run/MyBiOut
@@ -4196,17 +4302,89 @@ def 确保Rar可执行文件(状态: 打包进度 | None = None) -> 路径:
     raise AssertionError("不可达")
 
 
+def _写入发布说明(版本: str) -> 路径:
+    说明文件 = 工程根目录 / "README.txt"
+    if 系统.platform == "win32":
+        简短说明 = (
+            f"MyBiOut! v{版本}\n\n"
+            "解压后，保持 MyBiOut! 文件夹完整，双击其中的 MyBiOut!.exe 启动。\n"
+            "无需安装 Python；登录态和导出目录请在设置页自行配置。\n"
+        )
+    else:
+        简短说明 = (
+            f"MyBiOut! v{版本}\n\n"
+            "解压后，保持 MyBiOut! 文件夹完整，在其中执行 ./MyBiOut! 启动。\n"
+            "无需安装系统 Python；登录态和导出目录请在设置页自行配置。\n"
+            "内嵌窗口需要 GTK/WebKit；也可 ./MyBiOut! --browser\n"
+        )
+    说明文件.write_text(简短说明, encoding="utf-8-sig")
+    return 说明文件
+
+
+def 打包为TarGz(绿色根: 路径, 版本: str, 状态: 打包进度 | None = None) -> 路径:
+    r"""Linux 发布包: tar.gz, 顶层 MyBiOut!/ + README.txt + LICENSE。"""
+    import tarfile as 归档库
+
+    if 状态 is None or 状态.纯文本:
+        打印步骤(4, 4, "压缩为 tar.gz 发布包")
+    说明文件 = _写入发布说明(版本)
+    许可文件 = 工程根目录 / "LICENSE"
+    for 必备, 标签 in ((说明文件, "README.txt"), (许可文件, "LICENSE")):
+        if not 必备.is_file():
+            说明 = f"发布包必备文件缺失: {标签} ({必备})"
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(说明)
+            失败退出(说明)
+
+    发布目录 = 发布目录路径().resolve()
+    发布目录.mkdir(parents=True, exist_ok=True)
+    基名 = 发布包基名(版本)
+    归档文件 = (发布目录 / f"{基名}.tar.gz").resolve()
+    临时文件 = (发布目录 / f"{基名}.tar.gz.part").resolve()
+    if 临时文件.exists():
+        安全删除文件(临时文件, 说明="清理上次未完成的 tar.gz.part")
+    if 归档文件.exists():
+        安全删除文件(归档文件, 说明="覆盖同名旧 tar.gz")
+
+    if 状态:
+        状态.进入阶段("压缩", "tar.gz 打包中…", 段内=0.1, 明细=基名)
+    with 归档库.open(临时文件, "w:gz") as 包:
+        包.add(绿色根, arcname=产物显示名)
+        包.add(说明文件, arcname="README.txt")
+        包.add(许可文件, arcname="LICENSE")
+    try:
+        临时文件.replace(归档文件)
+    except OSError:
+        文件工具.move(str(临时文件), str(归档文件))
+    大小兆 = 归档文件.stat().st_size / 1024 / 1024
+    if 状态 is None or 状态.纯文本:
+        打印成功(f"发布包已生成: {归档文件}")
+        打印信息(f"包内: {产物显示名}/ + README.txt + LICENSE")
+        打印信息(f"文件大小约 {大小兆:.1f} MB")
+    if 状态:
+        状态.完成阶段("压缩", "压缩完成", 明细=f"{大小兆:.1f} MB")
+    return 归档文件
+
+
 def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | None = None) -> 路径:
     r"""
-    调用本机 rar 兼容命令行生成 .rar。
+    Windows: 调用本机 rar 兼容命令行生成 .rar。
+    Linux: 生成 .tar.gz。
     包内顶层:
       · MyBiOut!/   绿色程序目录
       · README.txt
       · LICENSE
-    输出到工程根/打包结果/「MyBiOut! <版本>.rar」(空格与 ! 保留)。
-    环境缺 rar 时会自动检测并补齐 (tools/ 或 winget)。
-    先写到临时名再替换, 避免半成品被当分发包。
     """
+    if 系统.platform != "win32":
+        try:
+            return 打包为TarGz(绿色根, 版本, 状态)
+        except SystemExit:
+            raise
+        except Exception as 异常:  # noqa: BLE001
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(str(异常))
+            失败退出(f"tar.gz 打包失败: {异常}")
+
     if 状态 is None or 状态.纯文本:
         打印步骤(4, 4, "压缩为 rar 发布包")
 
@@ -4216,14 +4394,8 @@ def 打包为压缩包(绿色根: 路径, 版本: str, 状态: 打包进度 | No
             状态.标记失败(说明)
         失败退出(说明)
 
-    说明文件 = 工程根目录 / "README.txt"
+    说明文件 = _写入发布说明(版本)
     许可文件 = 工程根目录 / "LICENSE"
-    简短说明 = (
-        f"MyBiOut! v{版本}\n\n"
-        "解压后，保持 MyBiOut! 文件夹完整，双击其中的 MyBiOut!.exe 启动。\n"
-        "无需安装 Python；登录态和导出目录请在设置页自行配置。\n"
-    )
-    说明文件.write_text(简短说明, encoding="utf-8-sig")
     for 必备, 标签 in ((说明文件, "README.txt"), (许可文件, "LICENSE")):
         if not 必备.is_file():
             说明 = f"发布包必备文件缺失: {标签} ({必备})"

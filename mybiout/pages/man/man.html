@@ -596,7 +596,9 @@
                     <p><strong>常见坑：</strong></p>
                     <ul>
                         <li><b>高画质不行</b>：先配有效 SESSDATA（建议扫码登录获取）；再确认视频本身有没有那档清晰度。</li>
-                        <li><b>任务红了</b>：链接有效？Cookie 过期？画质/编码是否存在？bin/ 里有没有 BBDown.exe？一个个肘开排查。</li>
+                        <li><b>任务红了</b>：链接有效？Cookie 过期？画质/编码是否存在？bin/ 里有没有 BBDown？一个个肘开排查。</li>
+                        <li><b>一次要下很多</b>：BBDown / MdOut 输入栏点 <b>+</b> 展开多行。粘贴用逗号、分号、空格、回车分开的链接，会自动拆成每行一条。</li>
+                        <li><b>一次要下很多</b>：BBDown / MdOut 输入栏点 <b>+</b> 展开多行。粘贴一坨用逗号、分号、空格、回车分开的链接，会自动拆成每行一条。</li>
                         <li><b>只要音频/弹幕/字幕</b>：在下载内容里勾，不必手写命令行。</li>
                         <li><b>很慢</b>：先看网络和 B 站，再考虑降画质、少分 P、改天再来——81 分也不是一分钟刷的。</li>
                     </ul>
@@ -609,7 +611,7 @@
                     <p><strong>流程：</strong> 输入链接或编号 → 解析添加 → 预览（富文本 / 原文）→ 导出选中或全部就绪 →「打开导出目录」核对。</p>
                     <p><strong>常见坑：</strong></p>
                     <ul>
-                        <li>收藏夹/详情缺字段：多半要 SESSDATA（扫码登录即可），或接口权限/风控。</li>
+                        <li>收藏夹/详情缺字段：多半要 SESSDATA（扫码登录即可），或接口权限/风控。设置里「导出完整收藏列表」默认开着，会逐页拉全量；关掉则完整模式仍只取每夹前 20 条。</li>
                         <li>类型认错：换完整链接；确认是视频 / 空间 / 收藏夹 / 专栏 / 图文动态之一。</li>
                         <li><b>专栏/opus 正文为空</b>：正文在叶子节点组里面，预览能看到富文本就是抽到了；如果一直空检查网络到 B 站 API 通不通。</li>
                         <li>预览有字磁盘没有：查导出根目录和 MdOut 子目录名。</li>
@@ -648,9 +650,9 @@
 
                     <h2>启动参数与版本（进阶）</h2>
                     <ul>
-                        <li><code>MyBiOut!.exe --port 2026</code>：指定端口（默认 <b>23333</b>）。端口被占时换一个号即可；换不动说明有旧实例还在跑。</li>
-                        <li><code>MyBiOut!.exe --browser</code>：不开内嵌窗口，改用系统浏览器打开——WebView2 缺了 / 坏了 / 不想装的首选方案。</li>
-                        <li><code>MyBiOut!.exe --no-animation</code>：跳过启动直升机动效，直接进入（适合重复调试）。</li>
+                        <li><code>MyBiOut!.exe --port 2026</code>（Linux <code>./MyBiOut! --port 2026</code>）：指定端口（默认 <b>23333</b>）。端口被占时换一个号即可；换不动说明有旧实例还在跑。</li>
+                        <li><code>--browser</code>：不开内嵌窗口，改用系统浏览器——WebView2 / GTK-WebKit 缺了或不想装的首选方案。</li>
+                        <li><code>--no-animation</code>：跳过启动直升机动效，直接进入（适合重复调试）。</li>
                         <li>界面底部版本号来自绿色包根目录 <code>version.txt</code>，中文年月轨：如 <b>二六〇七甲</b> = 2026 年 7 月第 1 包（甲乙丙丁戊己庚辛壬癸子丑，月内最多 12 包）。</li>
                     </ul>
 
@@ -665,18 +667,18 @@
                         <li><b>端口起不来 / 窗口闪退</b>：换 <code>--port</code>；或用 <code>--browser</code>；看绿色目录有无 <code>startup_error.log</code>。</li>
                         <li><b>助手不像真 AI</b>：看「启用大模型」开没开、Key/Model/Base/超时；关着本来就是本地通道。</li>
                         <li><b>任务卡住</b>：取消当前，改设置后重加；看外部命令是否还在跑。</li>
-                        <li><b>打包失败</b>：多半旧 exe 还在跑或 dist/ 目录被占用；关掉 MyBiOut!.exe 和资源管理器窗口再打包。</li>
+                        <li><b>打包失败</b>：多半旧进程还在跑或 dist/ 目录被占用；关掉 MyBiOut! 后再打包。</li>
                     </ul>
 
                     <hr>
 
                     <h2>环境与依赖（需要时再看）</h2>
                     <ul>
-                        <li><b>目标系统</b>：Windows 11 x64 绿色包；工具在程序旁 <code>bin/</code> 随包分发</li>
-                        <li><b>FFmpeg</b>：LocalOut 导出必需 → <code>bin/ffmpeg.exe</code></li>
-                        <li><b>BBDown</b>：在线下载必需 → <code>bin/BBDown.exe</code></li>
-                        <li><b>ADB</b>：扫手机缓存 → <code>bin/adb.exe</code>（及配套 dll）</li>
-                        <li><b>WebView2</b>：内嵌窗口；Win11 一般自带。没有就弹提示，可 <code>--browser</code></li>
+                        <li><b>目标系统</b>：Windows 11 x64 与 Linux x64 绿色包；工具在程序旁 <code>bin/</code> 随包分发</li>
+                        <li><b>FFmpeg</b>：LocalOut 导出必需 → <code>bin/ffmpeg</code>（Windows 为 <code>ffmpeg.exe</code>）</li>
+                        <li><b>BBDown</b>：在线下载必需 → <code>bin/BBDown</code></li>
+                        <li><b>ADB</b>：扫手机缓存 → <code>bin/adb</code>（Windows 另含配套 dll）</li>
+                        <li><b>内嵌窗口</b>：Windows 用 WebView2；Linux 用 GTK/WebKit。没有就弹提示，可 <code>--browser</code></li>
                         <li>缺工具 / 窗口起不来：启动弹提示即可，程序仍尽量开；对应功能可能不可用</li>
                     </ul>
                     <div class="dep-card">

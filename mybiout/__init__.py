@@ -9,11 +9,12 @@ MyBiOut! 包初始化模块
 import sys as 系统
 from pathlib import Path as 路径
 
-if 系统.platform != "win32":
-    raise ImportError("MyBiOut! 仅支持 Windows 系统。")
+_支持平台: frozenset[str] = frozenset({"win32", "linux"})
+if 系统.platform not in _支持平台:
+    raise ImportError("MyBiOut! 目前支持 Windows 与 Linux。")
 
 if 系统.maxsize <= 2**32:
-    raise ImportError("MyBiOut! 仅支持 64 位 Windows 系统。")
+    raise ImportError("MyBiOut! 仅支持 64 位系统。")
 
 
 def 取版本号() -> str:
@@ -38,7 +39,7 @@ def 取版本号() -> str:
             if 文件.is_file():
                 文本: str = 文件.read_text(encoding="utf-8").strip()
                 if 文本:
-                    return 文本
+                    return 文本.splitlines()[0].strip() or 文本
         except OSError:
             continue
     return "〇〇〇〇甲"

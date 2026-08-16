@@ -899,6 +899,18 @@
             </div>
 
             <div class="setting-row">
+                <div class="setting-label">导出完整收藏列表</div>
+                <div class="setting-hint">逐页拉完全部收藏夹内容；关闭后「完整」模式仍只取每夹前 20 条</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-mdout-fav-complete"
+                            onchange="保存开关('mdout','favorite_complete',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
                 <div class="setting-label">请求间隔</div>
                 <div class="setting-hint">相邻 API 请求之间的等待时间，避免过快被 B 站限流</div>
                 <div class="setting-controls">
@@ -1082,6 +1094,7 @@
             document.getElementById('s-mdout-include-tags').checked = (s.mdout?.include_tags ?? 'true') === 'true';
             document.getElementById('s-mdout-include-stats').checked = (s.mdout?.include_stats ?? 'true') === 'true';
             document.getElementById('s-mdout-fav-detail').value = s.mdout?.favorite_detail ?? 'basic';
+            document.getElementById('s-mdout-fav-complete').checked = (s.mdout?.favorite_complete ?? 'true') === 'true';
             document.getElementById('s-mdout-delay').value = s.mdout?.request_delay ?? '0.5';
 
             同步条件显示();
