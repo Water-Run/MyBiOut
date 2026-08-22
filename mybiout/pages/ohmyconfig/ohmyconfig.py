@@ -62,7 +62,10 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
         case ("localout" | "bbdown" | "mdout", "folder"):
             return _校验文件夹(分区, 值)
 
-        case ("localout", "bilibili_pc_cache_optional_when_installed"):
+        case (
+            "localout",
+            "bilibili_pc_cache_optional_when_installed" | "skip_duplicates" | "preserve_metadata",
+        ):
             return _保存布尔(分区, 键, 值)
 
         case ("localout", "bilibili_pc_cache_path"):
@@ -99,14 +102,24 @@ def 校验并保存(分区: str, 键: str, 值: str) -> 设置结果:
             工具.设设置(分区, 键, 规范值)
             return _成功()
 
-        case ("bbdown", "download_danmaku" | "skip_subtitle" | "skip_cover" | "use_aria2c"):
+        case (
+            "bbdown",
+            "download_danmaku"
+            | "download_ai_subtitle"
+            | "skip_subtitle"
+            | "skip_cover"
+            | "use_aria2c",
+        ):
             return _保存布尔(分区, 键, 值)
 
         case ("bbdown", "cookie"):
             工具.设设置(分区, 键, 值.strip())
             return _成功()
 
-        case ("bbdown", "encoding_priority" | "quality_priority" | "file_pattern" | "multi_file_pattern"):
+        case (
+            "bbdown",
+            "encoding_priority" | "quality_priority" | "file_pattern" | "multi_file_pattern" | "language",
+        ):
             工具.设设置(分区, 键, 值.strip())
             return _成功()
 
@@ -256,6 +269,11 @@ def 取桌面路径() -> str:
     :return: str: 桌面导出路径
     """
     return str(工具.取桌面目录() / "MyBiOut!")
+
+
+def 取默认导出路径() -> str:
+    r"""获取当前平台默认导出根目录。"""
+    return 工具.取默认导出路径()
 
 
 def 取默认哔哩电脑缓存路径() -> str:

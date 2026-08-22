@@ -539,7 +539,7 @@
 
             <div class="setting-row">
                 <div class="setting-label">导出根目录</div>
-                <div class="setting-hint">导出内容的统一存储位置，默认 C:\MyBiOut!</div>
+                <div class="setting-hint" id="hint-export-default">导出内容的统一存储位置</div>
                 <div class="setting-controls">
                     <input type="text" id="s-export-path" style="width:420px" readonly>
                     <button class="btn btn-orange" onclick="浏览路径()">浏览</button>
@@ -630,12 +630,36 @@
 
             <div class="setting-row">
                 <div class="setting-label">哔哩哔哩桌面端缓存路径</div>
-                <div class="setting-hint">默认 C:\Users\[当前用户名]\Videos\bilibili；留空表示不扫描桌面端缓存</div>
+                <div class="setting-hint" id="hint-bili-pc-default">留空表示不扫描桌面端缓存</div>
                 <div class="setting-controls">
                     <input type="text" id="s-bili-pc-path" style="width:520px" oninput="同步条件显示()"
                         onchange="保存哔哩电脑路径(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
                     <button class="btn btn-orange" onclick="浏览哔哩电脑路径()">浏览</button>
                     <button class="btn btn-ghost" onclick="重置哔哩电脑路径()">恢复默认</button>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">自动跳过重复视频</div>
+                <div class="setting-hint">按 BV/AV、分P 与缓存大小建立导出记录；再次导出或跨手机遇到同一视频时直接复用已有文件</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-localout-skip-duplicates"
+                            onchange="保存开关('localout','skip_duplicates',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">保留缓存元文件</div>
+                <div class="setting-hint">以视频名新建归档文件夹，将 MP4 与源缓存中的 danmaku.xml、entry.json、index.json 放在一起并保留文件时间</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-localout-preserve-metadata"
+                            onchange="保存开关('localout','preserve_metadata',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
                 </div>
             </div>
 
@@ -797,6 +821,28 @@
                             onchange="保存开关('bbdown','download_danmaku',this.checked)">
                         <div class="toggle-track"></div>
                     </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">默认下载 AI 字幕</div>
+                <div class="setting-hint">显式向 BBDown 传入 --skip-ai=false；稿件未提供 AI 字幕时不会额外生成</div>
+                <div class="setting-controls">
+                    <label class="toggle">
+                        <input type="checkbox" id="s-bbdown-ai-sub"
+                            onchange="保存开关('bbdown','download_ai_subtitle',this.checked)">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">默认音轨语言代码</div>
+                <div class="setting-hint">BBDown --language 参数，例如 chi、jpn、eng；它标记混流音轨，不筛选字幕语言</div>
+                <div class="setting-controls">
+                    <input type="text" id="s-bbdown-language" style="width:260px" placeholder="留空 = 不指定"
+                        onchange="保存文本('bbdown','language',this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
                 </div>
             </div>
 
@@ -1048,6 +1094,14 @@
 
         async function 载入设置() {
             const s = await 接口读取('/api/settings');
+            const [默认导出, 默认缓存] = await Promise.all([
+                接口读取('/api/default-export-path'),
+                接口读取('/api/default-bili-pc-cache-path')
+            ]);
+            document.getElementById('hint-export-default').textContent =
+                `导出内容的统一存储位置，当前平台默认 ${默认导出.path ?? ''}`;
+            document.getElementById('hint-bili-pc-default').textContent =
+                `当前平台默认 ${默认缓存.path ?? ''}；留空表示不扫描桌面端缓存`;
 
             document.getElementById('s-export-path').value = s.export?.path ?? '';
             document.getElementById('s-sessdata').value = s.export?.sessdata ?? '';
@@ -1063,6 +1117,10 @@
             document.getElementById('s-bili-pc-path').value = s.localout?.bilibili_pc_cache_path ?? '';
             document.getElementById('s-bili-pc-path-only-if-installed').checked =
                 (s.localout?.bilibili_pc_cache_optional_when_installed ?? 'true') === 'true';
+            document.getElementById('s-localout-skip-duplicates').checked =
+                (s.localout?.skip_duplicates ?? 'true') === 'true';
+            document.getElementById('s-localout-preserve-metadata').checked =
+                (s.localout?.preserve_metadata ?? 'false') === 'true';
             document.getElementById('s-ffmpeg').value = s.localout?.ffmpeg_concurrent ?? '3';
             document.getElementById('s-incomplete-title-action').value =
                 s.localout?.incomplete_title_action ?? 'partial_or_folder';
@@ -1084,6 +1142,8 @@
             document.getElementById('s-bbdown-file-pattern').value = s.bbdown?.file_pattern ?? '<videoTitle>';
             document.getElementById('s-bbdown-multi-pattern').value = s.bbdown?.multi_file_pattern ?? '<videoTitle>/[P<pageNumberWithZero>]<pageTitle>';
             document.getElementById('s-bbdown-danmaku').checked = s.bbdown?.download_danmaku === 'true';
+            document.getElementById('s-bbdown-ai-sub').checked = s.bbdown?.download_ai_subtitle === 'true';
+            document.getElementById('s-bbdown-language').value = s.bbdown?.language ?? '';
             document.getElementById('s-bbdown-skip-sub').checked = s.bbdown?.skip_subtitle === 'true';
             document.getElementById('s-bbdown-skip-cover').checked = s.bbdown?.skip_cover === 'true';
             document.getElementById('s-bbdown-aria2c').checked = s.bbdown?.use_aria2c === 'true';
@@ -1187,7 +1247,10 @@
             document.getElementById('s-export-path').value = d.path; await 保存设置('export', 'path', d.path);
         }
         async function 重置导出路径() {
-            const def = 'C:\\MyBiOut!'; document.getElementById('s-export-path').value = def; await 保存设置('export', 'path', def);
+            const d = await 接口读取('/api/default-export-path');
+            const def = d.path ?? '';
+            document.getElementById('s-export-path').value = def;
+            await 保存设置('export', 'path', def);
         }
 
         /* API Key */

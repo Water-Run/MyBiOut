@@ -561,7 +561,7 @@
 
                     <h2>第一次上手（建议顺序）</h2>
                     <ol>
-                        <li>进 <b>OhMyConfig</b>，看<strong>导出根目录</strong>是不是你想要的（默认 <code>C:\MyBiOut!</code>）。各模块会在下面建子文件夹。</li>
+                        <li>进 <b>OhMyConfig</b>，看<strong>导出根目录</strong>是不是你想要的（Windows 默认 <code>C:\MyBiOut!</code>，Linux 默认 <code>~/MyBiOut!</code>）。各模块会在下面建子文件夹。</li>
                         <li>要高画质、收藏夹、更完整 B 站数据：配 <b>SESSDATA</b>。推荐点 <span class="badge-inline">扫码登录获取</span>——B 站 App 扫码即得，走官方登录通道，不碰密码、不养风控；也可以手动粘贴 Cookie。</li>
                         <li>大模型：默认<strong>关闭</strong>。想真 AI 再打开「启用大模型」并填 Key / Model / Base；关掉就永远本地助手，牢大亲自下场整活。</li>
                         <li>回首页进模块开干。卡住时：看任务状态原文 → 回设置对路径/凭证。一次只改一个设置，才知道哪一刀生效——曼巴式排障，一次一个动作。</li>
@@ -581,8 +581,10 @@
                     <p><strong>常见坑（对号入座）：</strong></p>
                     <ul>
                         <li><b>PC 扫空</b>：设置里 PC 缓存路径是不是 B 站真实目录（客户端一更新就爱搬家，比转会还勤）。</li>
-                        <li><b>手机扫不到</b>：USB 调试开着、手机点了允许本机调试、页面环境条能看见设备。ADB 在 bin/ 里要有 adb.exe + 配套 dll。</li>
+                        <li><b>手机扫不到</b>：USB 调试开着、手机点了允许本机调试、页面环境条能看见设备。Windows 的 <code>bin/</code> 要有 <code>adb.exe</code> 与配套 dll；Linux 为可执行的 <code>adb</code>。</li>
                         <li><b>导出失败</b>：FFmpeg 在不在（绿色包 bin/ 或 PATH）；卡片信息全不全；同一源再扫一次，别反复肘同一个按钮。</li>
+                        <li><b>不想重复导出</b>：页面顶部「智能去重」默认开启；它会校验导出索引和已有成品，再把重复任务标成「已跳过」。</li>
+                        <li><b>要保留缓存元文件</b>：开启「元文件归档」，每个成品会放进独立目录，并尽量保留 <code>danmaku.xml</code>、<code>entry.json</code>、<code>index.json</code>。</li>
                         <li><b>文件名翻车</b>：命名模板别堆空字段；Windows 路径别太长、别非法字符。</li>
                         <li><b>看起来跑完了目录却空</b>：以导出目录里真有文件为准，不是「感觉跑完了」。</li>
                     </ul>
@@ -597,9 +599,8 @@
                     <ul>
                         <li><b>高画质不行</b>：先配有效 SESSDATA（建议扫码登录获取）；再确认视频本身有没有那档清晰度。</li>
                         <li><b>任务红了</b>：链接有效？Cookie 过期？画质/编码是否存在？bin/ 里有没有 BBDown？一个个肘开排查。</li>
-                        <li><b>一次要下很多</b>：BBDown / MdOut 输入栏点 <b>+</b> 展开多行。粘贴用逗号、分号、空格、回车分开的链接，会自动拆成每行一条。</li>
                         <li><b>一次要下很多</b>：BBDown / MdOut 输入栏点 <b>+</b> 展开多行。粘贴一坨用逗号、分号、空格、回车分开的链接，会自动拆成每行一条。</li>
-                        <li><b>只要音频/弹幕/字幕</b>：在下载内容里勾，不必手写命令行。</li>
+                        <li><b>只要音频/弹幕/字幕</b>：在下载内容里勾，不必手写命令行。稿件有 AI 字幕时，可开启「下载 AI 字幕」；「音轨语言」只标记混流音轨，不用于筛字幕。</li>
                         <li><b>很慢</b>：先看网络和 B 站，再考虑降画质、少分 P、改天再来——81 分也不是一分钟刷的。</li>
                     </ul>
 
@@ -607,11 +608,12 @@
 
                     <h2>MdOut!：导出信息文档</h2>
                     <p>只产出 Markdown，<strong>不下载视频本体</strong>。适合归档标题、UP、标签、收藏夹概览，以及<strong>专栏正文 / 图文动态（opus）正文</strong>。</p>
-                    <p><strong>能贴什么：</strong> BV / av / 视频链接、UID / 空间链接、<code>cv</code> 号 / 专栏链接、<code>opus</code> 图文动态链接、<code>b23</code> 短链。链接里带 <code>?spm_id_from=</code> 等尾巴也认，不用手动截。</p>
+                    <p><strong>能贴什么：</strong> BV / av / 视频链接、UID / 空间链接、<code>cv</code> 号 / 专栏链接、<code>rl</code> 文集号 / 文集链接、<code>opus</code> 图文动态链接、<code>b23</code> 短链。链接里带 <code>?spm_id_from=</code> 等尾巴也认，不用手动截。</p>
                     <p><strong>流程：</strong> 输入链接或编号 → 解析添加 → 预览（富文本 / 原文）→ 导出选中或全部就绪 →「打开导出目录」核对。</p>
                     <p><strong>常见坑：</strong></p>
                     <ul>
                         <li>收藏夹/详情缺字段：多半要 SESSDATA（扫码登录即可），或接口权限/风控。设置里「导出完整收藏列表」默认开着，会逐页拉全量；关掉则完整模式仍只取每夹前 20 条。</li>
+                        <li><b>整本文集</b>：直接输入 <code>rl123</code> 或文集链接；导出时会建立文集目录，生成索引与逐篇 Markdown。</li>
                         <li>类型认错：换完整链接；确认是视频 / 空间 / 收藏夹 / 专栏 / 图文动态之一。</li>
                         <li><b>专栏/opus 正文为空</b>：正文在叶子节点组里面，预览能看到富文本就是抽到了；如果一直空检查网络到 B 站 API 通不通。</li>
                         <li>预览有字磁盘没有：查导出根目录和 MdOut 子目录名。</li>
@@ -650,7 +652,7 @@
 
                     <h2>启动参数与版本（进阶）</h2>
                     <ul>
-                        <li><code>MyBiOut!.exe --port 2026</code>（Linux <code>./MyBiOut! --port 2026</code>）：指定端口（默认 <b>23333</b>）。端口被占时换一个号即可；换不动说明有旧实例还在跑。</li>
+                        <li><code>MyBiOut!.exe --port 2026</code>（Linux <code>./MyBiOut! --port 2026</code>）：指定端口（默认 <b>23333</b>）。端口被占时会找到备用端口，一键确认即可继续，不会关闭占用端口的其他程序。</li>
                         <li><code>--browser</code>：不开内嵌窗口，改用系统浏览器——WebView2 / GTK-WebKit 缺了或不想装的首选方案。</li>
                         <li><code>--no-animation</code>：跳过启动直升机动效，直接进入（适合重复调试）。</li>
                         <li>界面底部版本号来自绿色包根目录 <code>version.txt</code>，中文年月轨：如 <b>二六〇七甲</b> = 2026 年 7 月第 1 包（甲乙丙丁戊己庚辛壬癸子丑，月内最多 12 包）。</li>
@@ -664,7 +666,7 @@
                         <li><b>扫码登录不弹码</b>：网络到 passport.bilibili.com 不通就会生成失败；二维码 3 分钟过期，过期点「刷新二维码」。</li>
                         <li><b>目录空</b>：任务是否完成、导出根是否改过、子目录名是否默认。</li>
                         <li><b>登录相关挂</b>：重扫码或更新 SESSDATA（过期、截断、风控都常见）。</li>
-                        <li><b>端口起不来 / 窗口闪退</b>：换 <code>--port</code>；或用 <code>--browser</code>；看绿色目录有无 <code>startup_error.log</code>。</li>
+                        <li><b>端口起不来 / 窗口闪退</b>：先用启动提示的一键换端口；也可手动传 <code>--port</code> 或 <code>--browser</code>，再看绿色目录有无 <code>startup_error.log</code>。</li>
                         <li><b>助手不像真 AI</b>：看「启用大模型」开没开、Key/Model/Base/超时；关着本来就是本地通道。</li>
                         <li><b>任务卡住</b>：取消当前，改设置后重加；看外部命令是否还在跑。</li>
                         <li><b>打包失败</b>：多半旧进程还在跑或 dist/ 目录被占用；关掉 MyBiOut! 后再打包。</li>

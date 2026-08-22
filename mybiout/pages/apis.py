@@ -211,6 +211,14 @@ async def 默认缓存路径接口() -> dict[str, str]:
     return {"path": 取默认哔哩电脑缓存路径()}
 
 
+@应用.get("/api/default-export-path")
+async def 默认导出路径接口() -> dict[str, str]:
+    r"""获取与当前操作系统匹配的默认导出根目录。"""
+    from mybiout.pages.ohmyconfig.ohmyconfig import 取默认导出路径
+
+    return {"path": 取默认导出路径()}
+
+
 @应用.get("/api/localout/state")
 async def 本地导出状态() -> dict[str, 任意]:
     r"""

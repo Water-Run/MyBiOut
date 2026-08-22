@@ -177,6 +177,15 @@ def _构建命令(任务: 下载任务) -> list[str]:
     命令: list[str] = [下载器]
     选项表: dict = 任务.选项 or {}
 
+    def _取布尔选项(键: str, 设置键: str | None = None) -> bool:
+        r"""任务显式传值优先；未传时才继承 OhMyConfig 默认值。"""
+        if 键 in 选项表:
+            值 = 选项表[键]
+            if isinstance(值, str):
+                return 值.strip().lower() in {"1", "true", "yes", "on"}
+            return bool(值)
+        return 工具.取设置("bbdown", 设置键 or 键) == "true"
+
     会话数据: str = 工具.取会话数据().strip()
     if 会话数据:
         命令.extend(["-c", f"SESSDATA={会话数据}"])
@@ -210,23 +219,30 @@ def _构建命令(任务: 下载任务) -> list[str]:
         case "cover_only":
             命令.append("--cover-only")
 
-    要弹幕: bool = (
-        选项表.get("download_danmaku", False) or 工具.取设置("bbdown", "download_danmaku") == "true"
-    )
+    要弹幕: bool = _取布尔选项("download_danmaku")
     if 要弹幕 and 内容 == "default":
         命令.append("-dd")
 
-    要跳过字幕: bool = 选项表.get("skip_subtitle", False) or 工具.取设置("bbdown", "skip_subtitle") == "true"
+    要跳过字幕: bool = _取布尔选项("skip_subtitle")
     if 要跳过字幕:
         命令.append("--skip-subtitle")
 
-    要跳过封面: bool = 选项表.get("skip_cover", False) or 工具.取设置("bbdown", "skip_cover") == "true"
+    要AI字幕: bool = _取布尔选项("download_ai_subtitle")
+    if 要AI字幕 and not 要跳过字幕:
+        # BBDown 的 --skip-ai 是默认开启的布尔选项；显式 false 才会下载 AI 字幕。
+        命令.append("--skip-ai=false")
+
+    要跳过封面: bool = _取布尔选项("skip_cover")
     if 要跳过封面:
         命令.append("--skip-cover")
 
     分P: str = 选项表.get("page", "").strip()
     if 分P:
         命令.extend(["-p", 分P])
+
+    语言: str = (选项表.get("language", "") or 工具.取设置("bbdown", "language")).strip()
+    if 语言:
+        命令.extend(["--language", 语言])
 
     文件命名: str = 工具.取设置("bbdown", "file_pattern").strip()
     if 文件命名:

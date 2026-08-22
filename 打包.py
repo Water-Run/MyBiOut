@@ -17,7 +17,7 @@ MyBiOut! 绿色版一键打包脚本（独立维护入口）
 
 中文版本轨: 年月 + 月内序标 (甲乙丙丁戊己庚辛壬癸子丑, 每月最多 12 包)。
 超过 12 个会提示「受不了版本号溢出来了....」并坠机退出; 可用「重来」从甲重新计。
-发布包名例: 「MyBiOut! 二六〇七甲.rar」(名称中空格 / ! 均保留)。
+发布包名例: Windows 为「MyBiOut! 二六〇七甲.rar」，Linux 为同名「.tar.gz」。
 
 终端 TUI（有交互控制台时）:
     开场 10→1 → MyBiOut! / 即将开始（快速语法结构检查）
@@ -61,11 +61,11 @@ _CLR远程加载配置: str = """<?xml version="1.0" encoding="utf-8"?>
 </configuration>
 """
 _窗口冒烟状态环境键: str = "MYBIOOUT_WINDOW_SMOKE_STATUS"
-# 最终 .rar 直接落在工程根下的本目录 (gitignore 排除, 勿放 dist/)
+# 最终 .rar / .tar.gz 直接落在工程根下的本目录（gitignore 排除，勿放 dist/）
 发布目录名: str = "打包结果"
 构建缓存目录名: str = "build"
 产物输出目录名: str = "dist"
-# 发布目录中最多保留的历史 rar 个数（含本次；防 打包结果/ 无限膨胀）
+# 发布目录中最多保留的历史发布包个数（含本次；防 打包结果/ 无限膨胀）
 发布包保留个数: int = 5
 # Windows 删除被占用目录时的重试
 删除重试次数: int = 6
@@ -365,7 +365,7 @@ def 目录体积字节(根: 路径) -> int:
 
 
 def _应跳过拷贝路径(路径点: 路径) -> bool:
-    r"""过滤缓存、VCS、半成品、系统垃圾，避免进绿包/zip。"""
+    r"""过滤缓存、VCS、半成品与系统垃圾，避免混入绿色包。"""
     if any(部分 in _跳过拷贝目录名 for 部分 in 路径点.parts):
         return True
     名小 = 路径点.name.lower()
@@ -531,7 +531,6 @@ def 预清理构建产物目录(状态: 打包进度 | None = None) -> tuple[boo
 
     _终止占用中的绿色版进程()
 
-    最后: BaseException | None = None
     for 次 in range(12):
         if 次 > 0:
             时间.sleep(1.0 + 次 * 0.6)
@@ -545,8 +544,8 @@ def 预清理构建产物目录(状态: 打包进度 | None = None) -> tuple[boo
             if 状态 is None or 状态.纯文本:
                 打印信息(f"已清理旧产物目录: {产物目录.name}")
             return True, ""
-        except OSError as 异常:
-            最后 = 异常
+        except OSError:
+            pass
 
     # rmtree 全败 — 改名绕开旧目录
     try:
@@ -701,13 +700,14 @@ def 发布包基名(版本: str) -> str:
 
 
 def 是否发布包文件(路径点: 路径) -> bool:
-    r"""识别发布目录内的正式包: 「MyBiOut! <版本>.rar」; 兼容旧「MyBiOut!-<版本>.rar」。"""
+    r"""识别 Windows rar / Linux tar.gz 正式包，并兼容旧连字符命名。"""
     if not 路径点.is_file():
         return False
-    if 路径点.suffix.lower() not in {".rar", ".zip"}:
+    名小 = 路径点.name.lower()
+    if not 名小.endswith((".rar", ".zip", ".tar.gz")):
         return False
     名 = 路径点.name
-    return 名.startswith(f"{产物显示名} ") or 名.startswith(f"{产物显示名}-")
+    return 名.startswith((f"{产物显示名} ", f"{产物显示名}-"))
 
 
 def 发布目录路径() -> 路径:
@@ -723,7 +723,7 @@ def 清理打包残留(
 ) -> None:
     r"""
     开工: 清半成品 (.part / 临时绿包), 避免上次崩溃污染。
-    收尾: 再清半成品, 并按 mtime 裁剪过旧 rar（保留 发布包保留个数）。
+    收尾: 再清半成品, 并按 mtime 裁剪过旧发布包（保留 发布包保留个数）。
     不删 build/ 与 PyInstaller onedir（增量构建需要）。
     """
     产物根 = 工程根目录 / 产物输出目录名
@@ -1464,14 +1464,13 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
     进度皮 = 随机源.choice(_进度条皮表)
     背景层 = 随机源.choice(_背景层表)
     人格种子 = {
-        "赛博霓虹": {"混辅": 0.35, "闪": 0.4, "速": 0.045},
-        "樱吹雪": {"混辅": 0.45, "闪": 0.55, "速": 0.048},
-        "深海极光": {"混辅": 0.15, "闪": 0.2, "速": 0.05},
-        "熔金狂想": {"混辅": 0.3, "闪": 0.35, "速": 0.046},
-        "幽灵矩阵": {"混辅": 0.2, "闪": 0.25, "速": 0.044},
-        "彩虹过载": {"混辅": 0.5, "闪": 0.6, "速": 0.045},
+        "赛博霓虹": {"混辅": 0.35, "闪": 0.4},
+        "樱吹雪": {"混辅": 0.45, "闪": 0.55},
+        "深海极光": {"混辅": 0.15, "闪": 0.2},
+        "熔金狂想": {"混辅": 0.3, "闪": 0.35},
+        "幽灵矩阵": {"混辅": 0.2, "闪": 0.25},
+        "彩虹过载": {"混辅": 0.5, "闪": 0.6},
     }[人格]
-    步长 = 人格种子["速"]
     # 直升机每帧最多推进的进度, 避免目标猛跳时一闪而过 (约 8~12 秒飞完全程下限)
     进度最大步进 = 0.0048
     输出缓冲: list[str] = []
@@ -1480,8 +1479,6 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
     粒子列表: list[_粒子] = []
     流星列表: list[tuple[float, float, float, float, tuple[int, int, int]]] = []
     矩阵列: list[tuple[int, float, str]] = []
-    前行 = max(3, 高度 // 4)
-    前列 = 宽度 + 6
     基准行 = max(3, 高度 // 4)
     波幅 = 随机源.uniform(0.4, 1.9)
     波频 = 随机源.uniform(0.9, 3.2)
@@ -2959,7 +2956,6 @@ def 运行进度TUI(状态: 打包进度, *, 开工=None) -> None:
 
             绘直升机(直升机列, 直升机行, 帧号, 朝右=朝右)
             绘进度条(状态行, 显示进度, 文案, 阶段键=阶段键, 明细=明细)
-            前行, 前列 = 直升机行, 直升机列
             冲刷整帧()
 
             if 已结束:
@@ -3334,8 +3330,15 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
     except Exception as 异常:  # noqa: BLE001
         if 状态 is None or 状态.纯文本:
             打印警告(f"无法导入程序默认设置，改用脚本内嵌模板（{异常}）")
+        回退导出路径: str = (
+            str(路径.home() / "MyBiOut!") if 系统.platform == "linux" else r"C:\MyBiOut!"
+        )
         默认分区 = {
-            "export": {"path": r"C:\MyBiOut!", "sessdata": ""},
+            "export": {
+                "path": 回退导出路径,
+                "sessdata": "",
+                "bilibili_login_enabled": "false",
+            },
             "api": {
                 "enabled": "false",
                 "key": "",
@@ -3347,6 +3350,8 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
                 "folder": "localout!",
                 "bilibili_pc_cache_path": "",
                 "bilibili_pc_cache_optional_when_installed": "true",
+                "skip_duplicates": "true",
+                "preserve_metadata": "false",
                 "name_parts": "title",
                 "incomplete_title_action": "partial_or_folder",
                 "ffmpeg_concurrent": "3",
@@ -3358,8 +3363,10 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
                 "encoding_priority": "",
                 "quality_priority": "",
                 "download_danmaku": "false",
+                "download_ai_subtitle": "false",
                 "skip_subtitle": "false",
                 "skip_cover": "false",
+                "language": "",
                 "file_pattern": "<videoTitle>",
                 "multi_file_pattern": "<videoTitle>/[P<pageNumberWithZero>]<pageTitle>",
                 "use_aria2c": "false",
@@ -3379,6 +3386,11 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
     assert 默认分区 is not None
     # 无论模板来自程序包还是内嵌, 一律强制脱敏（防本机路径/凭证泄漏）
     默认分区 = 强制脱敏配置分区(默认分区)
+    if 系统.platform != "win32":
+        # Linux 家目录必须在目标机首次读取时动态求值。发布配置若写入
+        # 打包用户的 /home/<user>，其他用户解压后会得到不可写路径。省略该键后，
+        # 载入配置会保留 utils.默认设置中按当前用户生成的值。
+        默认分区.get("export", {}).pop("path", None)
 
     配置 = 配置解析器.ConfigParser(interpolation=None)
     for 分区, 键值表 in 默认分区.items():
@@ -3896,6 +3908,7 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
 
 【可选命令行】
 · 指定端口:     MyBiOut!.exe --port 23333
+· 端口被占用时会提示一键改用空闲端口，不会结束其他程序。
 · 浏览器调试:   MyBiOut!.exe --browser   （仅调试用；正常请双击用内嵌窗）
 
 【项目主页】
@@ -3921,6 +3934,7 @@ https://github.com/Water-Run/MyBiOut
 
 【可选命令行】
 · 指定端口:     ./MyBiOut! --port 23333
+· 端口被占用时会提示一键改用空闲端口，不会结束其他程序。
 · 浏览器调试:   ./MyBiOut! --browser
 · 跳过动画:     ./MyBiOut! --no-animation
 
@@ -4325,6 +4339,14 @@ def 打包为TarGz(绿色根: 路径, 版本: str, 状态: 打包进度 | None =
     r"""Linux 发布包: tar.gz, 顶层 MyBiOut!/ + README.txt + LICENSE。"""
     import tarfile as 归档库
 
+    def _规范归档成员(成员: 归档库.TarInfo) -> 归档库.TarInfo:
+        r"""清除打包机用户信息；保留原始权限，确保 Linux 可执行位不丢失。"""
+        成员.uid = 0
+        成员.gid = 0
+        成员.uname = "root"
+        成员.gname = "root"
+        return 成员
+
     if 状态 is None or 状态.纯文本:
         打印步骤(4, 4, "压缩为 tar.gz 发布包")
     说明文件 = _写入发布说明(版本)
@@ -4349,9 +4371,9 @@ def 打包为TarGz(绿色根: 路径, 版本: str, 状态: 打包进度 | None =
     if 状态:
         状态.进入阶段("压缩", "tar.gz 打包中…", 段内=0.1, 明细=基名)
     with 归档库.open(临时文件, "w:gz") as 包:
-        包.add(绿色根, arcname=产物显示名)
-        包.add(说明文件, arcname="README.txt")
-        包.add(许可文件, arcname="LICENSE")
+        包.add(绿色根, arcname=产物显示名, filter=_规范归档成员)
+        包.add(说明文件, arcname="README.txt", filter=_规范归档成员)
+        包.add(许可文件, arcname="LICENSE", filter=_规范归档成员)
     try:
         临时文件.replace(归档文件)
     except OSError:

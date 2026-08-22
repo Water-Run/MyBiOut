@@ -1,5 +1,5 @@
 r"""
-批量输入解析与构建: 从混排粘贴中抽出链接 / BV / av 等标识
+批量输入解析与构建：从混排粘贴中抽出链接 / BV / av / cv / rl 等标识
 
 :file: mybiout/pages/batch_input.py
 :author: WaterRun
@@ -14,7 +14,9 @@ _已知标识: 正则.Pattern[str] = 正则.compile(
     r"|(?:BV[0-9A-Za-z]{10,})"
     r"|(?:av\d+)"
     r"|(?:ep\d+)"
-    r"|(?:ss\d+)",
+    r"|(?:ss\d+)"
+    r"|(?:cv\d+)"
+    r"|(?:rl\d+)",
     正则.I,
 )
 _分界: 正则.Pattern[str] = 正则.compile(r"[\s,;，；、|]+")
@@ -28,7 +30,7 @@ def _剥皮(项: str) -> str:
 def 解析批量输入(文本: str) -> list[str]:
     r"""
     从用户粘贴文本中抽出条目, 保序去重。
-    优先识别 URL / b23 / BV / av / ep / ss;
+    优先识别 URL / b23 / BV / av / ep / ss / cv / rl；
     若没有已知标识, 则按逗号、分号、空白、顿号、竖线切开。
     :param 文本: 原始粘贴
     :return: 条目列表

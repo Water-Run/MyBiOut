@@ -302,6 +302,13 @@
             margin-bottom: 4px;
         }
 
+        .opt-hint {
+            margin-top: 4px;
+            color: #999;
+            font-size: 10px;
+            line-height: 1.45;
+        }
+
         .opt-group select,
         .opt-group input[type="text"] {
             width: 100%;
@@ -825,9 +832,15 @@
                         <div class="opt-label">分P选择 (留空下载默认)</div>
                         <input type="text" id="opt-page" placeholder="ALL / 1,3,5 / 1-10 / LAST">
                     </div>
+                    <div class="opt-group">
+                        <div class="opt-label">音轨语言代码（可选）</div>
+                        <input type="text" id="opt-language" placeholder="如: chi / jpn / eng">
+                        <div class="opt-hint">写入混流音轨的语言标记；AI 字幕会下载稿件实际提供的语言。</div>
+                    </div>
                     <hr class="opt-divider">
                     <label class="opt-check"><input type="checkbox" id="opt-danmaku"> 额外下载弹幕</label>
-                    <label class="opt-check"><input type="checkbox" id="opt-skip-sub"> 跳过字幕</label>
+                    <label class="opt-check"><input type="checkbox" id="opt-ai-sub"> 下载 AI 字幕</label>
+                    <label class="opt-check"><input type="checkbox" id="opt-skip-sub" onchange="同步字幕选项()"> 跳过全部字幕</label>
                     <label class="opt-check"><input type="checkbox" id="opt-skip-cover"> 跳过封面</label>
                 </div>
             </div>
@@ -918,6 +931,23 @@
             }
         }
 
+        async function 载入默认选项() {
+            try {
+                const s = await (await fetch('/api/settings')).json();
+                const d = s.bbdown || {};
+                取元素('opt-quality').value = d.quality_priority || '';
+                取元素('opt-encoding').value = d.encoding_priority || '';
+                取元素('opt-language').value = d.language || '';
+                取元素('opt-danmaku').checked = d.download_danmaku === 'true';
+                取元素('opt-ai-sub').checked = d.download_ai_subtitle === 'true';
+                取元素('opt-skip-sub').checked = d.skip_subtitle === 'true';
+                取元素('opt-skip-cover').checked = d.skip_cover === 'true';
+                同步字幕选项();
+            } catch (e) {
+                // 设置读取失败时保留页面安全默认值。
+            }
+        }
+
         const 批量框 = 挂载批量输入({
             inputId: 'url-input',
             textareaId: 'url-multi',
@@ -935,7 +965,9 @@
                 encoding: 取元素('opt-encoding').value.trim(),
                 content: 取元素('opt-content').value,
                 page: 取元素('opt-page').value.trim(),
+                language: 取元素('opt-language').value.trim(),
                 download_danmaku: 取元素('opt-danmaku').checked,
+                download_ai_subtitle: 取元素('opt-ai-sub').checked,
                 skip_subtitle: 取元素('opt-skip-sub').checked,
                 skip_cover: 取元素('opt-skip-cover').checked,
             };
@@ -951,6 +983,12 @@
         }
 
         async function 取消当前() { await fetch('/api/bbdown/cancel', { method: 'POST' }); }
+
+        function 同步字幕选项() {
+            const 跳过 = 取元素('opt-skip-sub').checked;
+            取元素('opt-ai-sub').disabled = 跳过;
+            if (跳过) 取元素('opt-ai-sub').checked = false;
+        }
         async function 重试任务(id) { await (await fetch('/api/bbdown/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task_id: id }) })).json(); }
         async function 移除任务(id) { await fetch('/api/bbdown/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task_id: id }) }); }
         async function 清空队列() { await fetch('/api/bbdown/clear-queue', { method: 'POST' }); }
@@ -1076,7 +1114,8 @@
         window.clearFailed = 清空失败;
         window.clearDone = 清空完成;
         window.openInExplorer = 在资源管理器中打开;
-        初始化背景(); 检查环境(); 轮询();
+        window.同步字幕选项 = 同步字幕选项;
+        初始化背景(); 载入默认选项(); 检查环境(); 轮询();
         setInterval(轮询, 500); setInterval(检查环境, 15000);
     })();
 </script>

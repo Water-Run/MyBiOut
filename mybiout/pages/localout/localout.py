@@ -78,6 +78,12 @@ if 系统信息.platform == "win32":
 _封面缓存目录: 路径 = 路径(临时文件.gettempdir()) / "mybiout_covers"
 _封面缓存目录.mkdir(parents=True, exist_ok=True)
 
+_缓存元文件名: tuple[str, ...] = ("danmaku.xml", "entry.json", "index.json")
+_导出索引文件名: str = ".mybiout-export-index.json"
+_导出索引锁: 线程.RLock = 线程.RLock()
+_导出身份锁表锁: 线程.Lock = 线程.Lock()
+_导出身份锁表: dict[str, 线程.Lock] = {}
+
 
 # ===== ADB 工具 =====
 
@@ -314,6 +320,7 @@ class 视频卡片:
     视频路径: str = ""
     音频路径: str = ""
     封面路径: str = ""
+    元文件路径表: dict[str, str] = 字段(default_factory=dict)
     输出路径: str = ""
     状态名: str = "queued"
     错误: str = ""
@@ -348,6 +355,7 @@ class 视频卡片:
             "source_label": 自身.来源标签,
             "source_type": 自身.来源类型,
             "cover_url": f"/api/localout/cover/{自身.编号}" if 自身.封面路径 else "",
+            "metadata_files": sorted(自身.元文件路径表),
             "video_path": 自身.视频路径,
             "output_path": 自身.输出路径,
             "path_display": 自身.输出路径 or 显示路径,
@@ -357,7 +365,14 @@ class 视频卡片:
         }
 
     def 克隆(自身) -> 视频卡片:
-        return 替换数据(自身, 编号=_生成编号(), 状态名="queued", 错误="", 输出路径="")
+        return 替换数据(
+            自身,
+            编号=_生成编号(),
+            元文件路径表=dict(自身.元文件路径表),
+            状态名="queued",
+            错误="",
+            输出路径="",
+        )
 
 
 # ===== 全局状态 =====
@@ -381,6 +396,7 @@ class _本地状态:
         自身.导出总数: int = 0
         自身.导出完成数: int = 0
         自身.导出成功数: int = 0
+        自身.导出跳过数: int = 0
         自身.导出失败数: int = 0
         自身._扫描线程: 线程.Thread | None = None
         自身._扫描取消: 线程.Event = 线程.Event()
@@ -413,6 +429,7 @@ class _本地状态:
                 "export_total": 自身.导出总数,
                 "export_done": 自身.导出完成数,
                 "export_success": 自身.导出成功数,
+                "export_skipped": 自身.导出跳过数,
                 "export_failed": 自身.导出失败数,
             }
 
@@ -750,6 +767,7 @@ def _解析入口JSON(
         视频路径=视频路径,
         音频路径=音频路径,
         封面路径=_向上寻找封面(父目录),
+        元文件路径表=_寻找本地元文件(路径(视频路径).parent),
     )
 
 
@@ -867,6 +885,7 @@ def _解析视频信息JSON(路径文本: 路径, 来源标签: str) -> 视频�
         视频路径=视频路径,
         音频路径=音频路径,
         封面路径=_向上寻找封面(缓存目录),
+        元文件路径表=_寻找本地元文件(缓存目录),
     )
 
 
@@ -916,6 +935,28 @@ def _向上寻找封面(起点: 路径, 最大深度: int = 3) -> str:
     return ""
 
 
+def _寻找本地元文件(起点: 路径, 最大深度: int = 4) -> dict[str, str]:
+    r"""
+    从媒体目录向上寻找 Android 缓存的三类元文件，每类只取距离最近的一份。
+    :param 起点: video.m4s 所在目录
+    :param 最大深度: 最多上溯层数
+    :return: 文件名到本地绝对路径的映射
+    """
+    结果: dict[str, str] = {}
+    当前目录: 路径 = 起点
+    for _ in range(最大深度 + 1):
+        for 文件名 in _缓存元文件名:
+            if 文件名 in 结果:
+                continue
+            候选文件: 路径 = 当前目录 / 文件名
+            if 候选文件.is_file():
+                结果[文件名] = str(候选文件)
+        if len(结果) == len(_缓存元文件名) or 当前目录.parent == 当前目录:
+            break
+        当前目录 = 当前目录.parent
+    return 结果
+
+
 def _从M4S目录制卡(缓存媒体目录: 路径, 来源标签: str, 来源类型: str) -> 视频卡片 | None:
     r"""
     针对 "目录中含 video.m4s + audio.m4s" 的通用情况构造 VideoCard
@@ -956,6 +997,7 @@ def _从M4S目录制卡(缓存媒体目录: 路径, 来源标签: str, 来源类
         分辨率=分辨率,
         清晰度=清晰度,
         封面路径=_向上寻找封面(缓存媒体目录.parent),
+        元文件路径表=_寻找本地元文件(缓存媒体目录),
     )
 
 
@@ -1312,6 +1354,26 @@ def _取ADB元数据目录候选(远端路径: str) -> list[str]:
     return 候选目录
 
 
+def _寻找ADB元文件(远端媒体目录: str, 远端文件集合: set[str] | None) -> dict[str, str]:
+    r"""
+    根据一次 find 得到的远端文件集合，定位最靠近媒体目录的缓存元文件。
+    未提供文件集合时不猜测不存在的远端文件，避免导出阶段产生多次失败拉取。
+    """
+    if 远端文件集合 is None:
+        return {}
+    候选目录: list[str] = [远端媒体目录.rstrip("/")]
+    候选目录.extend(_取ADB元数据目录候选(远端媒体目录))
+    结果: dict[str, str] = {}
+    for 目录 in 候选目录:
+        for 文件名 in _缓存元文件名:
+            if 文件名 in 结果:
+                continue
+            候选路径: str = f"{目录}/{文件名}"
+            if 候选路径 in 远端文件集合:
+                结果[文件名] = 候选路径
+    return 结果
+
+
 def _制作ADB卡片(
     ADB路径: str,
     序列号: str,
@@ -1341,6 +1403,7 @@ def _制作ADB卡片(
     合集标题: str = ""
     分集序号: int = 1
     发布时间: str = ""
+    元文件路径表: dict[str, str] = _寻找ADB元文件(远端路径, 远端文件集合)
 
     # Android 普通版常将 entry.json / cover.jpg 放在 c_<cid> 层，
     # 其他版本则可能放在 AV 目录；从 m4s 所在目录逐层向上探测。
@@ -1376,6 +1439,7 @@ def _制作ADB卡片(
             字节数 = 元数据["字节数"]
             发布时间 = 元数据["发布时间"]
             远端父目录 = 元数据目录
+            元文件路径表["entry.json"] = 远端入口路径
             break
         except Exception:
             continue
@@ -1465,6 +1529,7 @@ def _制作ADB卡片(
         视频路径=f"{远端路径}/video.m4s",
         音频路径=f"{远端路径}/audio.m4s",
         封面路径=封面路径,
+        元文件路径表=元文件路径表,
     )
 
 
@@ -1685,7 +1750,7 @@ def _用随包FFmpeg合并(视频文件: str, 音频文件: str, 输出路径: s
     r"""兼容桌面端占位头，以临时文件无损封装并原子替换最终 MP4。"""
     转码器: str | None = _寻找FFmpeg()
     if not 转码器:
-        raise RuntimeError("未找到 ffmpeg.exe（请确认绿色包 bin/ 完整）")
+        raise RuntimeError("未找到 ffmpeg（请确认绿色包 bin/ 完整）")
     最终输出: 路径 = 路径(输出路径)
     最终输出.parent.mkdir(parents=True, exist_ok=True)
     临时输出: 路径 = 最终输出.parent / (
@@ -1752,6 +1817,189 @@ def _输出路径键(文件路径: 路径) -> str:
     return 系统.path.normcase(系统.path.abspath(str(文件路径)))
 
 
+def _导出身份键(卡片: 视频卡片) -> str:
+    r"""生成跨来源稳定的导出身份，用于识别不同手机中的同一稿件。"""
+    分集: int = max(1, _安全整数(卡片.分集序号, 1))
+    清晰度指纹原文: str = "|".join(
+        值.strip().casefold() for 值 in (卡片.清晰度, 卡片.分辨率) if 值.strip()
+    )
+    if 清晰度指纹原文:
+        版本指纹: str = f":q{哈希.sha256(清晰度指纹原文.encode('utf-8')).hexdigest()[:12]}"
+    elif 卡片.字节数 > 0:
+        版本指纹 = f":s{卡片.字节数}"
+    else:
+        版本指纹 = ""
+    if 卡片.BV号:
+        return f"bvid:{卡片.BV号.strip().lower()}:p{分集}{版本指纹}"
+    if 卡片.AV号:
+        return f"avid:{卡片.AV号.strip().lower().removeprefix('av')}:p{分集}{版本指纹}"
+    归一文本: str = "|".join(
+        正则.sub(r"\s+", " ", 值 or "").strip().casefold()
+        for 值 in (卡片.标题, 卡片.UP主名称, 卡片.合集标题, 卡片.文件夹名)
+    )
+    if not 归一文本.replace("|", "") and 卡片.字节数 <= 0:
+        归一文本 = f"source:{卡片.来源类型}|{卡片.视频路径}|{卡片.音频路径}"
+    原文: str = f"{归一文本}|p{分集}|size:{max(0, 卡片.字节数)}"
+    return f"fallback:{哈希.sha256(原文.encode('utf-8')).hexdigest()[:32]}"
+
+
+def _取导出身份锁(身份键: str) -> 线程.Lock:
+    r"""同一批并发任务中的相同视频串行处理，避免重复写出两份。"""
+    with _导出身份锁表锁:
+        if 身份键 not in _导出身份锁表:
+            _导出身份锁表[身份键] = 线程.Lock()
+        return _导出身份锁表[身份键]
+
+
+def _导出索引路径(输出目录: 路径) -> 路径:
+    return 输出目录 / _导出索引文件名
+
+
+def _载入导出索引(输出目录: 路径) -> dict:
+    r"""读取 LocalOut 隐藏索引；损坏或旧格式时安全回退为空索引。"""
+    索引文件: 路径 = _导出索引路径(输出目录)
+    try:
+        数据: object = 数据交换.loads(索引文件.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {"version": 1, "items": {}}
+    if not isinstance(数据, dict) or not isinstance(数据.get("items"), dict):
+        return {"version": 1, "items": {}}
+    return 数据
+
+
+def _索引文件转绝对路径(输出目录: 路径, 相对路径文本: object) -> 路径 | None:
+    r"""将索引中的相对路径限制在输出目录内，拒绝损坏索引造成的路径穿越。"""
+    if not isinstance(相对路径文本, str) or not 相对路径文本.strip():
+        return None
+    try:
+        根目录: 路径 = 输出目录.resolve()
+        候选文件: 路径 = (输出目录 / 相对路径文本).resolve()
+    except (OSError, RuntimeError):
+        return None
+    if 候选文件 == 根目录 or 根目录 not in 候选文件.parents:
+        return None
+    return 候选文件
+
+
+def _从索引查找重复(
+    输出目录: 路径,
+    身份键: str,
+    卡片: 视频卡片,
+    *,
+    需要元文件: bool,
+) -> 路径 | None:
+    with _导出索引锁:
+        索引: dict = _载入导出索引(输出目录)
+        项: object = 索引.get("items", {}).get(身份键)
+    if not isinstance(项, dict):
+        return None
+    if 需要元文件 and not bool(项.get("preserved_metadata")):
+        return None
+    if 需要元文件:
+        # 后来遇到元文件更完整的同一稿件时，不应被早期的不完整归档拦住。
+        当前可保留: set[str] = set(卡片.元文件路径表).intersection(_缓存元文件名)
+        已保留: set[str] = {
+            str(文件名)
+            for 文件名 in (项.get("metadata_files") or [])
+            if str(文件名) in _缓存元文件名
+        }
+        if 当前可保留 and not 当前可保留.issubset(已保留):
+            return None
+    旧大小: int = _安全整数(项.get("source_size"))
+    新大小: int = max(0, 卡片.字节数)
+    if 旧大小 and 新大小:
+        大小容差: int = max(1024 * 1024, int(max(旧大小, 新大小) * 0.02))
+        if abs(旧大小 - 新大小) > 大小容差:
+            return None
+    旧清晰度: str = str(项.get("quality") or "").strip().casefold()
+    新清晰度: str = (卡片.清晰度 or "").strip().casefold()
+    if 旧清晰度 and 新清晰度 and 旧清晰度 != 新清晰度:
+        return None
+    旧分辨率: str = str(项.get("resolution") or "").strip().casefold()
+    新分辨率: str = (卡片.分辨率 or "").strip().casefold()
+    if 旧分辨率 and 新分辨率 and 旧分辨率 != 新分辨率:
+        return None
+    已有文件: 路径 | None = _索引文件转绝对路径(输出目录, 项.get("path"))
+    if 已有文件 is not None and 已有文件.is_file() and 已有文件.stat().st_size > 0:
+        return 已有文件
+    return None
+
+
+def _保存导出索引项(
+    输出目录: 路径,
+    身份键: str,
+    输出文件: 路径,
+    卡片: 视频卡片,
+    *,
+    已保留元文件: bool,
+    元文件名称列表: list[str] | None = None,
+) -> None:
+    r"""以临时文件原子更新导出索引，不把机器绝对路径写入索引。"""
+    with _导出索引锁:
+        索引: dict = _载入导出索引(输出目录)
+        项们: dict = 索引.setdefault("items", {})
+        try:
+            相对路径: str = 输出文件.resolve().relative_to(输出目录.resolve()).as_posix()
+        except (OSError, ValueError):
+            return
+        项们[身份键] = {
+            "path": 相对路径,
+            "bvid": 卡片.BV号,
+            "avid": 卡片.AV号,
+            "part": max(1, _安全整数(卡片.分集序号, 1)),
+            "source_size": max(0, 卡片.字节数),
+            "quality": 卡片.清晰度,
+            "resolution": 卡片.分辨率,
+            "preserved_metadata": 已保留元文件,
+            "metadata_files": sorted(set(元文件名称列表 or [])),
+            "exported_at": _完整时间(),
+        }
+        索引["version"] = 1
+        临时索引: 路径 = _导出索引路径(输出目录).with_name(
+            f"{_导出索引文件名}.{唯一编号.uuid4().hex}.tmp"
+        )
+        try:
+            临时索引.write_text(
+                数据交换.dumps(索引, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            系统.replace(临时索引, _导出索引路径(输出目录))
+        finally:
+            临时索引.unlink(missing_ok=True)
+
+
+def _大小近似(文件: 路径, 预期字节数: int) -> bool:
+    if 预期字节数 <= 0:
+        return False
+    try:
+        实际字节数: int = 文件.stat().st_size
+    except OSError:
+        return False
+    容差: int = max(2 * 1024 * 1024, int(预期字节数 * 0.03))
+    return abs(实际字节数 - 预期字节数) <= 容差
+
+
+def _查找旧版同名导出(
+    输出目录: 路径,
+    文件名文本: str,
+    卡片: 视频卡片,
+    *,
+    保留元文件: bool,
+) -> 路径 | None:
+    r"""兼容索引功能上线前的导出：仅在文件体积吻合或文件名含稿件号时判重。"""
+    文件名路径: 路径 = 路径(文件名文本)
+    if 保留元文件:
+        候选: 路径 = 输出目录 / 文件名路径.stem / 文件名路径.name
+    else:
+        候选 = 输出目录 / 文件名路径.name
+    if not 候选.is_file() or 候选.stat().st_size <= 0:
+        return None
+    标识: str = (卡片.BV号 or (f"av{卡片.AV号}" if 卡片.AV号 else "")).casefold()
+    if _大小近似(候选, 卡片.字节数) or (标识 and 标识 in 候选.name.casefold()):
+        return 候选
+    return None
+
+
 def _预留输出路径(输出目录: 路径, 文件名文本: str) -> 路径:
     基础路径: 路径 = 输出目录 / 文件名文本
     with 状态.锁:
@@ -1769,9 +2017,77 @@ def _预留输出路径(输出目录: 路径, 文件名文本: str) -> 路径:
             计数器 += 1
 
 
+def _预留归档目录(输出目录: 路径, 文件名文本: str) -> tuple[路径, 路径]:
+    r"""预留与 MP4 同名的归档目录，返回（目录，目录内 MP4）。"""
+    基础名称: str = 路径(文件名文本).stem
+    with 状态.锁:
+        计数器: int = 0
+        while True:
+            目录名称: str = 基础名称 if 计数器 == 0 else f"{基础名称}_{计数器}"
+            候选目录: 路径 = 输出目录 / 目录名称
+            路径键: str = _输出路径键(候选目录)
+            if not 候选目录.exists() and 路径键 not in 状态._输出占用集合:
+                状态._输出占用集合.add(路径键)
+                return 候选目录, 候选目录 / f"{目录名称}.mp4"
+            计数器 += 1
+
+
 def _释放输出路径(文件路径: 路径) -> None:
     with 状态.锁:
         状态._输出占用集合.discard(_输出路径键(文件路径))
+
+
+def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> list[str]:
+    r"""复制或从 ADB 拉取可用元文件，返回成功保留的文件名。"""
+    已复制: list[str] = []
+    ADB路径: str | None = _寻找ADB() if 卡片.来源类型 == "adb" else None
+    for 文件名 in _缓存元文件名:
+        源路径: str = 卡片.元文件路径表.get(文件名, "")
+        if not 源路径:
+            continue
+        目标文件: 路径 = 目标目录 / 文件名
+        if 卡片.来源类型 == "adb":
+            if not ADB路径 or not 卡片.设备序列号:
+                raise RuntimeError("保留元文件时找不到 ADB 设备")
+            拉取结果: 子进程.CompletedProcess = _执行ADB(
+                ADB路径,
+                卡片.设备序列号,
+                "pull",
+                "-a",
+                源路径,
+                str(目标文件),
+                超时秒数=60,
+            )
+            if 拉取结果.returncode != 0:
+                # 兼容不支持 pull -a 的旧 ADB。
+                拉取结果 = _执行ADB(
+                    ADB路径,
+                    卡片.设备序列号,
+                    "pull",
+                    源路径,
+                    str(目标文件),
+                    超时秒数=60,
+                )
+            if 拉取结果.returncode != 0 or not 目标文件.is_file():
+                raise RuntimeError(f"ADB 拉取 {文件名} 失败: {拉取结果.stderr.strip()[:120]}")
+        else:
+            源文件: 路径 = 路径(源路径)
+            if not 源文件.is_file():
+                continue
+            文件工具.copy2(源文件, 目标文件)
+        已复制.append(文件名)
+    return 已复制
+
+
+def _继承本地缓存时间(卡片: 视频卡片, 输出文件: 路径) -> None:
+    r"""本地来源尽量让成品继承缓存媒体的访问/修改时间。"""
+    if 卡片.来源类型 == "adb":
+        return
+    try:
+        源状态 = 路径(卡片.视频路径).stat()
+        系统.utime(输出文件, ns=(源状态.st_atime_ns, 源状态.st_mtime_ns))
+    except OSError:
+        pass
 
 
 def _本地合并(卡片: 视频卡片, 输出路径: str) -> None:
@@ -1831,31 +2147,85 @@ def _导出单个ADB(卡片: 视频卡片, 输出路径: str) -> None:
         _用随包FFmpeg合并(本地视频, 本地音频, 输出路径)
 
 
-def _导出单个(卡片: 视频卡片, 输出目录: 路径) -> None:
+def _导出单个(卡片: 视频卡片, 输出目录: 路径) -> bool:
     r"""
     导出单个视频（自动区分本地与 ADB 来源）
     :param: card: 视频卡片
     :param: output_dir: 输出目录
+    :return: bool: True 表示命中已有导出并跳过，False 表示本次新导出
     """
-    if not _寻找FFmpeg():
-        raise RuntimeError("未找到 ffmpeg.exe（请确认绿色包 bin/ 完整）")
-
     文件名文本: str = _构建文件名(卡片)
     if not 文件名文本:
         raise RuntimeError("标题不完整且策略为跳过")
+    保留元文件: bool = 工具.取设置("localout", "preserve_metadata") == "true"
+    跳过重复: bool = 工具.取设置("localout", "skip_duplicates") != "false"
+    身份键: str = _导出身份键(卡片)
 
-    输出路径: 路径 = _预留输出路径(输出目录, 文件名文本)
-    try:
-        if 卡片.来源类型 == "adb":
-            _导出单个ADB(卡片, str(输出路径))
+    # 同身份任务串行：第一个完成写索引后，后续任务即可直接命中并跳过。
+    with _取导出身份锁(身份键):
+        if 跳过重复:
+            已有输出: 路径 | None = _从索引查找重复(
+                输出目录,
+                身份键,
+                卡片,
+                需要元文件=保留元文件,
+            )
+            if 已有输出 is None:
+                已有输出 = _查找旧版同名导出(
+                    输出目录,
+                    文件名文本,
+                    卡片,
+                    保留元文件=保留元文件,
+                )
+            if 已有输出 is not None:
+                卡片.输出路径 = str(已有输出)
+                return True
+
+        if not _寻找FFmpeg():
+            raise RuntimeError("未找到 ffmpeg（请确认绿色包 bin/ 完整）")
+
+        归档目录: 路径 | None = None
+        if 保留元文件:
+            归档目录, 输出路径 = _预留归档目录(输出目录, 文件名文本)
+            预留路径: 路径 = 归档目录
         else:
-            _本地合并(卡片, str(输出路径))
-        卡片.输出路径 = str(输出路径)
-    except Exception:
-        输出路径.unlink(missing_ok=True)
-        raise
-    finally:
-        _释放输出路径(输出路径)
+            输出路径 = _预留输出路径(输出目录, 文件名文本)
+            预留路径 = 输出路径
+
+        归档已创建: bool = False
+        try:
+            if 归档目录 is not None:
+                归档目录.mkdir(parents=False, exist_ok=False)
+                归档已创建 = True
+            if 卡片.来源类型 == "adb":
+                _导出单个ADB(卡片, str(输出路径))
+            else:
+                _本地合并(卡片, str(输出路径))
+            _继承本地缓存时间(卡片, 输出路径)
+            已复制元文件: list[str] = []
+            if 归档目录 is not None:
+                已复制元文件 = _复制缓存元文件(卡片, 归档目录)
+            卡片.输出路径 = str(输出路径)
+            try:
+                _保存导出索引项(
+                    输出目录,
+                    身份键,
+                    输出路径,
+                    卡片,
+                    已保留元文件=保留元文件,
+                    元文件名称列表=已复制元文件,
+                )
+            except OSError as 异常:
+                状态.记录日志("warn", f"视频已导出，但去重索引写入失败: {异常}")
+            return False
+        except Exception:
+            输出路径.unlink(missing_ok=True)
+            if 归档目录 is not None and 归档已创建:
+                with 忽略异常(OSError):
+                    文件工具.rmtree(归档目录)
+            raise
+        finally:
+            _释放输出路径(预留路径)
 
 
 def _导出线程函数(卡片编号列表: list[str]) -> None:
@@ -1890,9 +2260,9 @@ def _导出线程函数(卡片编号列表: list[str]) -> None:
                 卡片.错误 = ""
             状态.记录日志("info", f"导出中: {卡片.标题 or 卡片.文件夹名}")
             try:
-                _导出单个(卡片, 输出目录)
+                已跳过: bool = _导出单个(卡片, 输出目录)
                 with 状态.锁:
-                    卡片.状态名 = "success"
+                    卡片.状态名 = "skipped" if 已跳过 else "success"
                     状态.任务卡片列表 = [
                         卡片项
                         for 卡片项 in 状态.任务卡片列表
@@ -1900,11 +2270,20 @@ def _导出线程函数(卡片编号列表: list[str]) -> None:
                     ]
                     状态.完成卡片列表.append(卡片)
                     状态.导出完成数 += 1
-                    状态.导出成功数 += 1
+                    if 已跳过:
+                        状态.导出跳过数 += 1
+                    else:
+                        状态.导出成功数 += 1
                     状态.导出进度 = (
                         状态.导出完成数 / 状态.导出总数 if 状态.导出总数 else 1
                     )
-                状态.记录日志("success", f"导出完成: {卡片.标题 or 卡片.文件夹名}")
+                if 已跳过:
+                    状态.记录日志(
+                        "info",
+                        f"跳过重复: {卡片.标题 or 卡片.文件夹名}（已有 {卡片.输出路径}）",
+                    )
+                else:
+                    状态.记录日志("success", f"导出完成: {卡片.标题 or 卡片.文件夹名}")
             except Exception as e:
                 with 状态.锁:
                     卡片.状态名 = "failed"
@@ -1925,21 +2304,25 @@ def _导出线程函数(卡片编号列表: list[str]) -> None:
 
         with 状态.锁:
             成功数 = 状态.导出成功数
+            跳过数 = 状态.导出跳过数
             失败数 = 状态.导出失败数
             总数 = 状态.导出总数
             未开始数 = max(0, 总数 - 状态.导出完成数)
         if 状态._导出取消.is_set():
             状态.记录日志(
                 "warn",
-                f"导出已取消 (成功 {成功数}，失败 {失败数}，未开始 {未开始数})",
+                f"导出已取消 (新增 {成功数}，跳过 {跳过数}，失败 {失败数}，未开始 {未开始数})",
             )
         elif 失败数:
             状态.记录日志(
                 "warn",
-                f"导出结束 (成功 {成功数}，失败 {失败数}，共 {总数})",
+                f"导出结束 (新增 {成功数}，跳过 {跳过数}，失败 {失败数}，共 {总数})",
             )
         else:
-            状态.记录日志("success", f"全部导出任务结束 (成功 {成功数}/{总数})")
+            状态.记录日志(
+                "success",
+                f"全部导出任务结束 (新增 {成功数}，跳过 {跳过数}，共 {总数})",
+            )
     except Exception as e:
         状态.记录日志("error", f"导出线程异常: {e}")
     finally:
@@ -1967,17 +2350,19 @@ def 取环境状态() -> dict:
     ADB路径值: str | None = _寻找ADB()
     FFmpeg路径值: str | None = _寻找FFmpeg()
     有网络请求: bool = _有网络请求
+    ADB名称: str = "adb.exe 与 AdbWinApi.dll" if 系统信息.platform == "win32" else "adb"
+    FFmpeg名称: str = "ffmpeg.exe" if 系统信息.platform == "win32" else "ffmpeg"
 
     return {
         "adb": {
             "available": ADB路径值 is not None,
             "path": ADB路径值 or "",
-            "hint": "绿色包应自带 bin/adb.exe；若缺失请将 adb.exe 与 AdbWinApi.dll 等放入程序 bin/" if not ADB路径值 else "",
+            "hint": f"绿色包应自带 bin/{ADB名称}" if not ADB路径值 else "",
         },
         "ffmpeg": {
             "available": FFmpeg路径值 is not None,
             "path": FFmpeg路径值 or "",
-            "hint": "绿色包应自带 bin/ffmpeg.exe" if not FFmpeg路径值 else "",
+            "hint": f"绿色包应自带 bin/{FFmpeg名称}" if not FFmpeg路径值 else "",
         },
         "httpx": {
             "available": 有网络请求,
@@ -2305,6 +2690,7 @@ def 开始导出(卡片编号列表: list[str]) -> dict:
         状态.导出总数 = len(卡片编号列表)
         状态.导出完成数 = 0
         状态.导出成功数 = 0
+        状态.导出跳过数 = 0
         状态.导出失败数 = 0
         状态.导出进度 = 0.0
         线程对象: 线程.Thread = 线程.Thread(

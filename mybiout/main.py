@@ -235,6 +235,57 @@ def _系统消息框(标题: str, 消息: str, *, 警告: bool = False) -> None:
             continue
 
 
+def _系统确认框(标题: str, 消息: str, *, 确认文字: str = "继续") -> bool | None:
+    r"""显示原生确认框；无可用图形组件时返回 None，由调用方安全降级。"""
+    if 系统.platform == "win32":
+        try:
+            import ctypes
+
+            # MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON1；IDYES == 6。
+            return ctypes.windll.user32.MessageBoxW(0, 消息, 标题, 0x34) == 6
+        except Exception:
+            return None
+
+    if not (
+        操作系统.environ.get("DISPLAY")
+        or 操作系统.environ.get("WAYLAND_DISPLAY")
+    ):
+        return None
+
+    命令们: tuple[list[str], ...] = (
+        [
+            "zenity",
+            "--question",
+            "--title",
+            标题,
+            "--text",
+            消息,
+            "--ok-label",
+            确认文字,
+            "--cancel-label",
+            "退出",
+            "--no-wrap",
+        ],
+        [
+            "kdialog",
+            "--title",
+            标题,
+            "--yesno",
+            消息,
+            "--yes-label",
+            确认文字,
+            "--no-label",
+            "退出",
+        ],
+    )
+    for 命令 in 命令们:
+        try:
+            return 子进程.run(命令, check=False, timeout=30).returncode == 0
+        except Exception:
+            continue
+    return None
+
+
 def _提示致命错误(消息: str, *, 标题: str = "MyBiOut!") -> None:
     r"""
     输出致命错误; 冻结且无控制台时用系统消息框, 避免 --windowed 静默失败
@@ -525,6 +576,68 @@ def _探测端口绑定错误(端口: int) -> str | None:
         return f"端口 {端口号} 不可用: {详细原因}"
     except OverflowError:
         return f"端口须在 1~65535 之间, 收到 {端口号}"
+    return None
+
+
+def _寻找可用端口(期望端口: int) -> int | None:
+    r"""优先在期望端口之后寻找空闲端口，找不到时请求系统分配临时端口。"""
+    起点: int = 期望端口 if 1 <= 期望端口 <= 65535 else 取端口()
+    for 候选端口 in range(起点 + 1, min(65536, 起点 + 101)):
+        if _探测端口绑定错误(候选端口) is None:
+            return 候选端口
+    try:
+        with 套接字.socket(套接字.AF_INET, 套接字.SOCK_STREAM) as 套接字对象:
+            套接字对象.bind(("127.0.0.1", 0))
+            随机端口: int = int(套接字对象.getsockname()[1])
+        return 随机端口 if 随机端口 > 0 else None
+    except (OSError, OverflowError, TypeError, ValueError):
+        return None
+
+
+def _一键解决端口不可用(端口: int, 原因: str) -> int | None:
+    r"""
+    给出可直接继续使用的备用端口。图形环境使用一次确认；无对话框且无交互
+    终端时自动切换，避免 Linux 桌面快捷方式静默退出。
+    """
+    备用端口: int | None = _寻找可用端口(端口)
+    if 备用端口 is None:
+        _提示致命错误(
+            f"服务端口不可用，且没有找到备用端口。\n\n{原因}\n\n"
+            "请关闭占用程序或重启系统后再试。",
+            标题="MyBiOut! 启动失败",
+        )
+        return None
+
+    提示正文: str = (
+        f"MyBiOut! 无法使用端口 {端口}。\n\n"
+        f"原因：{原因}\n\n"
+        f"已找到可用端口 {备用端口}。选择“是”即可改用该端口继续启动，"
+        "不会关闭或影响正在占用原端口的程序。"
+    )
+    选择结果: bool | None = _系统确认框(
+        "MyBiOut! 端口被占用",
+        提示正文,
+        确认文字=f"改用 {备用端口}",
+    )
+    if 选择结果 is None and _是否有交互控制台():
+        _安全打印(f"  * {原因}")
+        _安全打印(f"  * 输入 Y 改用备用端口 {备用端口}，其他键退出")
+        try:
+            选择结果 = input("  > ").strip().lower() in {"y", "yes", "是", "继续"}
+        except (EOFError, KeyboardInterrupt):
+            选择结果 = False
+    if 选择结果 is None:
+        # 无 GUI 对话组件、也没有终端输入时，自动采用已验证的安全备用端口。
+        选择结果 = True
+        _安全打印(f"  * {原因}；自动改用备用端口 {备用端口}")
+    if 选择结果:
+        return 备用端口
+
+    _提示致命错误(
+        f"启动已取消。\n\n{原因}\n\n"
+        f"也可以稍后使用 {_启动示例(f'--port {备用端口}')} 启动。",
+        标题="MyBiOut! 启动已取消",
+    )
     return None
 
 
@@ -1515,6 +1628,11 @@ def 主程序() -> None:
     )
     参数: 参数解析.Namespace = 解析器.parse_args()
     端口: int = 参数.port
+
+    if 端口错误 := _探测端口绑定错误(端口):
+        if (备用端口 := _一键解决端口不可用(端口, 端口错误)) is None:
+            return
+        端口 = 备用端口
 
     # 默认内嵌窗口; 仅显式 --browser 才走系统浏览器 (绿色包不自动回退浏览器)
     强制浏览器: bool = bool(参数.browser)

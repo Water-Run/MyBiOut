@@ -8,12 +8,15 @@ MdOut! Markdown 导出服务层, 负责从 B 站 API 获取信息并生成 Markd
 
 import json as 数据交换
 import re as 正则
+import shutil as 文件工具
 import threading as 线程
 import time as 时间
 import uuid as 唯一编号
+from contextlib import suppress as 忽略异常
 from dataclasses import dataclass as 数据类
 from dataclasses import field as 字段
 from datetime import datetime as 日期时间
+from html.parser import HTMLParser as 网页解析器
 from pathlib import Path as 路径
 
 import httpx as 网络请求
@@ -37,6 +40,12 @@ _网址模式列表: list[tuple[正则.Pattern[str], str, str]] = [
     (正则.compile(r"^av(\d+)$", 正则.I), "video", "avid"),
     (正则.compile(r"(?:https?://)?(?:www\.)?bilibili\.com/read/cv(\d+)", 正则.I), "article", "cvid"),
     (正则.compile(r"^cv(\d+)$", 正则.I), "article", "cvid"),
+    (
+        正则.compile(r"(?:https?://)?(?:www\.)?bilibili\.com/read/(?:readlist/)?rl(\d+)", 正则.I),
+        "article",
+        "rlid",
+    ),
+    (正则.compile(r"^rl(\d+)$", 正则.I), "article", "rlid"),
     (正则.compile(r"(?:https?://)?(?:www\.)?bilibili\.com/opus/(\d+)", 正则.I), "article", "opusid"),
     (正则.compile(r"(?:https?://)?space\.bilibili\.com/(\d+)", 正则.I), "user", "mid"),
 ]
@@ -115,6 +124,132 @@ def _格式化时间戳(时间戳: int) -> str:
         return 日期时间.fromtimestamp(时间戳).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return ""
+
+
+def _表格文本(值: object, 默认值: str = "—") -> str:
+    r"""把接口文本安全放入 Markdown 表格单元格。"""
+    文本: str = str(值 or 默认值).replace("\r", " ").replace("\n", " ")
+    return 文本.replace("|", "\\|")
+
+
+class _专栏HTML转Markdown(网页解析器):
+    r"""将 B 站旧专栏正文中的常用 HTML 元素转换为可离线阅读的 Markdown。"""
+
+    def __init__(自身) -> None:
+        super().__init__(convert_charrefs=True)
+        自身.片段: list[str] = []
+        自身.链接栈: list[str] = []
+        自身.列表层级: int = 0
+        自身.预格式层级: int = 0
+        自身.忽略层级: int = 0
+
+    def _写(自身, 文本: str) -> None:
+        if 文本:
+            自身.片段.append(文本)
+
+    def handle_starttag(自身, 标签: str, 属性列表: list[tuple[str, str | None]]) -> None:
+        标签 = 标签.lower()
+        属性: dict[str, str] = {键: 值 or "" for 键, 值 in 属性列表}
+        if 标签 in {"script", "style"}:
+            自身.忽略层级 += 1
+            return
+        if 自身.忽略层级:
+            return
+        if 标签 in {"p", "div", "section", "figure", "figcaption"}:
+            自身._写("\n\n")
+        elif 标签 == "br":
+            自身._写("  \n")
+        elif 标签 in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            层级: int = min(6, int(标签[1]) + 1)
+            自身._写(f"\n\n{'#' * 层级} ")
+        elif 标签 in {"ul", "ol"}:
+            自身.列表层级 += 1
+            自身._写("\n")
+        elif 标签 == "li":
+            自身._写(f"\n{'  ' * max(0, 自身.列表层级 - 1)}- ")
+        elif 标签 == "blockquote":
+            自身._写("\n\n> ")
+        elif 标签 in {"strong", "b"}:
+            自身._写("**")
+        elif 标签 in {"em", "i"}:
+            自身._写("*")
+        elif 标签 in {"del", "s"}:
+            自身._写("~~")
+        elif 标签 == "code" and not 自身.预格式层级:
+            自身._写("`")
+        elif 标签 == "pre":
+            自身.预格式层级 += 1
+            自身._写("\n\n```text\n")
+        elif 标签 == "a":
+            地址: str = 属性.get("href", "").strip()
+            自身.链接栈.append(地址)
+            自身._写("[")
+        elif 标签 == "img":
+            地址 = 属性.get("data-src", "") or 属性.get("src", "")
+            if 地址.startswith("//"):
+                地址 = f"https:{地址}"
+            if 地址:
+                自身._写(f"\n\n![{属性.get('alt', '图片')}]({地址})\n\n")
+        elif 标签 == "hr":
+            自身._写("\n\n---\n\n")
+
+    def handle_endtag(自身, 标签: str) -> None:
+        标签 = 标签.lower()
+        if 标签 in {"script", "style"}:
+            自身.忽略层级 = max(0, 自身.忽略层级 - 1)
+            return
+        if 自身.忽略层级:
+            return
+        if 标签 in {"p", "div", "section", "figure", "figcaption", "blockquote"}:
+            自身._写("\n\n")
+        elif 标签 in {"h1", "h2", "h3", "h4", "h5", "h6", "li"}:
+            自身._写("\n")
+        elif 标签 in {"ul", "ol"}:
+            自身.列表层级 = max(0, 自身.列表层级 - 1)
+            自身._写("\n")
+        elif 标签 in {"strong", "b"}:
+            自身._写("**")
+        elif 标签 in {"em", "i"}:
+            自身._写("*")
+        elif 标签 in {"del", "s"}:
+            自身._写("~~")
+        elif 标签 == "code" and not 自身.预格式层级:
+            自身._写("`")
+        elif 标签 == "pre":
+            自身._写("\n```\n\n")
+            自身.预格式层级 = max(0, 自身.预格式层级 - 1)
+        elif 标签 == "a":
+            地址: str = 自身.链接栈.pop() if 自身.链接栈 else ""
+            自身._写(f"]({地址})" if 地址 else "]")
+
+    def handle_data(自身, 数据: str) -> None:
+        if 自身.忽略层级 or not 数据:
+            return
+        if 自身.预格式层级:
+            自身._写(数据)
+            return
+        文本: str = 正则.sub(r"[\t\r\f\v ]+", " ", 数据)
+        文本 = 正则.sub(r"\n+", " ", 文本)
+        自身._写(文本)
+
+    def 取结果(自身) -> str:
+        文本: str = "".join(自身.片段)
+        文本 = 正则.sub(r"[ \t]+\n", "\n", 文本)
+        文本 = 正则.sub(r"\n{3,}", "\n\n", 文本)
+        return 文本.strip()
+
+
+def _专栏正文转Markdown(网页正文: str) -> str:
+    if not 网页正文.strip():
+        return ""
+    转换器 = _专栏HTML转Markdown()
+    try:
+        转换器.feed(网页正文)
+        转换器.close()
+        return 转换器.取结果()
+    except Exception:
+        # Markdown 可直接容纳 HTML，极少数异常正文仍保留原文而不是整篇丢失。
+        return 网页正文.strip()
 
 
 def _客户端() -> 网络请求.Client:
@@ -295,7 +430,9 @@ def _获取收藏全部内容(
         去重后.append(媒体)
     媒体列表 = 去重后
     页码: int = 2
-    while (总数 <= 0 or len(媒体列表) < 总数) and 页码 <= 500:
+    # 不设人为页数上限；空页、无新项、media_count 与取消标记已能收敛。
+    # 这样大型收藏夹也不会在 10000 条处被静默截断。
+    while 总数 <= 0 or len(媒体列表) < 总数:
         if 取消事件 is not None and 取消事件.is_set():
             break
         if 总数 > 0 and len(媒体列表) >= 总数:
@@ -339,11 +476,39 @@ def 拉取收藏夹内容(
 
 def _获取专栏(专栏号: str) -> dict:
     r"""
-    获取专栏文章信息
+    获取专栏文章信息与正文；旧稿异常时回退到基础信息接口。
     :param: cvid: 专栏 cv 号
     :return: dict: 专栏信息
     """
-    return _安全接口读取("/x/article/viewinfo", {"id": 专栏号})
+    try:
+        信息: dict = _接口读取(
+            "/x/article/view",
+            {"id": 专栏号, "web_location": "333.976"},
+        )
+        if 信息.get("content") or 信息.get("opus") or 信息.get("id"):
+            return 信息
+    except Exception:
+        pass
+
+    # 旧专栏正在逐步迁移为 opus；read/cv 页面会 301 到对应 opus，页面内仍有完整正文。
+    try:
+        with _客户端() as 客户端:
+            响应: 网络请求.Response = 客户端.get(f"https://www.bilibili.com/read/cv{专栏号}")
+        if 响应.status_code == 200 and "/opus/" in str(响应.url):
+            详情: dict = _解析动态页面(响应.text)
+            return {"id": int(专栏号), "_opus_detail": 详情}
+    except Exception:
+        pass
+
+    基础信息: dict = _安全接口读取("/x/article/viewinfo", {"id": 专栏号})
+    if 基础信息:
+        基础信息.setdefault("id", int(专栏号))
+    return 基础信息
+
+
+def _获取专栏文集(文集号: str) -> dict:
+    r"""获取 rl 文集概览及其中全部专栏条目。"""
+    return _接口读取("/x/article/list/web/articles", {"id": 文集号})
 
 
 def _获取动态专栏(动态号: str) -> dict:
@@ -360,7 +525,12 @@ def _获取动态专栏(动态号: str) -> dict:
         响应: 网络请求.Response = 客户端.get(f"https://www.bilibili.com/opus/{动态号}")
     if 响应.status_code != 200:
         raise RuntimeError(f"动态页面请求失败 (HTTP {响应.status_code})")
-    匹配 = 正则.search(r"window\.__INITIAL_STATE__=(.*?);\(function", 响应.text, 正则.S)
+    return _解析动态页面(响应.text)
+
+
+def _解析动态页面(网页文本: str) -> dict:
+    r"""从 opus 页面内嵌的 INITIAL_STATE 中提取正文详情。"""
+    匹配 = 正则.search(r"window\.__INITIAL_STATE__=(.*?);\(function", 网页文本, 正则.S)
     if not 匹配:
         raise RuntimeError("动态页面无可解析数据 (可能被风控拦截)")
     try:
@@ -381,8 +551,8 @@ def _节点组Markdown(节点列表: list) -> str:
     """
     片段列表: list[str] = []
     for 节点 in 节点列表:
-        类型: str = 节点.get("type", "")
-        if 类型 == "TEXT_NODE_TYPE_WORD":
+        类型: str | int = 节点.get("type", 节点.get("node_type", ""))
+        if 类型 in {"TEXT_NODE_TYPE_WORD", 1} or isinstance(节点.get("word"), dict):
             词: dict = 节点.get("word") or {}
             文本: str = 词.get("words", "")
             if 文本.strip():
@@ -394,7 +564,7 @@ def _节点组Markdown(节点列表: list) -> str:
                 if 样式.get("strikethrough"):
                     文本 = f"~~{文本}~~"
             片段列表.append(文本)
-        elif 类型 == "TEXT_NODE_TYPE_RICH":
+        elif 类型 in {"TEXT_NODE_TYPE_RICH", 2} or isinstance(节点.get("rich"), dict):
             富文: dict = 节点.get("rich") or {}
             文本 = 富文.get("text", "")
             if not 文本:
@@ -403,7 +573,7 @@ def _节点组Markdown(节点列表: list) -> str:
             if 跳转.startswith("//"):
                 跳转 = "https:" + 跳转
             片段列表.append(f"[{文本}]({跳转})" if 跳转 else 文本)
-        elif 类型 == "TEXT_NODE_TYPE_FORMULA":
+        elif 类型 in {"TEXT_NODE_TYPE_FORMULA", 3} or isinstance(节点.get("formula"), dict):
             公式: dict = 节点.get("formula") or {}
             内容: str = 公式.get("latex_content", "") or 公式.get("content", "")
             if 内容:
@@ -433,6 +603,11 @@ def _段落Markdown(段落: dict) -> list[str]:
         行: list[str] = [f"![图片]({图['url']})" for 图 in 图片组 if 图.get("url")]
         return 行 + [""] if 行 else []
     if 段落.get("line") is not None:
+        分隔图: str = str(((段落.get("line") or {}).get("pic") or {}).get("url") or "")
+        if 分隔图:
+            if 分隔图.startswith("//"):
+                分隔图 = "https:" + 分隔图
+            return [f"![分隔图]({分隔图})", ""]
         return ["---", ""]
     if 段落.get("blockquote") is not None:
         引用行: list[str] = []
@@ -685,12 +860,18 @@ def _用户Markdown(卡片数据: dict, 用户统计: dict, 收藏夹列表: lis
                 媒体列表: list = 收藏内容[收藏夹编号值].get("medias") or []
                 if 媒体列表:
                     行列表.extend(["| # | 标题 | UP主 | BV号 |", "|---|------|------|------|"])
-                    行列表.extend(
-                        f"| {序号} | {(媒体项.get('title') or '—').replace('|', '\\|')} "
-                        f"| {(媒体项.get('upper', {}).get('name') or '—').replace('|', '\\|')} "
-                        f"| {媒体项.get('bvid') or '—'} |"
-                        for 序号, 媒体项 in enumerate(媒体列表, 1)
-                    )
+                    for 序号, 媒体项 in enumerate(媒体列表, 1):
+                        媒体数据: dict = 媒体项 if isinstance(媒体项, dict) else {}
+                        作者数据: dict = (
+                            媒体数据.get("upper")
+                            if isinstance(媒体数据.get("upper"), dict)
+                            else {}
+                        )
+                        行列表.append(
+                            f"| {序号} | {_表格文本(媒体数据.get('title'))} "
+                            f"| {_表格文本(作者数据.get('name'))} "
+                            f"| {_表格文本(媒体数据.get('bvid'))} |"
+                        )
                     总数: int = 收藏内容[收藏夹编号值].get("info", {}).get("media_count", 收藏夹.get("media_count", 0))
                     if len(媒体列表) < 总数:
                         行列表.append(f"\n*（仅显示前 {len(媒体列表)} 项，共 {总数} 项）*")
@@ -707,9 +888,13 @@ def _专栏Markdown(信息: dict, 配置: dict) -> str:
     :param: cfg: 导出配置
     :return: str: Markdown 文本
     """
+    if isinstance(信息.get("_opus_detail"), dict):
+        return _动态Markdown(信息["_opus_detail"], 配置)
+
     标题: str = 信息.get("title", "未知专栏")
     统计项: dict = 信息.get("stats", {})
     头图: str = 信息.get("banner_url", "")
+    作者信息: dict = 信息.get("author", {}) if isinstance(信息.get("author"), dict) else {}
 
     行列表: list[str] = [
         f"# {标题}\n",
@@ -721,13 +906,26 @@ def _专栏Markdown(信息: dict, 配置: dict) -> str:
         行列表.append(f"![头图]({头图})\n")
 
     行列表.extend(["## 基本信息\n", "| 项目 | 内容 |", "|------|------|"])
-    if 作者 := 信息.get("author_name", "") or str(信息.get("mid", "")):
+    if 作者 := (
+        信息.get("author_name", "")
+        or 作者信息.get("name", "")
+        or str(信息.get("mid", "") or 作者信息.get("mid", ""))
+    ):
         行列表.append(f"| 作者 | {作者} |")
     if 发布时间 := 信息.get("publish_time", 0):
         行列表.append(f"| 发布时间 | {_格式化时间戳(发布时间)} |")
-    if 信息.get("mid"):
+    if 信息.get("id"):
         行列表.append(f"| 链接 | https://www.bilibili.com/read/cv{信息.get('id', '')} |")
     行列表.append("")
+
+    if 配置.get("include_tags") == "true" and (标签们 := 信息.get("tags")):
+        标签名称: list[str] = [
+            str(项.get("name", ""))
+            for 项 in 标签们
+            if isinstance(项, dict) and 项.get("name")
+        ]
+        if 标签名称:
+            行列表.append(f"**标签:** {', '.join(标签名称)}\n")
 
     if 配置.get("include_stats") == "true" and 统计项:
         行列表.extend(["## 数据统计\n", "| 指标 | 数值 |", "|------|------|"])
@@ -742,7 +940,61 @@ def _专栏Markdown(信息: dict, 配置: dict) -> str:
             行列表.append(f"| {标签名} | {_格式化数字(统计项.get(键, 0))} |")
         行列表.append("")
 
+    if 摘要 := str(信息.get("summary", "") or "").strip():
+        行列表.extend(["## 摘要\n", 摘要, ""])
+
+    专栏动态数据: dict = 信息.get("opus") if isinstance(信息.get("opus"), dict) else {}
+    动态正文数据: dict = (
+        专栏动态数据.get("content")
+        if isinstance(专栏动态数据.get("content"), dict)
+        else {}
+    )
+    动态段落列表: list = (
+        动态正文数据.get("paragraphs", [])
+        if isinstance(动态正文数据.get("paragraphs"), list)
+        else []
+    )
+    if 动态段落列表:
+        行列表.append("## 正文\n")
+        for 段落 in 动态段落列表:
+            if isinstance(段落, dict):
+                行列表.extend(_段落Markdown(段落))
+    else:
+        正文: str = _专栏正文转Markdown(str(信息.get("content", "") or ""))
+        if 正文:
+            行列表.extend(["## 正文\n", 正文, ""])
+
     行列表.extend(["---", f"*由 MyBiOut! MdOut 导出于 {_完整时间()}*"])
+    return "\n".join(行列表)
+
+
+def _文集索引Markdown(文集数据: dict, 文档列表: list[dict[str, str]], 配置: dict) -> str:
+    r"""生成文集目录页，链接到同目录下逐篇导出的 Markdown。"""
+    概览: dict = 文集数据.get("list", {}) if isinstance(文集数据.get("list"), dict) else {}
+    作者: dict = 文集数据.get("author", {}) if isinstance(文集数据.get("author"), dict) else {}
+    标题: str = str(概览.get("name") or "未命名文集")
+    行列表: list[str] = [
+        f"# {标题}\n",
+        f"> 专栏文集 rl{概览.get('id', '')}",
+        f"> 共 {len(文档列表)} 篇 · 导出时间: {_完整时间()}\n",
+    ]
+    封面: str = str(概览.get("image_url") or "")
+    if 配置.get("include_cover") == "true" and 封面:
+        行列表.append(f"![文集封面]({封面})\n")
+    if 作者名 := str(作者.get("name") or 概览.get("author_name") or ""):
+        行列表.append(f"**作者:** {作者名}\n")
+    if 简介 := str(概览.get("summary") or "").strip():
+        行列表.extend(["## 简介\n", 简介, ""])
+    行列表.extend(["## 目录\n", "| # | 文章 | 原链接 |", "|---:|------|--------|"])
+    for 序号, 文档 in enumerate(文档列表, 1):
+        标题文本: str = _表格文本(文档.get("title"), "未命名")
+        文件名: str = 文档.get("filename", "")
+        专栏号: str = 文档.get("cvid", "")
+        行列表.append(
+            f"| {序号} | [{标题文本}](<{文件名}>) | "
+            f"[cv{专栏号}](https://www.bilibili.com/read/cv{专栏号}) |"
+        )
+    行列表.extend(["", "---", f"*由 MyBiOut! MdOut 批量导出于 {_完整时间()}*"])
     return "\n".join(行列表)
 
 
@@ -760,6 +1012,7 @@ class 文档卡片:
     标题: str = ""
     副标题: str = ""
     Markdown文本: str = ""
+    批量文档列表: list[dict[str, str]] = 字段(default_factory=list)
     状态名: str = "pending"
     错误: str = ""
     文件名: str = ""
@@ -778,6 +1031,7 @@ class 文档卡片:
             "title": 自身.标题,
             "subtitle": 自身.副标题,
             "has_markdown": bool(自身.Markdown文本),
+            "batch_count": len(自身.批量文档列表),
             "status": 自身.状态名,
             "error": 自身.错误,
             "filename": 自身.文件名,
@@ -930,6 +1184,61 @@ def _执行获取专栏(卡片: 文档卡片) -> None:
     :raise: RuntimeError: 无法获取专栏信息
     """
     配置: dict[str, str] = _设置字典()
+    if 卡片.编号类型 == "rlid":
+        文集数据: dict = _获取专栏文集(卡片.编号值)
+        概览: dict = 文集数据.get("list", {}) if isinstance(文集数据.get("list"), dict) else {}
+        文章列表: list = 文集数据.get("articles", []) or []
+        if not 文章列表:
+            raise RuntimeError("文集为空、不可见或不存在")
+        位数: int = max(2, len(str(len(文章列表))))
+        批量文档: list[dict[str, str]] = []
+        for 序号, 文章摘要 in enumerate(文章列表, 1):
+            if 状态._取消标记.is_set():
+                break
+            if not isinstance(文章摘要, dict) or not 文章摘要.get("id"):
+                continue
+            if 序号 > 1:
+                _延迟()
+            专栏号: str = str(文章摘要["id"])
+            动态号: str = str(文章摘要.get("dyn_id_str") or "")
+            if 动态号:
+                try:
+                    信息: dict = {
+                        "id": int(专栏号),
+                        "_opus_detail": _获取动态专栏(动态号),
+                    }
+                except Exception:
+                    信息 = _获取专栏(专栏号) or 文章摘要
+            else:
+                信息 = _获取专栏(专栏号) or 文章摘要
+            动态详情: dict = (
+                信息.get("_opus_detail", {})
+                if isinstance(信息.get("_opus_detail"), dict)
+                else {}
+            )
+            标题: str = str(
+                信息.get("title")
+                or (_动态标题(动态详情) if 动态详情 else "")
+                or 文章摘要.get("title")
+                or f"专栏 cv{专栏号}"
+            )
+            文件名: str = f"{序号:0{位数}d}-{_清理文件名(标题)}.md"
+            批量文档.append(
+                {
+                    "title": 标题,
+                    "cvid": 专栏号,
+                    "filename": 文件名,
+                    "markdown": _专栏Markdown(信息, 配置),
+                }
+            )
+            状态.记录日志("info", f"获取文集文章 ({序号}/{len(文章列表)}): {标题}")
+        if not 批量文档:
+            raise RuntimeError("文集文章均未能获取")
+        卡片.标题 = str(概览.get("name") or f"专栏文集 rl{卡片.编号值}")
+        卡片.副标题 = f"rl{卡片.编号值} · {len(批量文档)} 篇"
+        卡片.批量文档列表 = 批量文档
+        卡片.Markdown文本 = _文集索引Markdown(文集数据, 批量文档, 配置)
+        return
     if 卡片.编号类型 == "opusid":
         详情: dict = _获取动态专栏(卡片.编号值)
         卡片.标题 = _动态标题(详情) or "未知动态"
@@ -939,7 +1248,10 @@ def _执行获取专栏(卡片: 文档卡片) -> None:
     信息: dict = _获取专栏(卡片.编号值)
     if not 信息:
         raise RuntimeError("无法获取专栏信息")
-    卡片.标题 = 信息.get("title", "未知专栏")
+    动态详情: dict = (
+        信息.get("_opus_detail", {}) if isinstance(信息.get("_opus_detail"), dict) else {}
+    )
+    卡片.标题 = 信息.get("title") or (_动态标题(动态详情) if 动态详情 else "") or "未知专栏"
     卡片.副标题 = f"cv{卡片.编号值}"
     卡片.Markdown文本 = _专栏Markdown(信息, 配置)
 
@@ -1091,6 +1403,29 @@ def 选择卡片(卡片编号: str) -> None:
         状态.选中编号 = 卡片编号
 
 
+def _导出文集卡片(卡片: 文档卡片, 输出目录: 路径) -> 路径:
+    r"""把文集目录页与逐篇 Markdown 写入同名文件夹。"""
+    基础名称: str = _清理文件名(卡片.标题 or f"文集-rl{卡片.编号值}")
+    目标目录: 路径 = 输出目录 / 基础名称
+    序号: int = 1
+    while 目标目录.exists():
+        目标目录 = 输出目录 / f"{基础名称}_{序号}"
+        序号 += 1
+    目标目录.mkdir(parents=False, exist_ok=False)
+    try:
+        (目标目录 / "00-文集索引.md").write_text(卡片.Markdown文本, encoding="utf-8")
+        for 文档 in 卡片.批量文档列表:
+            文件名: str = 路径(str(文档.get("filename") or "untitled.md")).name
+            if not 文件名.lower().endswith(".md"):
+                文件名 += ".md"
+            (目标目录 / 文件名).write_text(str(文档.get("markdown") or ""), encoding="utf-8")
+        return 目标目录
+    except Exception:
+        with 忽略异常(OSError):
+            文件工具.rmtree(目标目录)
+        raise
+
+
 def 导出卡片(卡片编号列表: list[str]) -> dict:
     r"""
     导出指定卡片为 Markdown 文件
@@ -1101,11 +1436,35 @@ def 导出卡片(卡片编号列表: list[str]) -> dict:
     输出目录.mkdir(parents=True, exist_ok=True)
 
     导出数量: int = 0
+    导出文件数量: int = 0
     with 状态.锁:
         目标列表: list[文档卡片] = [客户端 for 客户端 in 状态.卡片列表 if 客户端.编号 in 卡片编号列表 and 客户端.状态名 == "ready"]
 
     for 卡片 in 目标列表:
         if not 卡片.Markdown文本:
+            continue
+        if 卡片.批量文档列表:
+            try:
+                文集目录: 路径 = _导出文集卡片(卡片, 输出目录)
+                with 状态.锁:
+                    卡片.状态名 = "success"
+                    卡片.文件名 = 文集目录.name
+                    卡片.输出路径 = str(文集目录)
+                    状态.卡片列表 = [
+                        客户端 for 客户端 in 状态.卡片列表 if 客户端.编号 != 卡片.编号
+                    ]
+                    状态.完成列表.append(卡片)
+                导出数量 += 1
+                导出文件数量 += len(卡片.批量文档列表) + 1
+                状态.记录日志(
+                    "success",
+                    f"已批量导出文集: {文集目录.name}（{len(卡片.批量文档列表)} 篇）",
+                )
+            except Exception as e:
+                with 状态.锁:
+                    卡片.状态名 = "failed"
+                    卡片.错误 = str(e)
+                状态.记录日志("error", f"文集导出失败: {卡片.标题} — {e}")
             continue
         文件名文本: str = _清理文件名(卡片.标题 or "untitled") + ".md"
         输出文件: 路径 = 输出目录 / 文件名文本
@@ -1122,6 +1481,7 @@ def 导出卡片(卡片编号列表: list[str]) -> dict:
                 状态.卡片列表 = [客户端 for 客户端 in 状态.卡片列表 if 客户端.编号 != 卡片.编号]
                 状态.完成列表.append(卡片)
             导出数量 += 1
+            导出文件数量 += 1
             状态.记录日志("success", f"已导出: {输出文件.name}")
         except Exception as e:
             with 状态.锁:
@@ -1129,7 +1489,7 @@ def 导出卡片(卡片编号列表: list[str]) -> dict:
                 卡片.错误 = str(e)
             状态.记录日志("error", f"导出失败: {卡片.标题} — {e}")
 
-    return {"ok": True, "exported": 导出数量}
+    return {"ok": True, "exported": 导出数量, "files": 导出文件数量}
 
 
 def 导出全部就绪() -> dict:
