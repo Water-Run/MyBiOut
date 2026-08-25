@@ -17,6 +17,7 @@ import subprocess as 子进程
 import sys as 系统信息
 import uuid as 唯一编号
 from collections.abc import Callable as 可调用
+from collections.abc import Iterable as 可迭代
 from dataclasses import dataclass as 数据类
 from datetime import datetime as 日期时间
 from pathlib import Path as 路径
@@ -29,6 +30,10 @@ if 系统信息.platform == "win32":
 _安卓包名格式 = 正则.compile(r"^[A-Za-z0-9._]+$")
 _允许的缓存布局: tuple[str, ...] = ("download", "files/download")
 进度回调 = 可调用[[float, str], None]
+
+
+class 缓存已存在错误(RuntimeError):
+    r"""目标设备已存在同一 avid 时使用的可跳过异常。"""
 
 
 @数据类(frozen=True, slots=True)
@@ -48,8 +53,14 @@ class 恢复归档:
     def 相对缓存路径(自身) -> str:
         return f"{自身.稿件号}/{自身.分集目录}/{自身.清晰度目录}"
 
+    @property
+    def 标识(自身) -> str:
+        原文 = 系统.path.normcase(str(自身.目录.resolve()))
+        return 哈希.sha256(原文.encode("utf-8")).hexdigest()[:20]
+
     def 转字典(自身) -> dict:
         return {
+            "id": 自身.标识,
             "path": str(自身.目录),
             "title": 自身.标题,
             "avid": 自身.稿件号,
@@ -98,7 +109,11 @@ def 检查恢复归档(归档路径: str | 路径) -> 恢复归档:
         if not 文件路径.is_file():
             raise RuntimeError(f"存档缺少 {文件路径.name}")
 
-    视频列表 = [文件路径 for 文件路径 in 目录.glob("*.mp4") if 文件路径.is_file()]
+    视频列表 = [
+        文件路径
+        for 文件路径 in 目录.iterdir()
+        if 文件路径.is_file() and 文件路径.suffix.lower() == ".mp4"
+    ]
     if len(视频列表) != 1:
         raise RuntimeError(f"存档必须且只能包含一个 MP4，当前找到 {len(视频列表)} 个")
 
@@ -125,6 +140,45 @@ def 检查恢复归档(归档路径: str | 路径) -> 恢复归档:
         清晰度目录=清晰度目录,
         字节数=视频列表[0].stat().st_size,
     )
+
+
+def 扫描恢复归档目录(根目录路径: str | 路径) -> tuple[list[恢复归档], list[str]]:
+    r"""递归发现归档四件套；不依赖导出索引，也不跟随目录链接。"""
+    根目录 = 路径(根目录路径).expanduser()
+    if not 根目录.is_dir():
+        raise RuntimeError(f"扫描文件夹不存在: {根目录}")
+
+    归档列表: list[恢复归档] = []
+    警告列表: list[str] = []
+    必需文件名 = {"entry.json", "index.json", "danmaku.xml"}
+    for 当前目录文本, 子目录名列表, 文件名列表 in 系统.walk(根目录, followlinks=False):
+        当前目录 = 路径(当前目录文本)
+        子目录名列表[:] = sorted(
+            名称 for 名称 in 子目录名列表 if not (当前目录 / 名称).is_symlink()
+        )
+        文件名集合 = set(文件名列表)
+        MP4数量 = sum(1 for 名称 in 文件名列表 if 名称.lower().endswith(".mp4"))
+        if not (必需文件名 <= 文件名集合 and MP4数量 == 1):
+            if MP4数量 and 必需文件名.intersection(文件名集合):
+                缺少 = sorted(必需文件名 - 文件名集合)
+                详情 = f"缺少 {', '.join(缺少)}" if 缺少 else f"找到 {MP4数量} 个 MP4"
+                警告列表.append(f"跳过不完整归档 {当前目录}: {详情}")
+            continue
+        try:
+            归档列表.append(检查恢复归档(当前目录))
+            子目录名列表.clear()
+        except Exception as 异常:
+            警告列表.append(f"跳过无效归档 {当前目录}: {异常}")
+
+    归档列表.sort(
+        key=lambda 归档: (
+            int(归档.稿件号),
+            int(归档.分集目录.removeprefix("c_")),
+            int(归档.清晰度目录),
+            str(归档.目录).casefold(),
+        )
+    )
+    return 归档列表, 警告列表
 
 
 def _文件MD5(文件路径: 路径) -> str:
@@ -198,56 +252,93 @@ def _更新索引(索引数据: dict, 视频路径: 路径, 音频路径: 路径
     音频索引["md5"] = _文件MD5(音频路径)
 
 
+def _重建归档分集(
+    归档: 恢复归档,
+    稿件目录: 路径,
+    FFmpeg路径: str,
+    回调: 进度回调 | None = None,
+) -> None:
+    元数据目录 = 稿件目录 / 归档.分集目录
+    媒体目录 = 元数据目录 / 归档.清晰度目录
+    if 元数据目录.exists():
+        raise RuntimeError(f"同一 avid 中存在重复分集目录: {归档.分集目录}")
+
+    条目数据 = _读取JSON(归档.条目文件)
+    索引数据 = _读取JSON(归档.索引文件)
+    媒体目录.mkdir(parents=True)
+    文件工具.copy2(归档.弹幕文件, 元数据目录 / "danmaku.xml")
+
+    视频路径 = 媒体目录 / "video.m4s"
+    音频路径 = 媒体目录 / "audio.m4s"
+    _报告(回调, 0.12, f"拆分视频流: {归档.标题}")
+    _拆分媒体流(FFmpeg路径, 归档.视频文件, "0:v:0", 视频路径)
+    _报告(回调, 0.42, f"拆分音频流: {归档.标题}")
+    _拆分媒体流(FFmpeg路径, 归档.视频文件, "0:a:0", 音频路径)
+
+    _报告(回调, 0.78, f"更新校验信息: {归档.标题}")
+    _更新索引(索引数据, 视频路径, 音频路径)
+    总字节数 = 视频路径.stat().st_size + 音频路径.stat().st_size
+    条目数据["has_dash_audio"] = True
+    条目数据["is_completed"] = True
+    条目数据["total_bytes"] = 总字节数
+    条目数据["downloaded_bytes"] = 总字节数
+    条目数据["guessed_total_bytes"] = 0
+    _写JSON并保留时间(元数据目录 / "entry.json", 条目数据, 归档.条目文件)
+    _写JSON并保留时间(媒体目录 / "index.json", 索引数据, 归档.索引文件)
+    _报告(回调, 1.0, f"分集已重建: {归档.相对缓存路径}")
+
+
+def 重建缓存组(
+    归档集合: 可迭代[恢复归档],
+    输出根目录: str | 路径,
+    FFmpeg路径: str,
+    回调: 进度回调 | None = None,
+) -> 路径:
+    r"""将同一 avid 的多个分集合并为一棵缓存树，并原子写入输出目录。"""
+    if not FFmpeg路径 or not 路径(FFmpeg路径).is_file():
+        raise RuntimeError("未找到 ffmpeg，无法拆分 MP4")
+
+    归档列表 = list(归档集合)
+    if not 归档列表:
+        raise RuntimeError("没有可重建的缓存归档")
+    稿件号 = 归档列表[0].稿件号
+    if any(归档.稿件号 != 稿件号 for 归档 in 归档列表):
+        raise RuntimeError("缓存组中包含不同 avid")
+    分集目录列表 = [归档.分集目录 for 归档 in 归档列表]
+    if len(set(分集目录列表)) != len(分集目录列表):
+        raise RuntimeError(f"av{稿件号} 中包含重复 cid，无法确定应恢复哪个版本")
+
+    输出根 = 路径(输出根目录)
+    输出根.mkdir(parents=True, exist_ok=True)
+    最终目录 = 输出根 / 稿件号
+    if 最终目录.exists():
+        raise RuntimeError(f"拒绝覆盖已存在的还原目录: {最终目录}")
+
+    临时目录 = 输出根 / f".{稿件号}.restore-{唯一编号.uuid4().hex}"
+    try:
+        临时目录.mkdir()
+        总数 = len(归档列表)
+        for 序号, 归档 in enumerate(归档列表):
+            def 分集进度(进度: float, 消息: str, *, _序号: int = 序号) -> None:
+                _报告(回调, (_序号 + 进度) / 总数, 消息)
+
+            _重建归档分集(归档, 临时目录, FFmpeg路径, 分集进度)
+        临时目录.replace(最终目录)
+        _报告(回调, 1.0, f"av{稿件号} 的 {总数} 个分集已重建")
+        return 最终目录
+    except Exception:
+        文件工具.rmtree(临时目录, ignore_errors=True)
+        raise
+
+
 def 重建缓存目录(
     归档: 恢复归档,
     输出根目录: str | 路径,
     FFmpeg路径: str,
     回调: 进度回调 | None = None,
 ) -> 路径:
-    r"""在输出根目录下原子创建 ``avid/c_cid/type_tag`` 缓存树。"""
-    if not FFmpeg路径 or not 路径(FFmpeg路径).is_file():
-        raise RuntimeError("未找到 ffmpeg，无法拆分 MP4")
-
-    输出根 = 路径(输出根目录)
-    输出根.mkdir(parents=True, exist_ok=True)
-    最终目录 = 输出根 / 归档.稿件号
-    if 最终目录.exists():
-        raise RuntimeError(f"拒绝覆盖已存在的还原目录: {最终目录}")
-
-    临时目录 = 输出根 / f".{归档.稿件号}.restore-{唯一编号.uuid4().hex}"
-    元数据目录 = 临时目录 / 归档.分集目录
-    媒体目录 = 元数据目录 / 归档.清晰度目录
-    try:
-        _报告(回调, 0.05, "检查存档元数据")
-        条目数据 = _读取JSON(归档.条目文件)
-        索引数据 = _读取JSON(归档.索引文件)
-        媒体目录.mkdir(parents=True)
-        文件工具.copy2(归档.弹幕文件, 元数据目录 / "danmaku.xml")
-
-        视频路径 = 媒体目录 / "video.m4s"
-        音频路径 = 媒体目录 / "audio.m4s"
-        _报告(回调, 0.12, "从 MP4 拆分视频流")
-        _拆分媒体流(FFmpeg路径, 归档.视频文件, "0:v:0", 视频路径)
-        _报告(回调, 0.34, "从 MP4 拆分音频流")
-        _拆分媒体流(FFmpeg路径, 归档.视频文件, "0:a:0", 音频路径)
-
-        _报告(回调, 0.52, "更新缓存校验信息")
-        _更新索引(索引数据, 视频路径, 音频路径)
-        总字节数 = 视频路径.stat().st_size + 音频路径.stat().st_size
-        条目数据["has_dash_audio"] = True
-        条目数据["is_completed"] = True
-        条目数据["total_bytes"] = 总字节数
-        条目数据["downloaded_bytes"] = 总字节数
-        条目数据["guessed_total_bytes"] = 0
-        _写JSON并保留时间(元数据目录 / "entry.json", 条目数据, 归档.条目文件)
-        _写JSON并保留时间(媒体目录 / "index.json", 索引数据, 归档.索引文件)
-
-        临时目录.replace(最终目录)
-        _报告(回调, 0.60, "电脑端缓存目录已重建")
-        return 最终目录
-    except Exception:
-        文件工具.rmtree(临时目录, ignore_errors=True)
-        raise
+    r"""兼容原单项接口。"""
+    return 重建缓存组([归档], 输出根目录, FFmpeg路径, 回调)
 
 
 def _执行ADB(
@@ -321,7 +412,7 @@ def 导入缓存到手机(
     if not _远端存在(ADB路径, 序列号, 远端根目录):
         raise RuntimeError(f"手机缓存目录不存在: {远端根目录}")
     if _远端存在(ADB路径, 序列号, 远端最终目录):
-        raise RuntimeError(f"手机中已存在 av{本地目录.name}，为避免覆盖已停止导入")
+        raise 缓存已存在错误(f"手机中已存在 av{本地目录.name}，为避免覆盖已停止导入")
 
     暂存根目录 = f"/sdcard/Download/MyBiOutRestore-{唯一编号.uuid4().hex}"
     暂存缓存目录 = f"{暂存根目录}/{本地目录.name}"
@@ -350,7 +441,7 @@ def 导入缓存到手机(
         _报告(回调, 0.82, "停止目标客户端并写入缓存")
         _执行ADB(ADB路径, 序列号, "shell", "am", "force-stop", 包名, 超时秒数=30)
         if _远端存在(ADB路径, 序列号, 远端最终目录):
-            raise RuntimeError("导入期间目标缓存已出现，为避免覆盖已停止导入")
+            raise 缓存已存在错误("导入期间目标缓存已出现，为避免覆盖已停止导入")
         _执行ADB(
             ADB路径,
             序列号,

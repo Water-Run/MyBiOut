@@ -31,9 +31,11 @@ from datetime import datetime as 日期时间
 from pathlib import Path as 路径
 
 from mybiout.pages import utils as 工具
+from mybiout.pages.localout.restore import 缓存已存在错误
 from mybiout.pages.localout.restore import 导入缓存到手机
+from mybiout.pages.localout.restore import 扫描恢复归档目录 as _扫描恢复归档目录
 from mybiout.pages.localout.restore import 检查恢复归档 as _检查恢复归档
-from mybiout.pages.localout.restore import 重建缓存目录
+from mybiout.pages.localout.restore import 重建缓存组
 
 try:
     import httpx as 网络请求
@@ -297,6 +299,11 @@ def _安全整数(值: object, 默认值: int = 0) -> int:
         return 默认值
 
 
+def _安全文本(值: object) -> str:
+    r"""将缓存元数据中的 None 和非字符串值规范为可安全处理的文本。"""
+    return str(值 or "").strip()
+
+
 # ===== 数据模型 =====
 
 
@@ -330,7 +337,27 @@ class 视频卡片:
     错误: str = ""
 
     def __post_init__(自身) -> None:
-        自身.AV号 = "" if 自身.AV号 is None else str(自身.AV号)
+        for 属性名 in (
+            "标题",
+            "BV号",
+            "AV号",
+            "UP主名称",
+            "合集标题",
+            "清晰度",
+            "分辨率",
+            "发布时间",
+            "文件夹名",
+            "来源标签",
+            "来源类型",
+            "设备序列号",
+            "视频路径",
+            "音频路径",
+            "封面路径",
+            "输出路径",
+            "状态名",
+            "错误",
+        ):
+            setattr(自身, 属性名, _安全文本(getattr(自身, 属性名)))
         自身.分集序号 = _安全整数(自身.分集序号, 1)
         自身.字节数 = _安全整数(自身.字节数)
 
@@ -407,12 +434,19 @@ class _本地状态:
         自身.恢复消息: str = ""
         自身.恢复错误: str = ""
         自身.恢复目标路径: str = ""
+        自身.恢复项目列表: list[dict] = []
+        自身.恢复总数: int = 0
+        自身.恢复完成数: int = 0
+        自身.恢复成功数: int = 0
+        自身.恢复跳过数: int = 0
+        自身.恢复失败数: int = 0
         自身._扫描线程: 线程.Thread | None = None
         自身._扫描取消: 线程.Event = 线程.Event()
         自身._扫描暂停: 线程.Event = 线程.Event()
         自身._导出线程: 线程.Thread | None = None
         自身._导出取消: 线程.Event = 线程.Event()
         自身._恢复线程: 线程.Thread | None = None
+        自身._恢复取消: 线程.Event = 线程.Event()
         自身._恢复上次消息: str = ""
         自身._已知键集合: set[str] = set()
         自身._可用键集合: set[str] = set()
@@ -447,6 +481,12 @@ class _本地状态:
                 "restore_message": 自身.恢复消息,
                 "restore_error": 自身.恢复错误,
                 "restore_target_path": 自身.恢复目标路径,
+                "restore_items": [dict(项目) for 项目 in 自身.恢复项目列表],
+                "restore_total": 自身.恢复总数,
+                "restore_done": 自身.恢复完成数,
+                "restore_success": 自身.恢复成功数,
+                "restore_skipped": 自身.恢复跳过数,
+                "restore_failed": 自身.恢复失败数,
             }
 
     def _去重键(自身, 卡片项: 视频卡片) -> str:
@@ -1837,7 +1877,9 @@ def _导出身份键(卡片: 视频卡片) -> str:
     r"""生成跨来源稳定的导出身份，用于识别不同手机中的同一稿件。"""
     分集: int = max(1, _安全整数(卡片.分集序号, 1))
     清晰度指纹原文: str = "|".join(
-        值.strip().casefold() for 值 in (卡片.清晰度, 卡片.分辨率) if 值.strip()
+        _安全文本(值).casefold()
+        for 值 in (卡片.清晰度, 卡片.分辨率)
+        if _安全文本(值)
     )
     if 清晰度指纹原文:
         版本指纹: str = f":q{哈希.sha256(清晰度指纹原文.encode('utf-8')).hexdigest()[:12]}"
@@ -1846,9 +1888,9 @@ def _导出身份键(卡片: 视频卡片) -> str:
     else:
         版本指纹 = ""
     if 卡片.BV号:
-        return f"bvid:{卡片.BV号.strip().lower()}:p{分集}{版本指纹}"
+        return f"bvid:{_安全文本(卡片.BV号).lower()}:p{分集}{版本指纹}"
     if 卡片.AV号:
-        return f"avid:{卡片.AV号.strip().lower().removeprefix('av')}:p{分集}{版本指纹}"
+        return f"avid:{_安全文本(卡片.AV号).lower().removeprefix('av')}:p{分集}{版本指纹}"
     归一文本: str = "|".join(
         正则.sub(r"\s+", " ", 值 or "").strip().casefold()
         for 值 in (卡片.标题, 卡片.UP主名称, 卡片.合集标题, 卡片.文件夹名)
@@ -2085,7 +2127,8 @@ def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> list[s
                     超时秒数=60,
                 )
             if 拉取结果.returncode != 0 or not 目标文件.is_file():
-                raise RuntimeError(f"ADB 拉取 {文件名} 失败: {拉取结果.stderr.strip()[:120]}")
+                错误文本 = (拉取结果.stderr or 拉取结果.stdout or "未知 ADB 错误").strip()
+                raise RuntimeError(f"ADB 拉取 {文件名} 失败: {错误文本[:120]}")
         else:
             源文件: 路径 = 路径(源路径)
             if not 源文件.is_file():
@@ -2158,7 +2201,8 @@ def _导出单个ADB(卡片: 视频卡片, 输出路径: str) -> None:
                 超时秒数=300,
             )
             if 拉取结果.returncode != 0:
-                raise RuntimeError(f"ADB 拉取{名称}失败: {拉取结果.stderr.strip()[:120]}")
+                错误文本 = (拉取结果.stderr or 拉取结果.stdout or "未知 ADB 错误").strip()
+                raise RuntimeError(f"ADB 拉取{名称}失败: {错误文本[:120]}")
 
         _用随包FFmpeg合并(本地视频, 本地音频, 输出路径)
 
@@ -2511,7 +2555,7 @@ def 浏览本地() -> str | None:
 
 
 def 浏览恢复归档() -> str | None:
-    r"""弹出文件夹对话框选择由“元文件归档”生成的目录。"""
+    r"""弹出文件夹对话框选择包含一个或多个元文件归档的目录。"""
     try:
         from tkinter import Tk
         from tkinter import filedialog as 文件对话框
@@ -2519,7 +2563,7 @@ def 浏览恢复归档() -> str | None:
         根目录: Tk = Tk()
         根目录.withdraw()
         根目录.attributes("-topmost", True)
-        文件夹: str = 文件对话框.askdirectory(title="选择 MyBiOut 元文件归档")
+        文件夹: str = 文件对话框.askdirectory(title="选择 MyBiOut 归档文件夹或其上级目录")
         根目录.destroy()
         return 文件夹 if 文件夹 else None
     except Exception:
@@ -2529,10 +2573,36 @@ def 浏览恢复归档() -> str | None:
 def 检查恢复归档(归档路径: str) -> dict:
     r"""检查归档完整性并返回将要生成的缓存坐标。"""
     try:
-        归档 = _检查恢复归档(归档路径.strip())
+        归档 = _检查恢复归档(_安全文本(归档路径))
         return {"ok": True, "archive": 归档.转字典()}
     except Exception as 异常:
         return {"ok": False, "error": str(异常)}
+
+
+def 扫描恢复归档(根目录路径: str) -> dict:
+    r"""递归扫描恢复归档，索引文件存在与否均不影响识别。"""
+    try:
+        归档列表, 警告列表 = _扫描恢复归档目录(_安全文本(根目录路径))
+        with 状态.锁:
+            if 状态._恢复线程 is None or not 状态._恢复线程.is_alive():
+                状态.恢复状态 = "idle"
+                状态.恢复进度 = 0.0
+                状态.恢复消息 = ""
+                状态.恢复错误 = ""
+                状态.恢复目标路径 = ""
+                状态.恢复项目列表 = []
+                状态.恢复总数 = 0
+                状态.恢复完成数 = 0
+                状态.恢复成功数 = 0
+                状态.恢复跳过数 = 0
+                状态.恢复失败数 = 0
+        return {
+            "ok": True,
+            "archives": [归档.转字典() for 归档 in 归档列表],
+            "warnings": 警告列表,
+        }
+    except Exception as 异常:
+        return {"ok": False, "archives": [], "warnings": [], "error": str(异常)}
 
 
 def _ADB目录存在(ADB路径: str, 序列号: str, 目录: str) -> bool:
@@ -2602,9 +2672,29 @@ def _更新恢复进度(进度: float, 消息: str) -> None:
         状态.记录日志("info", f"缓存恢复: {消息}")
 
 
-def _恢复线程函数(归档路径: str, 序列号: str, 包名: str, 缓存布局: str) -> None:
+def _更新恢复项目(
+    项目编号集合: set[str],
+    状态名: str,
+    消息: str = "",
+    目标路径: str = "",
+) -> None:
+    with 状态.锁:
+        for 项目 in 状态.恢复项目列表:
+            if 项目.get("id") not in 项目编号集合:
+                continue
+            项目["status"] = 状态名
+            项目["message"] = 消息
+            if 目标路径:
+                项目["target_path"] = 目标路径
+        终态 = {"success", "skipped", "failed", "cancelled"}
+        状态.恢复完成数 = sum(1 for 项目 in 状态.恢复项目列表 if 项目.get("status") in 终态)
+        状态.恢复成功数 = sum(1 for 项目 in 状态.恢复项目列表 if 项目.get("status") == "success")
+        状态.恢复跳过数 = sum(1 for 项目 in 状态.恢复项目列表 if 项目.get("status") == "skipped")
+        状态.恢复失败数 = sum(1 for 项目 in 状态.恢复项目列表 if 项目.get("status") == "failed")
+
+
+def _恢复线程函数(归档列表: list, 序列号: str, 包名: str, 缓存布局: str) -> None:
     try:
-        归档 = _检查恢复归档(归档路径)
         FFmpeg路径 = _寻找FFmpeg()
         ADB路径 = _寻找ADB()
         if not FFmpeg路径:
@@ -2612,25 +2702,73 @@ def _恢复线程函数(归档路径: str, 序列号: str, 包名: str, 缓存�
         if not ADB路径:
             raise RuntimeError("未找到 ADB（请确认绿色包 bin/ 完整）")
 
-        状态.记录日志("info", f"开始恢复: {归档.标题}")
+        稿件分组: dict[str, list] = {}
+        for 归档 in 归档列表:
+            稿件分组.setdefault(归档.稿件号, []).append(归档)
+        总组数 = max(1, len(稿件分组))
+        状态.记录日志(
+            "info",
+            f"开始批量恢复 {len(归档列表)} 个归档，共 {len(稿件分组)} 个 avid",
+        )
+        已导入目标: list[str] = []
         with 临时文件.TemporaryDirectory(prefix="mybiout_restore_") as 临时目录:
-            缓存目录 = 重建缓存目录(归档, 临时目录, FFmpeg路径, _更新恢复进度)
-            手机路径 = 导入缓存到手机(
-                缓存目录,
-                ADB路径,
-                序列号,
-                包名,
-                缓存布局,
-                _更新恢复进度,
-            )
+            for 组序号, (稿件号, 组内归档) in enumerate(稿件分组.items()):
+                项目编号集合 = {归档.标识 for 归档 in 组内归档}
+                if 状态._恢复取消.is_set():
+                    _更新恢复项目(项目编号集合, "cancelled", "已取消，尚未处理")
+                    continue
+
+                _更新恢复项目(项目编号集合, "restoring", f"正在重建 av{稿件号}")
+                状态.记录日志("info", f"正在恢复 av{稿件号}，包含 {len(组内归档)} 个分集")
+
+                def 重建进度(进度: float, 消息: str, *, _组序号: int = 组序号) -> None:
+                    总进度 = (_组序号 + 0.56 * 进度) / 总组数
+                    _更新恢复进度(总进度, 消息)
+
+                def 导入进度(进度: float, 消息: str, *, _组序号: int = 组序号) -> None:
+                    归一进度 = max(0.0, min(1.0, (进度 - 0.64) / 0.36))
+                    总进度 = (_组序号 + 0.56 + 0.44 * 归一进度) / 总组数
+                    _更新恢复进度(总进度, 消息)
+
+                try:
+                    缓存目录 = 重建缓存组(组内归档, 临时目录, FFmpeg路径, 重建进度)
+                    手机路径 = 导入缓存到手机(
+                        缓存目录,
+                        ADB路径,
+                        序列号,
+                        包名,
+                        缓存布局,
+                        导入进度,
+                    )
+                    已导入目标.append(手机路径)
+                    _更新恢复项目(项目编号集合, "success", "恢复与导入完成", 手机路径)
+                    状态.记录日志("success", f"缓存已恢复到手机: {手机路径}")
+                except 缓存已存在错误 as 异常:
+                    _更新恢复项目(项目编号集合, "skipped", str(异常))
+                    状态.记录日志("warn", f"跳过 av{稿件号}: {异常}")
+                except Exception as 异常:
+                    _更新恢复项目(项目编号集合, "failed", str(异常))
+                    状态.记录日志("error", f"恢复 av{稿件号} 失败: {异常}")
+
         with 状态.锁:
-            状态.恢复状态 = "success"
+            有取消 = any(项目.get("status") == "cancelled" for 项目 in 状态.恢复项目列表)
+            有问题 = 状态.恢复失败数 > 0 or 状态.恢复跳过数 > 0
+            状态.恢复状态 = "cancelled" if 有取消 else "partial" if 有问题 else "success"
             状态.恢复进度 = 1.0
-            状态.恢复消息 = "恢复与导入完成"
-            状态.恢复错误 = ""
-            状态.恢复目标路径 = 手机路径
-        状态.记录日志("success", f"缓存已恢复到手机: {手机路径}")
+            状态.恢复消息 = (
+                f"批量恢复结束：成功 {状态.恢复成功数}，跳过 {状态.恢复跳过数}，失败 {状态.恢复失败数}"
+            )
+            状态.恢复错误 = "" if 状态.恢复失败数 == 0 else "部分归档恢复失败，请查看列表"
+            状态.恢复目标路径 = "；".join(已导入目标)
+        状态.记录日志("success" if 状态.恢复失败数 == 0 else "warn", 状态.恢复消息)
     except Exception as 异常:
+        with 状态.锁:
+            未完成编号 = {
+                str(项目.get("id"))
+                for 项目 in 状态.恢复项目列表
+                if 项目.get("status") in {"queued", "restoring"}
+            }
+        _更新恢复项目(未完成编号, "failed", str(异常))
         with 状态.锁:
             状态.恢复状态 = "error"
             状态.恢复消息 = "恢复失败"
@@ -2640,18 +2778,14 @@ def _恢复线程函数(归档路径: str, 序列号: str, 包名: str, 缓存�
     finally:
         with 状态.锁:
             状态._恢复线程 = None
+        状态._恢复取消.clear()
 
 
-def 开始恢复(归档路径: str, 序列号: str, 包名: str, 缓存布局: str) -> dict:
-    r"""校验选择并启动后台恢复线程。"""
-    归档路径 = 归档路径.strip()
-    序列号 = 序列号.strip()
-    包名 = 包名.strip()
-    缓存布局 = 缓存布局.strip()
-    try:
-        _检查恢复归档(归档路径)
-    except Exception as 异常:
-        return {"ok": False, "error": str(异常)}
+def 开始批量恢复(归档路径列表: list[str], 序列号: str, 包名: str, 缓存布局: str) -> dict:
+    r"""校验批量选择并启动后台恢复线程。"""
+    序列号 = _安全文本(序列号)
+    包名 = _安全文本(包名)
+    缓存布局 = _安全文本(缓存布局)
     if 包名 not in _哔哩包名表:
         return {"ok": False, "error": f"不支持的哔哩哔哩客户端: {包名}"}
     if 缓存布局 not in {"download", "files/download"}:
@@ -2664,6 +2798,36 @@ def 开始恢复(归档路径: str, 序列号: str, 包名: str, 缓存布局: s
     if (序列号, 包名, 缓存布局) not in 可用设备集合:
         return {"ok": False, "error": "目标设备已离线、未授权或缓存目录不可用"}
 
+    去重路径列表 = list(dict.fromkeys(_安全文本(路径项) for 路径项 in 归档路径列表 if _安全文本(路径项)))
+    if not 去重路径列表:
+        return {"ok": False, "error": "没有选择可恢复的归档"}
+
+    归档列表: list = []
+    项目列表: list[dict] = []
+    for 归档路径 in 去重路径列表:
+        try:
+            归档 = _检查恢复归档(归档路径)
+            归档列表.append(归档)
+            项目 = 归档.转字典()
+            项目.update({"status": "queued", "message": "等待恢复", "target_path": ""})
+        except Exception as 异常:
+            项目 = {
+                "id": f"invalid-{哈希.sha256(归档路径.encode('utf-8')).hexdigest()[:20]}",
+                "path": 归档路径,
+                "title": 路径(归档路径).name or 归档路径,
+                "avid": "",
+                "cache_path": "",
+                "mp4_name": "",
+                "size_bytes": 0,
+                "size_mb": 0,
+                "status": "failed",
+                "message": str(异常),
+                "target_path": "",
+            }
+        项目列表.append(项目)
+    if not 归档列表:
+        return {"ok": False, "error": "选择的归档均已失效或不完整"}
+
     with 状态.锁:
         if 状态._恢复线程 is not None and 状态._恢复线程.is_alive():
             return {"ok": False, "error": "已有缓存恢复任务正在进行"}
@@ -2672,10 +2836,17 @@ def 开始恢复(归档路径: str, 序列号: str, 包名: str, 缓存布局: s
         状态.恢复消息 = "准备恢复"
         状态.恢复错误 = ""
         状态.恢复目标路径 = ""
+        状态.恢复项目列表 = 项目列表
+        状态.恢复总数 = len(项目列表)
+        状态.恢复完成数 = sum(1 for 项目 in 项目列表 if 项目["status"] == "failed")
+        状态.恢复成功数 = 0
+        状态.恢复跳过数 = 0
+        状态.恢复失败数 = 状态.恢复完成数
         状态._恢复上次消息 = ""
+        状态._恢复取消.clear()
         线程对象 = 线程.Thread(
             target=_恢复线程函数,
-            args=(归档路径, 序列号, 包名, 缓存布局),
+            args=(归档列表, 序列号, 包名, 缓存布局),
             daemon=True,
         )
         状态._恢复线程 = 线程对象
@@ -2686,6 +2857,22 @@ def 开始恢复(归档路径: str, 序列号: str, 包名: str, 缓存布局: s
             状态.恢复状态 = "error"
             状态._恢复线程 = None
         raise
+    return {"ok": True, "total": len(项目列表), "valid": len(归档列表)}
+
+
+def 开始恢复(归档路径: str, 序列号: str, 包名: str, 缓存布局: str) -> dict:
+    r"""兼容原单项恢复接口。"""
+    return 开始批量恢复([归档路径], 序列号, 包名, 缓存布局)
+
+
+def 取消恢复() -> dict:
+    r"""请求在当前 avid 处理完成后停止后续批量恢复。"""
+    with 状态.锁:
+        if 状态._恢复线程 is None or not 状态._恢复线程.is_alive():
+            return {"ok": False, "error": "当前没有正在进行的恢复任务"}
+        状态._恢复取消.set()
+        状态.恢复消息 = "正在完成当前缓存，之后将停止"
+    状态.记录日志("warn", "已请求取消批量恢复")
     return {"ok": True}
 
 

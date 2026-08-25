@@ -792,7 +792,7 @@
         }
 
         .restore-dialog {
-            width: 680px;
+            width: 760px;
             max-height: calc(100vh - 48px);
             overflow-y: auto;
             background: #fff;
@@ -868,23 +868,96 @@
             border-color: #E85B8A;
         }
 
-        .restore-preview {
-            display: none;
-            padding: 10px 12px;
-            border-left: 4px solid #27ae60;
-            background: #f3fbf6;
-            color: #555;
+        .restore-list-tools {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0 6px;
+        }
+
+        .restore-list-tools .restore-count {
+            margin-left: auto;
+            color: #777;
             font-size: 12px;
-            line-height: 1.65;
+            font-weight: 800;
         }
 
-        .restore-preview.show {
-            display: block;
+        .restore-list {
+            min-height: 96px;
+            max-height: 270px;
+            overflow-y: auto;
+            border: 2px solid #F5A623;
+            background: #fafafa;
         }
 
-        .restore-preview b {
+        .restore-list-empty {
+            padding: 34px 12px;
+            color: #aaa;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .restore-item {
+            display: grid;
+            grid-template-columns: 20px minmax(0, 1fr) auto;
+            gap: 9px;
+            align-items: center;
+            padding: 9px 10px;
+            border-bottom: 1px dashed rgba(232, 91, 138, .35);
+            cursor: pointer;
+        }
+
+        .restore-item:last-child {
+            border-bottom: 0;
+        }
+
+        .restore-item:hover {
+            background: #fff5f8;
+        }
+
+        .restore-item input {
+            width: 15px;
+            height: 15px;
+            accent-color: #E85B8A;
+        }
+
+        .restore-item-main {
+            min-width: 0;
+        }
+
+        .restore-item-title {
+            overflow: hidden;
             color: #333;
+            font-size: 12px;
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
+
+        .restore-item-meta {
+            margin-top: 2px;
+            overflow: hidden;
+            color: #888;
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .restore-item-status {
+            max-width: 170px;
+            padding: 3px 6px;
+            color: #777;
+            font-size: 10px;
+            font-weight: 800;
+            text-align: right;
+        }
+
+        .restore-item-status.success { color: #1e8449; }
+        .restore-item-status.failed { color: #c0392b; }
+        .restore-item-status.skipped,
+        .restore-item-status.cancelled { color: #d68910; }
+        .restore-item-status.restoring { color: #E85B8A; }
 
         .restore-message {
             min-height: 42px;
@@ -1070,13 +1143,20 @@
             </div>
             <div class="restore-body">
                 <div class="restore-field">
-                    <label for="restore-path">电脑存档文件夹</label>
+                    <label for="restore-path">电脑存档文件夹或上级目录</label>
                     <div class="restore-row">
-                        <input id="restore-path" readonly placeholder="选择包含 MP4、entry.json、index.json 与 danmaku.xml 的文件夹">
-                        <button class="btn btn-or" id="btn-browse-restore" onclick="选择恢复归档()">选择存档</button>
+                        <input id="restore-path" readonly placeholder="可选择改名后的导出目录，程序会递归识别有效归档">
+                        <button class="btn btn-or" id="btn-browse-restore" onclick="选择恢复归档()">扫描文件夹</button>
                     </div>
                 </div>
-                <div class="restore-preview" id="restore-preview"></div>
+                <div class="restore-list-tools">
+                    <button class="btn btn-gh" id="btn-select-all-restore" onclick="全选恢复归档()">全选</button>
+                    <button class="btn btn-gh" id="btn-select-none-restore" onclick="取消选择恢复归档()">取消选择</button>
+                    <span class="restore-count" id="restore-count">尚未扫描</span>
+                </div>
+                <div class="restore-list" id="restore-list">
+                    <div class="restore-list-empty">选择文件夹后，将在这里列出可恢复归档</div>
+                </div>
                 <div class="restore-field" style="margin-top:16px">
                     <label for="restore-device">目标手机与客户端</label>
                     <div class="restore-row">
@@ -1093,7 +1173,8 @@
             </div>
             <div class="restore-foot">
                 <button class="btn btn-gh" onclick="关闭恢复窗口()">关闭</button>
-                <button class="btn btn-gn" id="btn-start-restore" onclick="开始恢复缓存()" disabled>↶ 开始恢复</button>
+                <button class="btn btn-dn" id="btn-cancel-restore" onclick="取消恢复缓存()" style="display:none">取消恢复</button>
+                <button class="btn btn-gn" id="btn-start-restore" onclick="开始恢复缓存()" disabled>↶ 批量恢复</button>
             </div>
         </div>
     </div>
@@ -1107,7 +1188,8 @@
             const _已移除编号 = new Set(); // 已消失设备对应的卡片 id
             let _上次可用键 = new Set();
             let _设备刷新中 = false;
-            let _恢复归档 = null, _恢复设备列表 = [], _上次恢复状态 = 'idle';
+            let _恢复归档列表 = [], _恢复设备列表 = [], _上次恢复状态 = 'idle';
+            const _已选恢复归档 = new Set();
 
             /* ===== TOAST ===== */
             let _提示计时器 = null;
@@ -1142,33 +1224,81 @@
             }
 
             async function 选择恢复归档() {
-                提示('请在弹出的窗口中选择存档文件夹');
+                提示('请选择存档文件夹或其上级目录');
                 const data = await (await fetch('/api/localout/restore/browse', { method: 'POST' })).json();
                 if (!data.ok || !data.path) return;
                 取元素('restore-path').value = data.path;
-                await 解析恢复归档(data.path);
+                await 扫描恢复归档(data.path);
             }
 
-            async function 解析恢复归档(path) {
-                _恢复归档 = null;
-                取元素('restore-preview').classList.remove('show');
-                设置恢复消息('正在检查存档...');
-                const data = await (await fetch('/api/localout/restore/inspect', {
+            async function 扫描恢复归档(path) {
+                _恢复归档列表 = [];
+                _已选恢复归档.clear();
+                渲染恢复归档列表();
+                设置恢复消息('正在递归扫描有效归档...');
+                const data = await (await fetch('/api/localout/restore/scan', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path })
                 })).json();
                 if (!data.ok) {
-                    设置恢复消息(data.error || '存档检查失败', 'error');
+                    设置恢复消息(data.error || '存档扫描失败', 'error');
                     更新恢复按钮();
                     return;
                 }
-                _恢复归档 = data.archive;
-                const preview = 取元素('restore-preview');
-                preview.innerHTML = `<b>${转义网页(_恢复归档.title)}</b><br>` +
-                    `缓存路径：${转义网页(_恢复归档.cache_path)} · ${_恢复归档.size_mb} MB`;
-                preview.classList.add('show');
-                设置恢复消息('存档检查通过。导入时若手机已存在同一 avid，将停止并保留原缓存。', 'success');
+                _恢复归档列表 = data.archives || [];
+                _恢复归档列表.forEach(item => _已选恢复归档.add(item.id));
+                渲染恢复归档列表();
+                const warningText = (data.warnings || []).length ? `；另跳过 ${data.warnings.length} 个不完整目录` : '';
+                if (_恢复归档列表.length) {
+                    设置恢复消息(`找到 ${_恢复归档列表.length} 个有效归档${warningText}。同一 avid 的多个分集会合并后导入。`, 'success');
+                } else {
+                    设置恢复消息(`没有找到有效归档${warningText}`, 'error');
+                }
+                更新恢复按钮();
+            }
+
+            function 渲染恢复归档列表() {
+                const 运行项目 = new Map((_上次状态?.restore_items || []).map(item => [item.id, item]));
+                const 正在恢复 = _上次状态?.restore_status === 'restoring';
+                const 状态文字 = {
+                    queued: '等待恢复', restoring: '处理中', success: '已完成',
+                    skipped: '已跳过', failed: '失败', cancelled: '已取消'
+                };
+                const items = _恢复归档列表;
+                取元素('restore-list').innerHTML = items.length ? items.map(item => {
+                    const runtime = 运行项目.get(item.id) || item;
+                    const status = runtime.status || '';
+                    const statusText = runtime.message || 状态文字[status] || '';
+                    return `<label class="restore-item">
+                        <input type="checkbox" ${_已选恢复归档.has(item.id) ? 'checked' : ''}
+                            ${正在恢复 ? 'disabled' : ''} onchange="切换恢复归档('${item.id}',this.checked)">
+                        <span class="restore-item-main">
+                            <span class="restore-item-title">${转义网页(item.title || item.mp4_name || '未知归档')}</span>
+                            <span class="restore-item-meta">${转义网页(item.cache_path || '')} · ${item.size_mb || 0} MB</span>
+                        </span>
+                        <span class="restore-item-status ${status}">${转义网页(statusText)}</span>
+                    </label>`;
+                }).join('') : '<div class="restore-list-empty">没有可恢复归档</div>';
+                const avid数量 = new Set(items.filter(item => _已选恢复归档.has(item.id)).map(item => item.avid)).size;
+                取元素('restore-count').textContent = `已选 ${_已选恢复归档.size}/${items.length} · ${avid数量} 个 avid`;
+            }
+
+            function 切换恢复归档(id, checked) {
+                checked ? _已选恢复归档.add(id) : _已选恢复归档.delete(id);
+                渲染恢复归档列表();
+                更新恢复按钮();
+            }
+
+            function 全选恢复归档() {
+                _恢复归档列表.forEach(item => _已选恢复归档.add(item.id));
+                渲染恢复归档列表();
+                更新恢复按钮();
+            }
+
+            function 取消选择恢复归档() {
+                _已选恢复归档.clear();
+                渲染恢复归档列表();
                 更新恢复按钮();
             }
 
@@ -1202,21 +1332,25 @@
 
             function 更新恢复按钮() {
                 const 正在恢复 = _上次状态?.restore_status === 'restoring';
-                取元素('btn-start-restore').disabled = !_恢复归档 || !取元素('restore-device').value || 正在恢复;
+                取元素('btn-start-restore').disabled = !_已选恢复归档.size || !取元素('restore-device').value || 正在恢复;
                 取元素('btn-browse-restore').disabled = 正在恢复;
                 取元素('btn-refresh-restore').disabled = 正在恢复;
                 取元素('restore-device').disabled = 正在恢复;
+                取元素('btn-select-all-restore').disabled = 正在恢复 || !_恢复归档列表.length;
+                取元素('btn-select-none-restore').disabled = 正在恢复 || !_恢复归档列表.length;
+                取元素('btn-cancel-restore').style.display = 正在恢复 ? '' : 'none';
             }
 
             async function 开始恢复缓存() {
                 const device = _恢复设备列表.find(item => item.id === 取元素('restore-device').value);
-                if (!_恢复归档) { 提示('请先选择有效存档', true); return; }
+                const 选中归档 = _恢复归档列表.filter(item => _已选恢复归档.has(item.id));
+                if (!选中归档.length) { 提示('请先选择有效归档', true); return; }
                 if (!device) { 提示('请选择目标手机', true); return; }
                 const data = await (await fetch('/api/localout/restore/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        path: _恢复归档.path,
+                        paths: 选中归档.map(item => item.path),
                         serial: device.serial,
                         package: device.package,
                         layout: device.layout
@@ -1227,23 +1361,36 @@
                     提示(data.error || '无法开始恢复', true);
                     return;
                 }
-                设置恢复消息('准备恢复...');
-                提示('缓存恢复已开始');
+                设置恢复消息(`准备批量恢复 ${data.valid || 选中归档.length} 个归档...`);
+                提示('批量恢复已开始');
                 轮询();
+            }
+
+            async function 取消恢复缓存() {
+                const data = await (await fetch('/api/localout/restore/cancel', { method: 'POST' })).json();
+                if (!data.ok) 提示(data.error || '无法取消恢复', true);
+                else 提示('将在当前 avid 处理完成后停止');
             }
 
             function 更新恢复状态(s) {
                 const status = s.restore_status || 'idle';
                 取元素('restore-progress-fill').style.width = ((s.restore_progress || 0) * 100) + '%';
+                if ((s.restore_items || []).length) 渲染恢复归档列表();
                 if (status === 'restoring') {
-                    设置恢复消息(s.restore_message || '正在恢复...');
+                    设置恢复消息(`${s.restore_message || '正在恢复...'} · ${s.restore_done || 0}/${s.restore_total || 0}`);
                 } else if (status === 'success') {
-                    设置恢复消息(`恢复完成：${s.restore_target_path || ''}`, 'success');
+                    设置恢复消息(s.restore_message || '批量恢复完成', 'success');
+                } else if (status === 'partial') {
+                    设置恢复消息(s.restore_message || '批量恢复结束，部分项目未完成', 'error');
+                } else if (status === 'cancelled') {
+                    设置恢复消息(s.restore_message || '批量恢复已取消', 'error');
                 } else if (status === 'error') {
                     设置恢复消息(s.restore_error || '恢复失败', 'error');
                 }
                 if (status !== _上次恢复状态) {
-                    if (status === 'success') 提示('缓存已恢复并导入手机');
+                    if (status === 'success') 提示('所选缓存已批量导入手机');
+                    if (status === 'partial') 提示('批量恢复结束，部分项目未完成', true);
+                    if (status === 'cancelled') 提示('批量恢复已取消', true);
                     if (status === 'error') 提示(s.restore_error || '缓存恢复失败', true);
                     _上次恢复状态 = status;
                 }
@@ -1792,9 +1939,14 @@
             window.打开恢复窗口 = 打开恢复窗口;
             window.关闭恢复窗口 = 关闭恢复窗口;
             window.选择恢复归档 = 选择恢复归档;
+            window.扫描恢复归档 = 扫描恢复归档;
+            window.切换恢复归档 = 切换恢复归档;
+            window.全选恢复归档 = 全选恢复归档;
+            window.取消选择恢复归档 = 取消选择恢复归档;
             window.刷新恢复设备 = 刷新恢复设备;
             window.更新恢复按钮 = 更新恢复按钮;
             window.开始恢复缓存 = 开始恢复缓存;
+            window.取消恢复缓存 = 取消恢复缓存;
             window.清空来源 = 清空来源;
             window.清空任务 = 清空任务;
             window.清空完成 = 清空完成;
