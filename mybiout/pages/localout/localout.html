@@ -775,6 +775,162 @@
             box-shadow: 4px 4px 0 #F5A623;
         }
 
+        /* ===== RESTORE DIALOG ===== */
+        .restore-layer {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9500;
+            background: rgba(30, 30, 40, .58);
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .restore-layer.open {
+            display: flex;
+        }
+
+        .restore-dialog {
+            width: 680px;
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+            background: #fff;
+            border: 3px solid #F5A623;
+            box-shadow: 7px 7px 0 #E85B8A;
+        }
+
+        .restore-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 18px;
+            background: #FB7299;
+            color: #fff;
+            border-bottom: 3px dashed #F5A623;
+        }
+
+        .restore-head h2 {
+            font-size: 19px;
+            font-weight: 900;
+        }
+
+        .restore-close {
+            margin-left: auto;
+            width: 32px;
+            height: 32px;
+            background: #fff;
+            color: #E85B8A;
+            border: 2px solid #c44876;
+            font-size: 20px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .restore-body {
+            padding: 18px;
+        }
+
+        .restore-field {
+            margin-bottom: 16px;
+        }
+
+        .restore-field label {
+            display: block;
+            margin-bottom: 6px;
+            color: #555;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .restore-row {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .restore-row input,
+        .restore-row select {
+            flex: 1;
+            min-width: 0;
+            height: 36px;
+            padding: 6px 10px;
+            border: 2px solid #F5A623;
+            background: #fff;
+            color: #333;
+            font-family: inherit;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .restore-row input:focus,
+        .restore-row select:focus {
+            border-color: #E85B8A;
+        }
+
+        .restore-preview {
+            display: none;
+            padding: 10px 12px;
+            border-left: 4px solid #27ae60;
+            background: #f3fbf6;
+            color: #555;
+            font-size: 12px;
+            line-height: 1.65;
+        }
+
+        .restore-preview.show {
+            display: block;
+        }
+
+        .restore-preview b {
+            color: #333;
+        }
+
+        .restore-message {
+            min-height: 42px;
+            padding: 10px 12px;
+            border: 2px dashed rgba(232, 91, 138, .45);
+            background: rgba(251, 114, 153, .05);
+            color: #666;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .restore-message.error {
+            color: #c0392b;
+            border-color: #e74c3c;
+            background: #fff5f4;
+        }
+
+        .restore-message.success {
+            color: #1e8449;
+            border-color: #27ae60;
+            background: #f3fbf6;
+        }
+
+        .restore-progress {
+            height: 16px;
+            margin-top: 8px;
+            border: 2px solid #F5A623;
+            background: #eee;
+            overflow: hidden;
+        }
+
+        .restore-progress-fill {
+            width: 0;
+            height: 100%;
+            background: #E85B8A;
+            transition: width .25s ease;
+        }
+
+        .restore-foot {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 12px 18px 16px;
+            border-top: 2px dashed rgba(245, 166, 35, .55);
+        }
+
         .empty-hint {
             text-align: center;
             padding: 40px 10px;
@@ -850,6 +1006,7 @@
                     <h2>📋 任务</h2>
                     <div class="badge" id="badge-task">0</div>
                     <div class="col-hd-right">
+                        <button class="btn btn-or" id="btn-open-restore" onclick="打开恢复窗口()">↶ 恢复缓存</button>
                         <button class="btn btn-dn" id="btn-cancel-exp" onclick="取消导出()"
                             style="display:none">取消导出</button>
                     </div>
@@ -905,6 +1062,41 @@
 
     <div class="dd-backdrop" id="dd-backdrop" onclick="关闭下拉()"></div>
     <div class="dd-menu" id="dd-menu"></div>
+    <div class="restore-layer" id="restore-layer" role="dialog" aria-modal="true" aria-labelledby="restore-title">
+        <div class="restore-dialog">
+            <div class="restore-head">
+                <h2 id="restore-title">恢复手机缓存</h2>
+                <button class="restore-close" onclick="关闭恢复窗口()" title="关闭" aria-label="关闭">×</button>
+            </div>
+            <div class="restore-body">
+                <div class="restore-field">
+                    <label for="restore-path">电脑存档文件夹</label>
+                    <div class="restore-row">
+                        <input id="restore-path" readonly placeholder="选择包含 MP4、entry.json、index.json 与 danmaku.xml 的文件夹">
+                        <button class="btn btn-or" id="btn-browse-restore" onclick="选择恢复归档()">选择存档</button>
+                    </div>
+                </div>
+                <div class="restore-preview" id="restore-preview"></div>
+                <div class="restore-field" style="margin-top:16px">
+                    <label for="restore-device">目标手机与客户端</label>
+                    <div class="restore-row">
+                        <select id="restore-device" onchange="更新恢复按钮()">
+                            <option value="">正在检测设备...</option>
+                        </select>
+                        <button class="btn btn-gh" id="btn-refresh-restore" onclick="刷新恢复设备()">刷新</button>
+                    </div>
+                </div>
+                <div class="restore-message" id="restore-message">请选择存档与目标手机。</div>
+                <div class="restore-progress" aria-label="恢复进度">
+                    <div class="restore-progress-fill" id="restore-progress-fill"></div>
+                </div>
+            </div>
+            <div class="restore-foot">
+                <button class="btn btn-gh" onclick="关闭恢复窗口()">关闭</button>
+                <button class="btn btn-gn" id="btn-start-restore" onclick="开始恢复缓存()" disabled>↶ 开始恢复</button>
+            </div>
+        </div>
+    </div>
     <div class="toast" id="toast"></div>
 
     <script>
@@ -915,6 +1107,7 @@
             const _已移除编号 = new Set(); // 已消失设备对应的卡片 id
             let _上次可用键 = new Set();
             let _设备刷新中 = false;
+            let _恢复归档 = null, _恢复设备列表 = [], _上次恢复状态 = 'idle';
 
             /* ===== TOAST ===== */
             let _提示计时器 = null;
@@ -930,6 +1123,132 @@
             const 取元素 = id => document.getElementById(id);
             function 转义网页(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
             function 转义属性(s) { return 转义网页(s || '').replace(/'/g, '&#39;'); }
+
+            /* ===== RESTORE ===== */
+            async function 打开恢复窗口() {
+                取元素('restore-layer').classList.add('open');
+                await 刷新恢复设备();
+                更新恢复按钮();
+            }
+
+            function 关闭恢复窗口() {
+                取元素('restore-layer').classList.remove('open');
+            }
+
+            function 设置恢复消息(消息, 类型 = '') {
+                const el = 取元素('restore-message');
+                el.textContent = 消息;
+                el.className = 'restore-message' + (类型 ? ' ' + 类型 : '');
+            }
+
+            async function 选择恢复归档() {
+                提示('请在弹出的窗口中选择存档文件夹');
+                const data = await (await fetch('/api/localout/restore/browse', { method: 'POST' })).json();
+                if (!data.ok || !data.path) return;
+                取元素('restore-path').value = data.path;
+                await 解析恢复归档(data.path);
+            }
+
+            async function 解析恢复归档(path) {
+                _恢复归档 = null;
+                取元素('restore-preview').classList.remove('show');
+                设置恢复消息('正在检查存档...');
+                const data = await (await fetch('/api/localout/restore/inspect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path })
+                })).json();
+                if (!data.ok) {
+                    设置恢复消息(data.error || '存档检查失败', 'error');
+                    更新恢复按钮();
+                    return;
+                }
+                _恢复归档 = data.archive;
+                const preview = 取元素('restore-preview');
+                preview.innerHTML = `<b>${转义网页(_恢复归档.title)}</b><br>` +
+                    `缓存路径：${转义网页(_恢复归档.cache_path)} · ${_恢复归档.size_mb} MB`;
+                preview.classList.add('show');
+                设置恢复消息('存档检查通过。导入时若手机已存在同一 avid，将停止并保留原缓存。', 'success');
+                更新恢复按钮();
+            }
+
+            async function 刷新恢复设备() {
+                const select = 取元素('restore-device');
+                const button = 取元素('btn-refresh-restore');
+                button.disabled = true;
+                select.innerHTML = '<option value="">正在检测设备...</option>';
+                try {
+                    const data = await (await fetch('/api/localout/restore/devices', { cache: 'no-store' })).json();
+                    _恢复设备列表 = data.devices || [];
+                    if (_恢复设备列表.length) {
+                        select.innerHTML = _恢复设备列表.map(device =>
+                            `<option value="${转义属性(device.id)}">${转义网页(device.label)} · ${转义网页(device.path)}</option>`
+                        ).join('');
+                    } else {
+                        select.innerHTML = '<option value="">未检测到可用设备</option>';
+                    }
+                    if ((data.warnings || []).length && !_恢复设备列表.length) {
+                        设置恢复消息(data.warnings.join('；'), 'error');
+                    }
+                } catch (e) {
+                    _恢复设备列表 = [];
+                    select.innerHTML = '<option value="">设备检测失败</option>';
+                    设置恢复消息('设备检测失败: ' + (e.message || '网络错误'), 'error');
+                } finally {
+                    button.disabled = false;
+                    更新恢复按钮();
+                }
+            }
+
+            function 更新恢复按钮() {
+                const 正在恢复 = _上次状态?.restore_status === 'restoring';
+                取元素('btn-start-restore').disabled = !_恢复归档 || !取元素('restore-device').value || 正在恢复;
+                取元素('btn-browse-restore').disabled = 正在恢复;
+                取元素('btn-refresh-restore').disabled = 正在恢复;
+                取元素('restore-device').disabled = 正在恢复;
+            }
+
+            async function 开始恢复缓存() {
+                const device = _恢复设备列表.find(item => item.id === 取元素('restore-device').value);
+                if (!_恢复归档) { 提示('请先选择有效存档', true); return; }
+                if (!device) { 提示('请选择目标手机', true); return; }
+                const data = await (await fetch('/api/localout/restore/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: _恢复归档.path,
+                        serial: device.serial,
+                        package: device.package,
+                        layout: device.layout
+                    })
+                })).json();
+                if (!data.ok) {
+                    设置恢复消息(data.error || '无法开始恢复', 'error');
+                    提示(data.error || '无法开始恢复', true);
+                    return;
+                }
+                设置恢复消息('准备恢复...');
+                提示('缓存恢复已开始');
+                轮询();
+            }
+
+            function 更新恢复状态(s) {
+                const status = s.restore_status || 'idle';
+                取元素('restore-progress-fill').style.width = ((s.restore_progress || 0) * 100) + '%';
+                if (status === 'restoring') {
+                    设置恢复消息(s.restore_message || '正在恢复...');
+                } else if (status === 'success') {
+                    设置恢复消息(`恢复完成：${s.restore_target_path || ''}`, 'success');
+                } else if (status === 'error') {
+                    设置恢复消息(s.restore_error || '恢复失败', 'error');
+                }
+                if (status !== _上次恢复状态) {
+                    if (status === 'success') 提示('缓存已恢复并导入手机');
+                    if (status === 'error') 提示(s.restore_error || '缓存恢复失败', true);
+                    _上次恢复状态 = status;
+                }
+                更新恢复按钮();
+            }
 
             /* ===== DROPDOWN ===== */
             async function 切换下拉() {
@@ -1286,6 +1605,10 @@
                     pct = s.export_progress * 100;
                     label = `导出 ${s.export_done}/${s.export_total}`;
                 }
+                if (s.restore_status === 'restoring') {
+                    pct = s.restore_progress * 100;
+                    label = s.restore_message || '恢复缓存中...';
+                }
                 取元素('prog-fill').style.width = pct + '%';
                 取元素('prog-text').textContent = Math.round(pct) + '%';
                 取元素('prog-label').textContent = label;
@@ -1322,6 +1645,7 @@
                     渲染列('done', s.completed_cards);
                     渲染日志(s.logs);
                     更新进度(s);
+                    更新恢复状态(s);
 
                     取元素('badge-src').textContent = s.source_cards.length;
                     取元素('badge-task').textContent = s.task_cards.length;
@@ -1465,6 +1789,12 @@
             window.开始导出 = 开始导出;
             window.保存导出开关 = 保存导出开关;
             window.取消导出 = 取消导出;
+            window.打开恢复窗口 = 打开恢复窗口;
+            window.关闭恢复窗口 = 关闭恢复窗口;
+            window.选择恢复归档 = 选择恢复归档;
+            window.刷新恢复设备 = 刷新恢复设备;
+            window.更新恢复按钮 = 更新恢复按钮;
+            window.开始恢复缓存 = 开始恢复缓存;
             window.清空来源 = 清空来源;
             window.清空任务 = 清空任务;
             window.清空完成 = 清空完成;

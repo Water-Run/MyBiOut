@@ -31,6 +31,9 @@ from datetime import datetime as 日期时间
 from pathlib import Path as 路径
 
 from mybiout.pages import utils as 工具
+from mybiout.pages.localout.restore import 导入缓存到手机
+from mybiout.pages.localout.restore import 检查恢复归档 as _检查恢复归档
+from mybiout.pages.localout.restore import 重建缓存目录
 
 try:
     import httpx as 网络请求
@@ -123,6 +126,7 @@ def _寻找ADB() -> str | None:
             路径("C:/Android/sdk/platform-tools/adb.exe"),
             路径("C:/Program Files/Android/platform-tools/adb.exe"),
             路径("C:/Program Files (x86)/Android/platform-tools/adb.exe"),
+            路径("C:/Program Files (x86)/Android SDK Platform-Tools/platform-tools/adb.exe"),
         ):
             if 候选路径.is_file():
                 return str(候选路径)
@@ -398,11 +402,18 @@ class _本地状态:
         自身.导出成功数: int = 0
         自身.导出跳过数: int = 0
         自身.导出失败数: int = 0
+        自身.恢复状态: str = "idle"
+        自身.恢复进度: float = 0.0
+        自身.恢复消息: str = ""
+        自身.恢复错误: str = ""
+        自身.恢复目标路径: str = ""
         自身._扫描线程: 线程.Thread | None = None
         自身._扫描取消: 线程.Event = 线程.Event()
         自身._扫描暂停: 线程.Event = 线程.Event()
         自身._导出线程: 线程.Thread | None = None
         自身._导出取消: 线程.Event = 线程.Event()
+        自身._恢复线程: 线程.Thread | None = None
+        自身._恢复上次消息: str = ""
         自身._已知键集合: set[str] = set()
         自身._可用键集合: set[str] = set()
         自身._输出占用集合: set[str] = set()
@@ -431,6 +442,11 @@ class _本地状态:
                 "export_success": 自身.导出成功数,
                 "export_skipped": 自身.导出跳过数,
                 "export_failed": 自身.导出失败数,
+                "restore_status": 自身.恢复状态,
+                "restore_progress": round(自身.恢复进度, 3),
+                "restore_message": 自身.恢复消息,
+                "restore_error": 自身.恢复错误,
+                "restore_target_path": 自身.恢复目标路径,
             }
 
     def _去重键(自身, 卡片项: 视频卡片) -> str:
@@ -2492,6 +2508,185 @@ def 浏览本地() -> str | None:
         return 文件夹 if 文件夹 else None
     except Exception:
         return None
+
+
+def 浏览恢复归档() -> str | None:
+    r"""弹出文件夹对话框选择由“元文件归档”生成的目录。"""
+    try:
+        from tkinter import Tk
+        from tkinter import filedialog as 文件对话框
+
+        根目录: Tk = Tk()
+        根目录.withdraw()
+        根目录.attributes("-topmost", True)
+        文件夹: str = 文件对话框.askdirectory(title="选择 MyBiOut 元文件归档")
+        根目录.destroy()
+        return 文件夹 if 文件夹 else None
+    except Exception:
+        return None
+
+
+def 检查恢复归档(归档路径: str) -> dict:
+    r"""检查归档完整性并返回将要生成的缓存坐标。"""
+    try:
+        归档 = _检查恢复归档(归档路径.strip())
+        return {"ok": True, "archive": 归档.转字典()}
+    except Exception as 异常:
+        return {"ok": False, "error": str(异常)}
+
+
+def _ADB目录存在(ADB路径: str, 序列号: str, 目录: str) -> bool:
+    try:
+        结果 = _执行ADB(
+            ADB路径,
+            序列号,
+            "shell",
+            f"test -d {命令行转义.quote(目录)}",
+            超时秒数=12,
+        )
+        return 结果.returncode == 0
+    except Exception:
+        return False
+
+
+def 取恢复设备列表() -> dict:
+    r"""返回已授权、安装了受支持客户端且缓存目录可写入的 ADB 设备。"""
+    ADB路径: str | None = _寻找ADB()
+    if not ADB路径:
+        return {"devices": [], "warnings": ["未找到 ADB，无法导入手机"]}
+
+    设备列表: list[dict] = []
+    警告列表: list[str] = []
+    ADB设备列表 = _取ADB设备列表()
+    if not ADB设备列表:
+        return {"devices": [], "warnings": ["未检测到已授权的 ADB 设备"]}
+
+    for 序列号, 显示名称 in ADB设备列表:
+        已安装包列表 = _取ADB已安装哔哩包(ADB路径, 序列号)
+        if not 已安装包列表:
+            警告列表.append(f"{显示名称} 未安装受支持的哔哩哔哩客户端")
+            continue
+        for 包名, 客户端名称 in 已安装包列表:
+            找到布局 = False
+            for 缓存布局 in ("download", "files/download"):
+                手机路径 = f"/sdcard/Android/data/{包名}/{缓存布局}"
+                if not _ADB目录存在(ADB路径, 序列号, 手机路径):
+                    continue
+                找到布局 = True
+                设备列表.append(
+                    {
+                        "id": f"{序列号}|{包名}|{缓存布局}",
+                        "serial": 序列号,
+                        "device_name": 显示名称,
+                        "package": 包名,
+                        "app_name": 客户端名称,
+                        "layout": 缓存布局,
+                        "path": 手机路径,
+                        "label": f"{显示名称} · {客户端名称}",
+                    }
+                )
+            if not 找到布局:
+                警告列表.append(f"{显示名称} · {客户端名称} 尚未生成 download 缓存目录")
+    return {"devices": 设备列表, "warnings": 警告列表}
+
+
+def _更新恢复进度(进度: float, 消息: str) -> None:
+    需要记录日志 = False
+    with 状态.锁:
+        状态.恢复进度 = 进度
+        状态.恢复消息 = 消息
+        if 消息 and 消息 != 状态._恢复上次消息:
+            状态._恢复上次消息 = 消息
+            需要记录日志 = True
+    if 需要记录日志:
+        状态.记录日志("info", f"缓存恢复: {消息}")
+
+
+def _恢复线程函数(归档路径: str, 序列号: str, 包名: str, 缓存布局: str) -> None:
+    try:
+        归档 = _检查恢复归档(归档路径)
+        FFmpeg路径 = _寻找FFmpeg()
+        ADB路径 = _寻找ADB()
+        if not FFmpeg路径:
+            raise RuntimeError("未找到 ffmpeg（请确认绿色包 bin/ 完整）")
+        if not ADB路径:
+            raise RuntimeError("未找到 ADB（请确认绿色包 bin/ 完整）")
+
+        状态.记录日志("info", f"开始恢复: {归档.标题}")
+        with 临时文件.TemporaryDirectory(prefix="mybiout_restore_") as 临时目录:
+            缓存目录 = 重建缓存目录(归档, 临时目录, FFmpeg路径, _更新恢复进度)
+            手机路径 = 导入缓存到手机(
+                缓存目录,
+                ADB路径,
+                序列号,
+                包名,
+                缓存布局,
+                _更新恢复进度,
+            )
+        with 状态.锁:
+            状态.恢复状态 = "success"
+            状态.恢复进度 = 1.0
+            状态.恢复消息 = "恢复与导入完成"
+            状态.恢复错误 = ""
+            状态.恢复目标路径 = 手机路径
+        状态.记录日志("success", f"缓存已恢复到手机: {手机路径}")
+    except Exception as 异常:
+        with 状态.锁:
+            状态.恢复状态 = "error"
+            状态.恢复消息 = "恢复失败"
+            状态.恢复错误 = str(异常)
+            状态.恢复目标路径 = ""
+        状态.记录日志("error", f"缓存恢复失败: {异常}")
+    finally:
+        with 状态.锁:
+            状态._恢复线程 = None
+
+
+def 开始恢复(归档路径: str, 序列号: str, 包名: str, 缓存布局: str) -> dict:
+    r"""校验选择并启动后台恢复线程。"""
+    归档路径 = 归档路径.strip()
+    序列号 = 序列号.strip()
+    包名 = 包名.strip()
+    缓存布局 = 缓存布局.strip()
+    try:
+        _检查恢复归档(归档路径)
+    except Exception as 异常:
+        return {"ok": False, "error": str(异常)}
+    if 包名 not in _哔哩包名表:
+        return {"ok": False, "error": f"不支持的哔哩哔哩客户端: {包名}"}
+    if 缓存布局 not in {"download", "files/download"}:
+        return {"ok": False, "error": f"不支持的缓存布局: {缓存布局}"}
+
+    可用设备集合 = {
+        (设备["serial"], 设备["package"], 设备["layout"])
+        for 设备 in 取恢复设备列表()["devices"]
+    }
+    if (序列号, 包名, 缓存布局) not in 可用设备集合:
+        return {"ok": False, "error": "目标设备已离线、未授权或缓存目录不可用"}
+
+    with 状态.锁:
+        if 状态._恢复线程 is not None and 状态._恢复线程.is_alive():
+            return {"ok": False, "error": "已有缓存恢复任务正在进行"}
+        状态.恢复状态 = "restoring"
+        状态.恢复进度 = 0.0
+        状态.恢复消息 = "准备恢复"
+        状态.恢复错误 = ""
+        状态.恢复目标路径 = ""
+        状态._恢复上次消息 = ""
+        线程对象 = 线程.Thread(
+            target=_恢复线程函数,
+            args=(归档路径, 序列号, 包名, 缓存布局),
+            daemon=True,
+        )
+        状态._恢复线程 = 线程对象
+    try:
+        线程对象.start()
+    except Exception:
+        with 状态.锁:
+            状态.恢复状态 = "error"
+            状态._恢复线程 = None
+        raise
+    return {"ok": True}
 
 
 def 添加来源(
