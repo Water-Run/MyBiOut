@@ -163,6 +163,8 @@ def _执行ADB(ADB路径: str, 序列号: str, *命令参数: str, 超时秒数:
         命令,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=超时秒数,
         **_子进程附加参数,
     )
@@ -2099,41 +2101,61 @@ def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> list[s
     r"""复制或从 ADB 拉取可用元文件，返回成功保留的文件名。"""
     已复制: list[str] = []
     ADB路径: str | None = _寻找ADB() if 卡片.来源类型 == "adb" else None
+
+    if 卡片.来源类型 == "adb":
+        if not ADB路径 or not 卡片.设备序列号:
+            raise RuntimeError("保留元文件时找不到 ADB 设备")
+
+        # Windows ADB 对部分中文完整目标文件路径处理不稳定。先拉到短的
+        # ASCII 临时目录，再由 Python 复制到最终归档目录。
+        with 临时文件.TemporaryDirectory(prefix="mybiout_metadata_") as 临时目录文本:
+            临时目录 = 路径(临时目录文本)
+            for 文件名 in _缓存元文件名:
+                源路径: str = 卡片.元文件路径表.get(文件名, "")
+                if not 源路径:
+                    continue
+                临时目标文件 = 临时目录 / 文件名
+                拉取结果: 子进程.CompletedProcess = _执行ADB(
+                    ADB路径,
+                    卡片.设备序列号,
+                    "pull",
+                    "-a",
+                    源路径,
+                    str(临时目录),
+                    超时秒数=60,
+                )
+                if 拉取结果.returncode != 0:
+                    # 兼容不支持 pull -a 的旧 ADB，并清除可能留下的半成品。
+                    临时目标文件.unlink(missing_ok=True)
+                    拉取结果 = _执行ADB(
+                        ADB路径,
+                        卡片.设备序列号,
+                        "pull",
+                        源路径,
+                        str(临时目录),
+                        超时秒数=60,
+                    )
+                if 拉取结果.returncode != 0 or not 临时目标文件.is_file():
+                    错误文本 = (拉取结果.stderr or 拉取结果.stdout or "ADB 未返回错误文本").strip()
+                    if 拉取结果.returncode == 0:
+                        错误文本 = f"ADB 返回成功，但临时文件未生成；{错误文本}"
+                    raise RuntimeError(
+                        f"ADB 拉取 {文件名} 失败 (returncode={拉取结果.returncode}): "
+                        f"{错误文本[:240]}"
+                    )
+                文件工具.copy2(临时目标文件, 目标目录 / 文件名)
+                已复制.append(文件名)
+        return 已复制
+
     for 文件名 in _缓存元文件名:
         源路径: str = 卡片.元文件路径表.get(文件名, "")
         if not 源路径:
             continue
         目标文件: 路径 = 目标目录 / 文件名
-        if 卡片.来源类型 == "adb":
-            if not ADB路径 or not 卡片.设备序列号:
-                raise RuntimeError("保留元文件时找不到 ADB 设备")
-            拉取结果: 子进程.CompletedProcess = _执行ADB(
-                ADB路径,
-                卡片.设备序列号,
-                "pull",
-                "-a",
-                源路径,
-                str(目标文件),
-                超时秒数=60,
-            )
-            if 拉取结果.returncode != 0:
-                # 兼容不支持 pull -a 的旧 ADB。
-                拉取结果 = _执行ADB(
-                    ADB路径,
-                    卡片.设备序列号,
-                    "pull",
-                    源路径,
-                    str(目标文件),
-                    超时秒数=60,
-                )
-            if 拉取结果.returncode != 0 or not 目标文件.is_file():
-                错误文本 = (拉取结果.stderr or 拉取结果.stdout or "未知 ADB 错误").strip()
-                raise RuntimeError(f"ADB 拉取 {文件名} 失败: {错误文本[:120]}")
-        else:
-            源文件: 路径 = 路径(源路径)
-            if not 源文件.is_file():
-                continue
-            文件工具.copy2(源文件, 目标文件)
+        源文件: 路径 = 路径(源路径)
+        if not 源文件.is_file():
+            continue
+        文件工具.copy2(源文件, 目标文件)
         已复制.append(文件名)
     return 已复制
 
