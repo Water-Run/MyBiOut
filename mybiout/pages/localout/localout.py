@@ -85,7 +85,10 @@ _封面缓存目录.mkdir(parents=True, exist_ok=True)
 
 _缓存元文件名: tuple[str, ...] = ("danmaku.xml", "entry.json", "index.json")
 _导出索引文件名: str = ".mybiout-export-index.json"
+_归档元数据文件名: str = ".mybiout-archive-metadata.json"
+_导出警告日志文件名: str = "LocalOut导出警告.log"
 _导出索引锁: 线程.RLock = 线程.RLock()
+_导出警告日志锁: 线程.RLock = 线程.RLock()
 _导出身份锁表锁: 线程.Lock = 线程.Lock()
 _导出身份锁表: dict[str, 线程.Lock] = {}
 
@@ -310,6 +313,12 @@ def _安全文本(值: object) -> str:
 
 
 @数据类(slots=True)
+class _元文件复制结果:
+    文件名列表: list[str] = 字段(default_factory=list)
+    警告列表: list[str] = 字段(default_factory=list)
+
+
+@数据类(slots=True)
 class 视频卡片:
     r"""
     视频缓存卡片数据模型, 表示一个被扫描到的缓存视频
@@ -337,6 +346,7 @@ class 视频卡片:
     输出路径: str = ""
     状态名: str = "queued"
     错误: str = ""
+    警告: str = ""
 
     def __post_init__(自身) -> None:
         for 属性名 in (
@@ -358,6 +368,7 @@ class 视频卡片:
             "输出路径",
             "状态名",
             "错误",
+            "警告",
         ):
             setattr(自身, 属性名, _安全文本(getattr(自身, 属性名)))
         自身.分集序号 = _安全整数(自身.分集序号, 1)
@@ -395,6 +406,7 @@ class 视频卡片:
             "alive": 仍存在,
             "status": 自身.状态名,
             "error": 自身.错误,
+            "warning": 自身.警告,
         }
 
     def 克隆(自身) -> 视频卡片:
@@ -404,6 +416,7 @@ class 视频卡片:
             元文件路径表=dict(自身.元文件路径表),
             状态名="queued",
             错误="",
+            警告="",
             输出路径="",
         )
 
@@ -1993,6 +2006,8 @@ def _保存导出索引项(
     *,
     已保留元文件: bool,
     元文件名称列表: list[str] | None = None,
+    元文件时间戳已保留: bool = True,
+    导出警告列表: list[str] | None = None,
 ) -> None:
     r"""以临时文件原子更新导出索引，不把机器绝对路径写入索引。"""
     with _导出索引锁:
@@ -2012,6 +2027,8 @@ def _保存导出索引项(
             "resolution": 卡片.分辨率,
             "preserved_metadata": 已保留元文件,
             "metadata_files": sorted(set(元文件名称列表 or [])),
+            "metadata_timestamps_preserved": 元文件时间戳已保留,
+            "warnings": list(导出警告列表 or []),
             "exported_at": _完整时间(),
         }
         索引["version"] = 1
@@ -2097,9 +2114,68 @@ def _释放输出路径(文件路径: 路径) -> None:
         状态._输出占用集合.discard(_输出路径键(文件路径))
 
 
-def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> list[str]:
-    r"""复制或从 ADB 拉取可用元文件，返回成功保留的文件名。"""
+def _记录元文件时间戳警告(
+    目标目录: 路径,
+    文件名: str,
+    源路径: str,
+    首次错误: str,
+) -> str:
+    r"""把 ADB 降级警告同时写入界面、输出日志和归档标记。"""
+    简短错误 = " ".join(首次错误.replace("\r", " ").replace("\n", " ").split())[:240]
+    警告 = (
+        f"{文件名} 的 adb pull -a 失败，将使用普通 adb pull 容错；"
+        f"归档“{目标目录.name}”的该文件时间戳可能未保留"
+    )
+    状态.记录日志("warn", 警告)
+
+    记录 = {
+        "recorded_at": _完整时间(),
+        "archive": 目标目录.name,
+        "file": 文件名,
+        "source": 源路径,
+        "timestamp_preserved": False,
+        "warning": 警告,
+        "adb_pull_a_error": 简短错误,
+    }
+    标记文件 = 目标目录 / _归档元数据文件名
+    日志文件 = 目标目录.parent / _导出警告日志文件名
+
+    with _导出警告日志锁:
+        标记数据: dict = {"version": 1, "metadata_timestamps_preserved": False, "warnings": []}
+        if 标记文件.is_file():
+            try:
+                已有数据 = 数据交换.loads(标记文件.read_text(encoding="utf-8"))
+                if isinstance(已有数据, dict):
+                    标记数据.update(已有数据)
+            except (OSError, ValueError, TypeError):
+                pass
+        警告记录 = 标记数据.setdefault("warnings", [])
+        if not isinstance(警告记录, list):
+            警告记录 = []
+            标记数据["warnings"] = 警告记录
+        警告记录.append(记录)
+        标记数据["metadata_timestamps_preserved"] = False
+        临时标记 = 标记文件.with_name(f"{标记文件.name}.{唯一编号.uuid4().hex}.tmp")
+        try:
+            临时标记.write_text(
+                数据交换.dumps(标记数据, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            系统.replace(临时标记, 标记文件)
+        finally:
+            临时标记.unlink(missing_ok=True)
+
+        with 日志文件.open("a", encoding="utf-8", newline="\n") as 日志:
+            日志.write(数据交换.dumps(记录, ensure_ascii=False) + "\n")
+            日志.flush()
+
+    return 警告
+
+
+def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> _元文件复制结果:
+    r"""复制或从 ADB 拉取元文件，并返回文件名及时间戳降级警告。"""
     已复制: list[str] = []
+    警告列表: list[str] = []
     ADB路径: str | None = _寻找ADB() if 卡片.来源类型 == "adb" else None
 
     if 卡片.来源类型 == "adb":
@@ -2125,7 +2201,16 @@ def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> list[s
                     超时秒数=60,
                 )
                 if 拉取结果.returncode != 0:
-                    # 兼容不支持 pull -a 的旧 ADB，并清除可能留下的半成品。
+                    # 保留普通 pull 作为容错，但明确留下不可随程序关闭消失的降级记录。
+                    首次错误 = 拉取结果.stderr or 拉取结果.stdout or "ADB 未返回错误文本"
+                    警告列表.append(
+                        _记录元文件时间戳警告(
+                            目标目录,
+                            文件名,
+                            源路径,
+                            首次错误,
+                        )
+                    )
                     临时目标文件.unlink(missing_ok=True)
                     拉取结果 = _执行ADB(
                         ADB路径,
@@ -2145,7 +2230,7 @@ def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> list[s
                     )
                 文件工具.copy2(临时目标文件, 目标目录 / 文件名)
                 已复制.append(文件名)
-        return 已复制
+        return _元文件复制结果(已复制, 警告列表)
 
     for 文件名 in _缓存元文件名:
         源路径: str = 卡片.元文件路径表.get(文件名, "")
@@ -2157,7 +2242,7 @@ def _复制缓存元文件(卡片: 视频卡片, 目标目录: 路径) -> list[s
             continue
         文件工具.copy2(源文件, 目标文件)
         已复制.append(文件名)
-    return 已复制
+    return _元文件复制结果(已复制, 警告列表)
 
 
 def _继承本地缓存时间(卡片: 视频卡片, 输出文件: 路径) -> None:
@@ -2285,8 +2370,12 @@ def _导出单个(卡片: 视频卡片, 输出目录: 路径) -> bool:
                 _本地合并(卡片, str(输出路径))
             _继承本地缓存时间(卡片, 输出路径)
             已复制元文件: list[str] = []
+            导出警告列表: list[str] = []
             if 归档目录 is not None:
-                已复制元文件 = _复制缓存元文件(卡片, 归档目录)
+                元文件结果 = _复制缓存元文件(卡片, 归档目录)
+                已复制元文件 = 元文件结果.文件名列表
+                导出警告列表 = 元文件结果.警告列表
+                卡片.警告 = "；".join(导出警告列表)
             卡片.输出路径 = str(输出路径)
             try:
                 _保存导出索引项(
@@ -2296,6 +2385,8 @@ def _导出单个(卡片: 视频卡片, 输出目录: 路径) -> bool:
                     卡片,
                     已保留元文件=保留元文件,
                     元文件名称列表=已复制元文件,
+                    元文件时间戳已保留=not bool(导出警告列表),
+                    导出警告列表=导出警告列表,
                 )
             except OSError as 异常:
                 状态.记录日志("warn", f"视频已导出，但去重索引写入失败: {异常}")

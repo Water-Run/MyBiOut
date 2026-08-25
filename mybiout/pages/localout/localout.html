@@ -388,6 +388,11 @@
             color: #fff;
         }
 
+        .card-status.warning {
+            background: #f39c12;
+            color: #fff;
+        }
+
         .card-row {
             display: flex;
             gap: 10px;
@@ -1547,6 +1552,9 @@
                     const doneClass = c.status === 'skipped' ? 'skipped' : 'success';
                     const doneText = c.status === 'skipped' ? '↷ 已跳过重复 · 打开已有文件' : '✓ 点击在资源管理器中打开';
                     statusHtml = `<div class="card-status ${doneClass}">${doneText}</div>`;
+                    if (c.warning) {
+                        statusHtml += `<div class="card-status warning">警告: ${转义网页(c.warning)}</div>`;
+                    }
                 }
 
                 // 源/任务栏显示单卡片删除按钮
