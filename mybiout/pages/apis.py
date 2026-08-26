@@ -264,6 +264,69 @@ def 本地导出浏览本地() -> dict[str, bool | str]:
     return {"ok": True, "path": 目录路径} if 目录路径 else {"ok": False}
 
 
+@应用.post("/api/localout/restore/browse")
+def 本地导出浏览恢复归档() -> dict[str, bool | str]:
+    r"""选择一个归档或包含多个归档的上级文件夹。"""
+    from mybiout.pages.localout.localout import 浏览恢复归档
+
+    目录路径: str | None = 浏览恢复归档()
+    return {"ok": True, "path": 目录路径} if 目录路径 else {"ok": False}
+
+
+@应用.post("/api/localout/restore/scan")
+async def 本地导出扫描恢复归档(请求对象: 请求) -> dict[str, 任意]:
+    r"""递归发现目录中的有效恢复归档，不依赖导出索引。"""
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+
+    from mybiout.pages.localout.localout import 扫描恢复归档
+
+    return 扫描恢复归档(_转字符串(请求体.get("path", "")))
+
+
+@应用.post("/api/localout/restore/inspect")
+async def 本地导出检查恢复归档(请求对象: 请求) -> dict[str, 任意]:
+    r"""检查恢复归档并返回标题与目标缓存路径。"""
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+
+    from mybiout.pages.localout.localout import 检查恢复归档
+
+    return 检查恢复归档(_转字符串(请求体.get("path", "")))
+
+
+@应用.get("/api/localout/restore/devices")
+async def 本地导出恢复设备列表() -> dict[str, 任意]:
+    r"""获取可接收恢复缓存的 ADB 设备及客户端。"""
+    from mybiout.pages.localout.localout import 取恢复设备列表
+
+    return 取恢复设备列表()
+
+
+@应用.post("/api/localout/restore/start")
+async def 本地导出开始恢复(请求对象: 请求) -> dict[str, 任意]:
+    r"""启动单项或批量归档重建与手机导入任务。"""
+    请求体: dict[str, 任意] = await _读取数据字典(请求对象)
+
+    from mybiout.pages.localout.localout import 开始批量恢复
+
+    路径列表 = _转字符串列表(请求体.get("paths", []))
+    if not 路径列表 and 请求体.get("path") is not None:
+        路径列表 = [_转字符串(请求体.get("path", ""))]
+    return 开始批量恢复(
+        归档路径列表=路径列表,
+        序列号=_转字符串(请求体.get("serial", "")),
+        包名=_转字符串(请求体.get("package", "")),
+        缓存布局=_转字符串(请求体.get("layout", "")),
+    )
+
+
+@应用.post("/api/localout/restore/cancel")
+async def 本地导出取消恢复() -> dict[str, 任意]:
+    r"""请求停止后续批量恢复项目。"""
+    from mybiout.pages.localout.localout import 取消恢复
+
+    return 取消恢复()
+
+
 @应用.post("/api/localout/add-source")
 async def 本地导出添加来源(请求对象: 请求) -> dict[str, 任意]:
     r"""

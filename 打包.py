@@ -156,6 +156,7 @@ _跳过拷贝后缀: frozenset[str] = frozenset(
     "mybiout.pages.utils",
     "mybiout.pages.bbdown.bbdown",
     "mybiout.pages.localout.localout",
+    "mybiout.pages.localout.restore",
     "mybiout.pages.mdout.mdout",
     "mybiout.pages.man.man",
     "mybiout.pages.ohmyconfig.ohmyconfig",
