@@ -3252,8 +3252,8 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
             "gi.repository.WebKit2",
         ):
             参数 += ["--hidden-import", 模块名]
-    # webview 需要少量数据文件, 比 collect-all 轻得多
-    参数 += ["--collect-data", "webview"]
+    # pywebview 自带 hook：所有平台收集 js，且只在 Windows 收集 WebView2 dll。
+    # 不再额外 collect-data，否则 Linux 包会混入整套 Windows 二进制。
     参数.append(str(程序包目录 / "main.py"))
 
     if 状态 is None or 状态.纯文本:
@@ -3406,13 +3406,12 @@ def 写入脱敏默认配置(目标文件: 路径, 状态: 打包进度 | None =
 
 
 def 目录内是否有FFmpeg(工具目录: 路径) -> bool:
+    程序名 = "ffmpeg.exe" if 系统.platform == "win32" else "ffmpeg"
     for 候选 in (
-        工具目录 / "ffmpeg.exe",
-        工具目录 / "ffmpeg",
-        工具目录 / "ffmpeg" / "ffmpeg.exe",
-        工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
-        工具目录 / "BBDown" / "ffmpeg.exe",
-        工具目录 / "BBDown" / "ffmpeg",
+        工具目录 / 程序名,
+        工具目录 / "ffmpeg" / 程序名,
+        工具目录 / "ffmpeg" / "bin" / 程序名,
+        工具目录 / "BBDown" / 程序名,
     ):
         if 候选.is_file():
             return True
@@ -3420,13 +3419,11 @@ def 目录内是否有FFmpeg(工具目录: 路径) -> bool:
 
 
 def 目录内是否有ADB(工具目录: 路径) -> bool:
+    程序名 = "adb.exe" if 系统.platform == "win32" else "adb"
     for 候选 in (
-        工具目录 / "adb.exe",
-        工具目录 / "adb",
-        工具目录 / "platform-tools" / "adb.exe",
-        工具目录 / "platform-tools" / "adb",
-        工具目录 / "adb" / "adb.exe",
-        工具目录 / "adb" / "adb",
+        工具目录 / 程序名,
+        工具目录 / "platform-tools" / 程序名,
+        工具目录 / "adb" / 程序名,
     ):
         if 候选.is_file():
             return True
@@ -3434,10 +3431,51 @@ def 目录内是否有ADB(工具目录: 路径) -> bool:
 
 
 def 目录内是否有BBDown(工具目录: 路径) -> bool:
+    if 系统.platform == "win32":
+        候选们 = (工具目录 / "BBDown.exe", 工具目录 / "BBDown" / "BBDown.exe")
+    else:
+        候选们 = (
+            工具目录 / "BBDown",
+            工具目录 / "bbdown",
+            工具目录 / "BBDown" / "BBDown",
+        )
     return any(
         候选.is_file()
-        for 候选 in (工具目录 / "BBDown.exe", 工具目录 / "BBDown", 工具目录 / "bbdown")
+        for 候选 in 候选们
     )
+
+
+def 清理异平台工具(工具目录: 路径, 状态: 打包进度 | None = None) -> None:
+    r"""从暂存绿包剔除另一平台的二进制，防止检测误报和用户误执行。"""
+    if not 工具目录.is_dir():
+        return
+    if 系统.platform == "win32":
+        候选们 = [
+            工具目录 / "BBDown",
+            工具目录 / "bbdown",
+            工具目录 / "ffmpeg",
+            工具目录 / "adb",
+            工具目录 / "platform-tools" / "adb",
+            工具目录 / "BBDown" / "BBDown",
+            工具目录 / "BBDown" / "ffmpeg",
+        ]
+        待删除 = [候选 for 候选 in 候选们 if 候选.is_file()]
+    else:
+        待删除 = sorted(
+            {
+                候选
+                for 模式 in ("*.exe", "*.dll")
+                for 候选 in 工具目录.rglob(模式)
+                if 候选.is_file()
+            }
+        )
+    for 候选 in 待删除:
+        try:
+            候选.unlink()
+        except OSError as 异常:
+            失败退出(f"无法剔除异平台工具: {候选} ({异常})")
+    if 待删除 and (状态 is None or 状态.纯文本):
+        打印信息(f"已剔除 {len(待删除)} 个异平台工具文件")
 
 
 def 确保路径可执行(路径对象: 路径) -> None:
@@ -3481,7 +3519,8 @@ def 尝试从系统路径补齐FFmpeg(工具目录: 路径, 状态: 打包进度
         if 状态 is None or 状态.纯文本:
             打印信息("已检测到旁路 ffmpeg")
         return
-    系统中的 = 文件工具.which("ffmpeg")
+    系统工具名 = "ffmpeg.exe" if 系统.platform == "win32" else "ffmpeg"
+    系统中的 = 文件工具.which(系统工具名)
     if not 系统中的:
         if 状态 is None or 状态.纯文本:
             打印警告("旁路与系统 PATH 均未发现 ffmpeg，稍后将按硬性条件校验")
@@ -3491,6 +3530,8 @@ def 尝试从系统路径补齐FFmpeg(工具目录: 路径, 状态: 打包进度
         return
     工具目录.mkdir(parents=True, exist_ok=True)
     目标文件 = 工具目录 / ("ffmpeg.exe" if 系统.platform == "win32" else "ffmpeg")
+    if 目标文件.is_dir():
+        目标文件 = 目标文件 / ("ffmpeg.exe" if 系统.platform == "win32" else "ffmpeg")
     文件工具.copy2(源文件, 目标文件)
     确保路径可执行(目标文件)
     if 状态 is None or 状态.纯文本:
@@ -3499,13 +3540,14 @@ def 尝试从系统路径补齐FFmpeg(工具目录: 路径, 状态: 打包进度
 
 def 尝试从系统路径补齐ADB(工具目录: 路径, 状态: 打包进度 | None = None) -> None:
     r"""
-    将 adb.exe 及 Win 配套 dll 打进 bin/（仅 Win11 x64 目标）。
+    将当前平台 adb 打进 bin/；Windows 同时复制配套 dll。
     """
     if 目录内是否有ADB(工具目录):
         if 状态 is None or 状态.纯文本:
             打印信息("已检测到旁路 adb")
         return
-    系统中的 = 文件工具.which("adb.exe") or 文件工具.which("adb")
+    程序名 = "adb.exe" if 系统.platform == "win32" else "adb"
+    系统中的 = 文件工具.which(程序名)
     if not 系统中的:
         if 状态 is None or 状态.纯文本:
             打印警告("旁路与系统 PATH 均未发现 adb，稍后将按硬性条件校验")
@@ -3515,8 +3557,11 @@ def 尝试从系统路径补齐ADB(工具目录: 路径, 状态: 打包进度 | 
         return
     工具目录.mkdir(parents=True, exist_ok=True)
     目标名 = "adb.exe" if 系统.platform == "win32" else "adb"
-    文件工具.copy2(源文件, 工具目录 / 目标名)
-    确保路径可执行(工具目录 / 目标名)
+    目标文件 = 工具目录 / 目标名
+    if 目标文件.is_dir():
+        目标文件 = 目标文件 / 目标名
+    文件工具.copy2(源文件, 目标文件)
+    确保路径可执行(目标文件)
     # 同目录配套库（缺了 adb 可能启动失败）
     if 系统.platform == "win32":
         for 名 in ("AdbWinApi.dll", "AdbWinUsbApi.dll", "libwinpthread-1.dll"):
@@ -3525,6 +3570,35 @@ def 尝试从系统路径补齐ADB(工具目录: 路径, 状态: 打包进度 | 
                 文件工具.copy2(旁, 工具目录 / 名)
     if 状态 is None or 状态.纯文本:
         打印成功(f"已从系统 PATH 复制 adb 到绿色包: {目标名} ({源文件})")
+
+
+def 尝试从系统路径补齐BBDown(工具目录: 路径, 状态: 打包进度 | None = None) -> None:
+    r"""从当前平台 PATH 复制 BBDown，绝不把另一平台文件当作可用工具。"""
+    if 目录内是否有BBDown(工具目录):
+        if 状态 is None or 状态.纯文本:
+            打印信息("已检测到旁路 BBDown")
+        return
+    程序名们 = ("BBDown.exe",) if 系统.platform == "win32" else ("BBDown", "bbdown")
+    系统中的 = next(
+        (找到 for 名称 in 程序名们 if (找到 := 文件工具.which(名称))),
+        None,
+    )
+    if not 系统中的:
+        if 状态 is None or 状态.纯文本:
+            打印警告("旁路与系统 PATH 均未发现当前平台的 BBDown")
+        return
+    源文件 = _解析真实可执行文件(系统中的)
+    if 源文件 is None or not 源文件.is_file():
+        return
+    工具目录.mkdir(parents=True, exist_ok=True)
+    目标名 = "BBDown.exe" if 系统.platform == "win32" else "BBDown"
+    目标文件 = 工具目录 / 目标名
+    if 目标文件.is_dir():
+        目标文件 = 目标文件 / 目标名
+    文件工具.copy2(源文件, 目标文件)
+    确保路径可执行(目标文件)
+    if 状态 is None or 状态.纯文本:
+        打印成功(f"已从系统 PATH 复制 BBDown 到绿色包: {目标名} ({源文件})")
 
 
 def 校验绿色包结构(绿色根: 路径, 状态: 打包进度 | None = None) -> None:
@@ -3564,6 +3638,21 @@ def 校验绿色包结构(绿色根: 路径, 状态: 打包进度 | None = None)
         if 状态 and not 状态.纯文本:
             状态.标记失败(文)
         失败退出(文)
+    if 系统.platform != "win32":
+        异平台二进制 = sorted(
+            {
+                文件
+                for 模式 in ("*.exe", "*.dll")
+                for 文件 in 绿色根.rglob(模式)
+                if 文件.is_file()
+            }
+        )
+        if 异平台二进制:
+            示例 = "、".join(str(文件.relative_to(绿色根)) for 文件 in 异平台二进制[:3])
+            文 = f"Linux 绿色包混入 Windows 二进制（共 {len(异平台二进制)} 个）：{示例}"
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(文)
+            失败退出(文)
     确保路径可执行(绿色根 / 产物显示名)
     确保路径可执行(绿色根 / f"{产物显示名}.exe")
     if 状态 is None or 状态.纯文本:
@@ -3748,6 +3837,7 @@ def 校验绿色包工具(绿色根: 路径, 状态: 打包进度 | None = None)
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
+    尝试从系统路径补齐BBDown(工具目录, 状态)
     if not 目录内是否有BBDown(工具目录):
         说明 = (
             f"组装失败：缺少 BBDown，请放到 {程序包目录 / 'bin'}"
@@ -3769,6 +3859,20 @@ def 校验绿色包工具(绿色根: 路径, 状态: 打包进度 | None = None)
         if 状态 and not 状态.纯文本:
             状态.标记失败(说明)
         失败退出(说明)
+    if 系统.platform != "win32":
+        Linux工具 = [
+            文件
+            for 文件 in 工具目录.rglob("*")
+            if 文件.is_file() and 文件.name.lower() in {"bbdown", "ffmpeg", "adb"}
+        ]
+        for 文件 in Linux工具:
+            确保路径可执行(文件)
+        无执行位 = [文件 for 文件 in Linux工具 if not 操作系统.access(文件, 操作系统.X_OK)]
+        if 无执行位:
+            说明 = "Linux 工具缺少可执行位：" + "、".join(str(文件) for 文件 in 无执行位)
+            if 状态 and not 状态.纯文本:
+                状态.标记失败(说明)
+            失败退出(说明)
     if 状态 is None or 状态.纯文本:
         打印成功("旁路工具校验通过（BBDown、ffmpeg、adb）")
 
@@ -3839,6 +3943,7 @@ def 组装绿色目录(版本: str, 状态: 打包进度 | None = None) -> 路�
                 安全移除树(目标工具, 说明="覆盖 bin")
             目标工具.mkdir(parents=True, exist_ok=True)
             _拷一批(源工具目录, 目标工具, 列举待拷文件(源工具目录))
+            清理异平台工具(目标工具, 状态)
             if 状态 is None or 状态.纯文本:
                 打印成功("已复制旁路工具目录 bin/")
         elif 状态 is None or 状态.纯文本:
@@ -4319,19 +4424,12 @@ def 确保Rar可执行文件(状态: 打包进度 | None = None) -> 路径:
 
 def _写入发布说明(版本: str) -> 路径:
     说明文件 = 工程根目录 / "README.txt"
-    if 系统.platform == "win32":
-        简短说明 = (
-            f"MyBiOut! v{版本}\n\n"
-            "解压后，保持 MyBiOut! 文件夹完整，双击其中的 MyBiOut!.exe 启动。\n"
-            "无需安装 Python；登录态和导出目录请在设置页自行配置。\n"
-        )
-    else:
-        简短说明 = (
-            f"MyBiOut! v{版本}\n\n"
-            "解压后，保持 MyBiOut! 文件夹完整，在其中执行 ./MyBiOut! 启动。\n"
-            "无需安装系统 Python；登录态和导出目录请在设置页自行配置。\n"
-            "内嵌窗口需要 GTK/WebKit；也可 ./MyBiOut! --browser\n"
-        )
+    简短说明 = (
+        f"MyBiOut! v{版本}\n\n"
+        "Windows：解压后保持 MyBiOut! 文件夹完整，双击其中的 MyBiOut!.exe 启动。\n"
+        "Linux：解压后进入 MyBiOut! 目录，执行 ./MyBiOut!（也可 --browser）。\n"
+        "无需安装系统 Python；登录态和导出目录请在设置页自行配置。\n"
+    )
     说明文件.write_text(简短说明, encoding="utf-8-sig")
     return 说明文件
 

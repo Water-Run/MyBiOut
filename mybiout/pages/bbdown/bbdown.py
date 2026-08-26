@@ -47,17 +47,26 @@ def _寻找BBDown() -> str | None:
     :return: str | None: 可执行文件路径, 未找到返回 None
     """
     程序工具目录: 路径 = _取程序工具目录()
-    候选路径列表: list[路径] = [
-        程序工具目录 / "BBDown" / "BBDown.exe",
-        程序工具目录 / "BBDown" / "BBDown",
-        程序工具目录 / "BBDown.exe",
-        程序工具目录 / "BBDown",
-    ]
+    if 系统.platform == "win32":
+        候选路径列表: list[路径] = [
+            程序工具目录 / "BBDown" / "BBDown.exe",
+            程序工具目录 / "BBDown.exe",
+        ]
+    else:
+        候选路径列表 = [
+            程序工具目录 / "BBDown" / "BBDown",
+            程序工具目录 / "BBDown",
+            程序工具目录 / "bbdown",
+        ]
     for 候选路径 in 候选路径列表:
-        if 候选路径.exists():
+        if 候选路径.is_file():
             工具.确保文件可执行(候选路径)
             return str(候选路径)
-    系统路径 = 文件工具.which("BBDown") or 文件工具.which("bbdown")
+    系统工具名们 = ("BBDown.exe",) if 系统.platform == "win32" else ("BBDown", "bbdown")
+    系统路径 = next(
+        (找到 for 名称 in 系统工具名们 if (找到 := 文件工具.which(名称))),
+        None,
+    )
     if 系统路径:
         工具.确保文件可执行(路径(系统路径))
     return 系统路径
@@ -69,19 +78,26 @@ def _寻找FFmpeg() -> str | None:
     :return: str | None: 可执行文件路径, 未找到返回 None
     """
     程序工具目录: 路径 = _取程序工具目录()
-    候选路径列表: list[路径] = [
-        程序工具目录 / "BBDown" / "ffmpeg.exe",
-        程序工具目录 / "BBDown" / "ffmpeg",
-        程序工具目录 / "ffmpeg.exe",
-        程序工具目录 / "ffmpeg",
-        程序工具目录 / "ffmpeg" / "ffmpeg.exe",
-        程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
-    ]
+    if 系统.platform == "win32":
+        候选路径列表: list[路径] = [
+            程序工具目录 / "BBDown" / "ffmpeg.exe",
+            程序工具目录 / "ffmpeg.exe",
+            程序工具目录 / "ffmpeg" / "ffmpeg.exe",
+            程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
+        ]
+    else:
+        候选路径列表 = [
+            程序工具目录 / "BBDown" / "ffmpeg",
+            程序工具目录 / "ffmpeg",
+            程序工具目录 / "ffmpeg" / "ffmpeg",
+            程序工具目录 / "ffmpeg" / "bin" / "ffmpeg",
+        ]
     for 候选路径 in 候选路径列表:
-        if 候选路径.exists():
+        if 候选路径.is_file():
             工具.确保文件可执行(候选路径)
             return str(候选路径)
-    系统路径 = 文件工具.which("ffmpeg")
+    系统工具名 = "ffmpeg.exe" if 系统.platform == "win32" else "ffmpeg"
+    系统路径 = 文件工具.which(系统工具名)
     if 系统路径:
         工具.确保文件可执行(路径(系统路径))
     return 系统路径

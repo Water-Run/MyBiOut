@@ -337,20 +337,18 @@ def _检查环境() -> list[_环境项]:
 
     # ffmpeg（绿色包应随 bin 分发）
     找到FFmpeg: bool = False
+    FFmpeg名: str = "ffmpeg.exe" if 系统.platform == "win32" else "ffmpeg"
     for 候选路径 in (
-        程序工具目录 / "ffmpeg.exe",
-        程序工具目录 / "ffmpeg",
-        程序工具目录 / "ffmpeg" / "ffmpeg.exe",
-        程序工具目录 / "ffmpeg" / "bin" / "ffmpeg.exe",
-        程序工具目录 / "ffmpeg" / "bin" / "ffmpeg",
-        程序工具目录 / "BBDown" / "ffmpeg.exe",
-        程序工具目录 / "BBDown" / "ffmpeg",
+        程序工具目录 / FFmpeg名,
+        程序工具目录 / "ffmpeg" / FFmpeg名,
+        程序工具目录 / "ffmpeg" / "bin" / FFmpeg名,
+        程序工具目录 / "BBDown" / FFmpeg名,
     ):
         if 候选路径.is_file():
             找到FFmpeg = True
             break
     if not 找到FFmpeg:
-        找到FFmpeg = 文件工具.which("ffmpeg") is not None
+        找到FFmpeg = 文件工具.which(FFmpeg名) is not None
     检查结果.append(
         _环境项(
             "ffmpeg",
@@ -362,17 +360,18 @@ def _检查环境() -> list[_环境项]:
 
     # BBDown
     找到BBDown: bool = False
+    BBDown名: str = "BBDown.exe" if 系统.platform == "win32" else "BBDown"
     for 候选路径 in (
-        程序工具目录 / "BBDown.exe",
-        程序工具目录 / "BBDown",
-        程序工具目录 / "BBDown" / "BBDown.exe",
-        程序工具目录 / "BBDown" / "BBDown",
+        程序工具目录 / BBDown名,
+        程序工具目录 / "BBDown" / BBDown名,
+        *(() if 系统.platform == "win32" else (程序工具目录 / "bbdown",)),
     ):
         if 候选路径.is_file():
             找到BBDown = True
             break
     if not 找到BBDown:
-        找到BBDown = 文件工具.which("BBDown") is not None or 文件工具.which("bbdown") is not None
+        系统工具名们 = ("BBDown.exe",) if 系统.platform == "win32" else ("BBDown", "bbdown")
+        找到BBDown = any(文件工具.which(名称) is not None for 名称 in 系统工具名们)
     检查结果.append(
         _环境项(
             "BBDown",
@@ -384,19 +383,17 @@ def _检查环境() -> list[_环境项]:
 
     # ADB（可选：Android 缓存扫描）
     找到ADB: bool = False
+    ADB名: str = "adb.exe" if 系统.platform == "win32" else "adb"
     for 候选路径 in (
-        程序工具目录 / "adb.exe",
-        程序工具目录 / "adb",
-        程序工具目录 / "platform-tools" / "adb.exe",
-        程序工具目录 / "platform-tools" / "adb",
-        程序工具目录 / "adb" / "adb.exe",
-        程序工具目录 / "adb" / "adb",
+        程序工具目录 / ADB名,
+        程序工具目录 / "platform-tools" / ADB名,
+        程序工具目录 / "adb" / ADB名,
     ):
         if 候选路径.is_file():
             找到ADB = True
             break
     if not 找到ADB:
-        找到ADB = 文件工具.which("adb.exe") is not None or 文件工具.which("adb") is not None
+        找到ADB = 文件工具.which(ADB名) is not None
     检查结果.append(
         _环境项(
             "ADB",

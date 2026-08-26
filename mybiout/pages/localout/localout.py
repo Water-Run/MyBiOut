@@ -103,19 +103,16 @@ def _寻找ADB() -> str | None:
     :return: str | None: 路径, 未找到返回 None
     """
     工具目录: 路径 = 工具.取工具目录()
+    程序名: str = "adb.exe" if 系统信息.platform == "win32" else "adb"
     for 候选路径 in (
-        工具目录 / "adb.exe",
-        工具目录 / "adb",
-        工具目录 / "platform-tools" / "adb.exe",
-        工具目录 / "platform-tools" / "adb",
-        工具目录 / "adb" / "adb.exe",
-        工具目录 / "adb" / "adb",
+        工具目录 / 程序名,
+        工具目录 / "platform-tools" / 程序名,
+        工具目录 / "adb" / 程序名,
     ):
         if 候选路径.is_file():
             工具.确保文件可执行(候选路径)
             return str(候选路径)
-    程序名: str = "adb.exe" if 系统信息.platform == "win32" else "adb"
-    which路径 = 文件工具.which(程序名) or 文件工具.which("adb")
+    which路径 = 文件工具.which(程序名)
     if which路径:
         return which路径
     if 系统信息.platform == "win32":
@@ -142,11 +139,15 @@ def _寻找FFmpeg() -> str | None:
     r"""优先使用绿色包旁路 ffmpeg，开发态才回退 PATH。"""
     工具目录: 路径 = 工具.取工具目录()
     程序名: str = "ffmpeg.exe" if 系统信息.platform == "win32" else "ffmpeg"
-    for 随包路径 in (工具目录 / 程序名, 工具目录 / "ffmpeg", 工具目录 / "ffmpeg.exe"):
+    for 随包路径 in (
+        工具目录 / 程序名,
+        工具目录 / "ffmpeg" / 程序名,
+        工具目录 / "ffmpeg" / "bin" / 程序名,
+    ):
         if 随包路径.is_file():
             工具.确保文件可执行(随包路径)
             return str(随包路径)
-    return 文件工具.which(程序名) or 文件工具.which("ffmpeg")
+    return 文件工具.which(程序名)
 
 
 def _执行ADB(ADB路径: str, 序列号: str, *命令参数: str, 超时秒数: float = 10) -> 子进程.CompletedProcess:

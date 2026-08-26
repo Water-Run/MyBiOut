@@ -22,7 +22,7 @@
 
 ### Windows
 
-1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut! *.rar`（例 `MyBiOut! 二六〇八丁.rar`）
+1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 Windows x64 版 `MyBiOut.rar`（当前版本：二六〇八丙）
 2. 解压到任意目录（包内含 `MyBiOut!/` 程序目录、`README.txt`、`LICENSE`）  
 3. 进入 **`MyBiOut!`** 目录，双击 **`MyBiOut!.exe`**  
 4. 关闭窗口即退出  
@@ -35,7 +35,7 @@
 
 ### Linux
 
-1. 下载 `MyBiOut! *.tar.gz`，解压后进入 `MyBiOut!/`  
+1. 下载 Linux x64 版 `MyBiOut-linux-x64.tar.gz`，解压后进入 `MyBiOut!/`
 2. 执行 `./MyBiOut!`（需可执行位；内嵌窗口依赖 GTK + WebKit，如 `webkit2gtk`）  
 3. 若窗口起不来：`./MyBiOut! --browser`  
 
