@@ -7,7 +7,7 @@
 支持的功能包括:  
 
 - **本地缓存导出与恢复**：导出电脑或 Android 手机中的哔哩哔哩缓存，支持智能去重与元文件归档；恢复时可递归扫描改名后的目录，无需导出索引，并将同一 avid 的多个分集合并后批量导入新的 ADB 手机
-- **可视化 BBDown 封装**：按单条或批量链接下载视频，可显式下载 AI 字幕
+- **可视化 BBDown 封装**：按单条或批量链接下载视频，可显式下载 AI 字幕；下载镜像不支持多线程时会自动切换单线程重试，并清理本次失败残片
 - **Markdown 导出**：导出视频、用户与完整收藏夹元数据，也能逐篇批量导出 `rl` 专栏文集
 
 项目依赖以下开源项目:  
@@ -22,7 +22,7 @@
 
 ### Windows
 
-1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut! *.rar`（例 `MyBiOut! 二六〇八丙.rar`）  
+1. 从 [GitHub Releases](https://github.com/Water-Run/MyBiOut/releases) 下载 `MyBiOut! *.rar`（例 `MyBiOut! 二六〇八丁.rar`）
 2. 解压到任意目录（包内含 `MyBiOut!/` 程序目录、`README.txt`、`LICENSE`）  
 3. 进入 **`MyBiOut!`** 目录，双击 **`MyBiOut!.exe`**  
 4. 关闭窗口即退出  

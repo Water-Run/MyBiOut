@@ -6,11 +6,13 @@ BBDown! 可视化封装服务层, 管理 BBDown 下载任务队列
 :time: 2026-04-06
 """
 
+import queue as 队列
 import re as 正则
 import shutil as 文件工具
 import subprocess as 子进程
 import sys as 系统
 import threading as 线程
+import time as 时间
 import uuid as 唯一编号
 from contextlib import suppress as 忽略异常
 from dataclasses import dataclass as 数据类
@@ -26,6 +28,9 @@ if 系统.platform == "win32":
     _子进程附加参数["creationflags"] = 0x08000000
 
 _控制台编码: str = "gbk" if 系统.platform == "win32" else "utf-8"
+_无输出提示秒数: float = 120.0
+_无输出失败秒数: float = 900.0
+_流结束标记: object = object()
 
 
 def _取程序工具目录() -> 路径:
@@ -116,6 +121,8 @@ class 下载任务:
     输出目录: str = ""
     封面地址: str = ""
     创建时间: str = 字段(default_factory=_完整时间)
+    单线程模式: bool = False
+    已自动降级: bool = False
 
     def 转字典(自身) -> dict:
         return {
@@ -258,6 +265,9 @@ def _构建命令(任务: 下载任务) -> list[str]:
     if 工具.取设置("bbdown", "use_aria2c") == "true":
         命令.append("--use-aria2c")
 
+    if 任务.单线程模式 or _取布尔选项("disable_multi_thread"):
+        命令.extend(["--multi-thread", "false"])
+
     if 转码器 := _寻找FFmpeg():
         命令.extend(["--ffmpeg-path", 转码器])
 
@@ -313,10 +323,29 @@ def _寻找最新输出(工作目录: 路径, 开始时间戳: float) -> str:
     """
     最佳路径: 路径 | None = None
     最佳时间: float = 开始时间戳
-    媒体后缀: set[str] = {".mp4", ".mkv", ".flv", ".m4a", ".mp3", ".aac", ".xml", ".ass", ".srt"}
+    成品后缀: set[str] = {
+        ".mp4",
+        ".mkv",
+        ".flv",
+        ".m4a",
+        ".mp3",
+        ".aac",
+        ".flac",
+        ".wav",
+        ".ogg",
+        ".opus",
+        ".xml",
+        ".ass",
+        ".srt",
+        ".vtt",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+    }
     try:
         for 候选文件 in 工作目录.rglob("*"):
-            if 候选文件.is_file() and 候选文件.suffix.lower() in 媒体后缀:
+            if 候选文件.is_file() and 候选文件.suffix.lower() in 成品后缀:
                 修改时间: float = 候选文件.stat().st_mtime
                 if 修改时间 > 最佳时间:
                     最佳时间 = 修改时间
@@ -355,6 +384,168 @@ def _读取原始行(进程: 子进程.Popen):
             yield bytes(行缓存).decode(_控制台编码, errors="replace")
 
 
+@数据类(slots=True)
+class _下载进程结果:
+    退出码: int
+    最近输出: list[str] = 字段(default_factory=list)
+    已取消: bool = False
+    超时原因: str = ""
+
+
+def _终止进程(进程: 子进程.Popen) -> None:
+    r"""尽力终止 BBDown，并回收进程句柄。"""
+    if 进程.poll() is None:
+        with 忽略异常(Exception):
+            进程.kill()
+    with 忽略异常(Exception):
+        进程.wait(timeout=10)
+
+
+def _需要单线程回退(输出行列表: list[str]) -> bool:
+    r"""识别 BBDown 对不支持分片下载的 CDN 给出的稳定诊断。"""
+    文本: str = "\n".join(输出行列表).casefold()
+    return "不支持多线程下载" in 文本 or "--multi-thread false" in 文本
+
+
+def _错误摘要(结果: _下载进程结果) -> str:
+    if 结果.超时原因:
+        return 结果.超时原因
+    有效行: list[str] = [行 for 行 in 结果.最近输出 if 行.strip()]
+    if not 有效行:
+        return f"退出码 {结果.退出码}"
+    摘要: str = "；".join(有效行[-3:])
+    if len(摘要) > 600:
+        摘要 = 摘要[-600:]
+    return f"退出码 {结果.退出码}：{摘要}"
+
+
+def _清理本次残片(工作目录: 路径, 开始时间戳: float) -> int:
+    r"""删除本次失败任务留下的 BBDown .vclip 分片，不碰既有文件。"""
+    已删除: int = 0
+    try:
+        候选列表 = list(工作目录.rglob("*.vclip"))
+    except OSError:
+        return 0
+    for 候选文件 in 候选列表:
+        try:
+            if 候选文件.is_file() and 候选文件.stat().st_mtime >= 开始时间戳 - 1:
+                候选文件.unlink()
+                已删除 += 1
+        except OSError:
+            continue
+    return 已删除
+
+
+def _执行一次下载(任务: 下载任务, 命令: list[str]) -> _下载进程结果:
+    r"""运行一次 BBDown，持续消费输出，并对永久无输出设置上限。"""
+    进程: 子进程.Popen = 子进程.Popen(
+        命令,
+        stdout=子进程.PIPE,
+        stderr=子进程.STDOUT,
+        bufsize=0,
+        **_子进程附加参数,
+    )
+    with 状态.锁:
+        状态._进程 = 进程
+        # 部分 BBDown 下载器不打印百分比，先让界面明确进入工作态。
+        任务.进度 = max(任务.进度, 0.01)
+
+    输出队列: 队列.Queue[object] = 队列.Queue()
+
+    def _读取输出() -> None:
+        try:
+            for 原始行 in _读取原始行(进程):
+                输出队列.put(原始行)
+        finally:
+            输出队列.put(_流结束标记)
+
+    读取线程 = 线程.Thread(target=_读取输出, daemon=True)
+    读取线程.start()
+    最近输出: list[str] = []
+    上次输出时刻: float = 时间.monotonic()
+    已提示等待: bool = False
+    超时原因: str = ""
+
+    while True:
+        if 状态._取消标记.is_set():
+            _终止进程(进程)
+            break
+        try:
+            队列项: object = 输出队列.get(timeout=0.5)
+        except 队列.Empty:
+            if 进程.poll() is not None and not 读取线程.is_alive():
+                break
+            等待秒数: float = 时间.monotonic() - 上次输出时刻
+            if 等待秒数 >= _无输出失败秒数:
+                超时原因 = f"BBDown 已 {int(等待秒数)} 秒没有任何输出，已停止本次任务"
+                状态.记录日志("error", 超时原因)
+                _终止进程(进程)
+                break
+            if 等待秒数 >= _无输出提示秒数 and not 已提示等待:
+                已提示等待 = True
+                with 状态.锁:
+                    任务.速度 = "等待网络响应"
+                状态.记录日志(
+                    "warn",
+                    f"BBDown 已 {int(等待秒数)} 秒没有新输出，仍在等待；可随时取消",
+                )
+            continue
+
+        if 队列项 is _流结束标记:
+            break
+        原始行 = str(队列项)
+        上次输出时刻 = 时间.monotonic()
+        if 已提示等待:
+            已提示等待 = False
+            with 状态.锁:
+                if 任务.速度 == "等待网络响应":
+                    任务.速度 = ""
+        干净行: str = _清理文本(原始行)
+        if not 干净行:
+            continue
+        最近输出.append(干净行)
+        if len(最近输出) > 30:
+            最近输出 = 最近输出[-20:]
+
+        进度值, 速度文本 = _解析进度(干净行)
+        if 进度值 is not None:
+            with 状态.锁:
+                任务.进度 = 进度值
+                if 速度文本:
+                    任务.速度 = 速度文本
+            # 进度行不写入日志避免刷屏，但仍保留在失败摘要中。
+            continue
+
+        if 阶段进度 := _估算阶段进度(干净行):
+            with 状态.锁:
+                任务.进度 = max(任务.进度, 阶段进度)
+
+        状态.记录日志("info", 干净行)
+
+        if 标题 := _解析标题(干净行):
+            with 状态.锁:
+                任务.标题 = 标题
+
+        if 封面 := _解析封面地址(干净行):
+            with 状态.锁:
+                任务.封面地址 = 封面
+
+    if 进程.poll() is None:
+        try:
+            进程.wait(timeout=15)
+        except 子进程.TimeoutExpired:
+            _终止进程(进程)
+    with 状态.锁:
+        if 状态._进程 is 进程:
+            状态._进程 = None
+    return _下载进程结果(
+        退出码=进程.returncode if 进程.returncode is not None else -1,
+        最近输出=最近输出,
+        已取消=状态._取消标记.is_set(),
+        超时原因=超时原因,
+    )
+
+
 def _工作线程函数() -> None:
     while True:
         任务: 下载任务 | None = None
@@ -377,95 +568,80 @@ def _工作线程函数() -> None:
         状态.记录日志("info", f"开始下载: {任务.链接}")
 
         try:
-            命令: list[str] = _构建命令(任务)
-            状态.记录日志("info", f"执行命令 ({len(命令)} 个参数)")
-
             工作目录: 路径 = _取工作目录()
             开始时间戳: float = 日期时间.now().timestamp()
-
             with 状态.锁:
                 任务.输出目录 = str(工作目录)
 
-            进程: 子进程.Popen = 子进程.Popen(
-                命令,
-                stdout=子进程.PIPE,
-                stderr=子进程.STDOUT,
-                bufsize=0,
-                **_子进程附加参数,
-            )
+            while True:
+                命令: list[str] = _构建命令(任务)
+                模式说明: str = "，单线程降级" if 任务.单线程模式 else ""
+                状态.记录日志("info", f"执行命令 ({len(命令)} 个参数{模式说明})")
+                结果: _下载进程结果 = _执行一次下载(任务, 命令)
 
-            with 状态.锁:
-                状态._进程 = 进程
-                # 部分 BBDown 下载器不打印百分比，先让界面明确进入工作态。
-                任务.进度 = 0.01
-
-            for 原始行 in _读取原始行(进程):
-                干净行: str = _清理文本(原始行)
-                if not 干净行:
-                    continue
-
-                if 状态._取消标记.is_set():
-                    进程.kill()
+                if 结果.已取消:
+                    with 状态.锁:
+                        任务.状态名 = "cancelled"
+                        任务.速度 = ""
+                    已清理 = _清理本次残片(工作目录, 开始时间戳)
+                    清理说明 = f"，已清理 {已清理} 个下载残片" if 已清理 else ""
+                    状态.记录日志("warn", f"已取消: {任务.标题 or 任务.链接}{清理说明}")
+                    状态._取消标记.clear()
                     break
 
-                进度值, 速度文本 = _解析进度(干净行)
-                if 进度值 is not None:
+                if 结果.退出码 == 0:
+                    输出文件: str = _寻找最新输出(工作目录, 开始时间戳)
                     with 状态.锁:
-                        任务.进度 = 进度值
-                        if 速度文本:
-                            任务.速度 = 速度文本
-                    # 进度行不写入日志避免刷屏
+                        任务.状态名 = "success"
+                        任务.进度 = 1.0
+                        任务.速度 = ""
+                        任务.输出文件 = 输出文件
+                        状态.任务列表 = [
+                            任务项 for 任务项 in 状态.任务列表 if 任务项.编号 != 任务.编号
+                        ]
+                        状态.完成列表.append(任务)
+                    状态.记录日志("success", f"下载完成: {任务.标题 or 任务.链接}")
+                    break
+
+                if not 任务.已自动降级 and _需要单线程回退(结果.最近输出):
+                    with 状态.锁:
+                        任务.已自动降级 = True
+                        任务.单线程模式 = True
+                        任务.进度 = 0.01
+                        任务.速度 = ""
+                        任务.错误 = ""
+                    状态.记录日志(
+                        "warn",
+                        "当前下载镜像不支持多线程，正在自动切换单线程重试一次",
+                    )
                     continue
 
-                if 阶段进度 := _估算阶段进度(干净行):
-                    with 状态.锁:
-                        任务.进度 = max(任务.进度, 阶段进度)
-
-                状态.记录日志("info", 干净行)
-
-                if 标题 := _解析标题(干净行):
-                    with 状态.锁:
-                        任务.标题 = 标题
-
-                if 封面 := _解析封面地址(干净行):
-                    with 状态.锁:
-                        任务.封面地址 = 封面
-
-            进程.wait()
-
-            with 状态.锁:
-                状态._进程 = None
-
-            if 状态._取消标记.is_set():
-                with 状态.锁:
-                    任务.状态名 = "cancelled"
-                状态.记录日志("warn", f"已取消: {任务.标题 or 任务.链接}")
-                状态._取消标记.clear()
-                with 状态.锁:
-                    状态._工作线程 = None
-                return
-
-            if 进程.returncode == 0:
-                输出文件: str = _寻找最新输出(工作目录, 开始时间戳)
-                with 状态.锁:
-                    任务.状态名 = "success"
-                    任务.进度 = 1.0
-                    任务.输出文件 = 输出文件
-                    状态.任务列表 = [任务项 for 任务项 in 状态.任务列表 if 任务项.编号 != 任务.编号]
-                    状态.完成列表.append(任务)
-                状态.记录日志("success", f"下载完成: {任务.标题 or 任务.链接}")
-            else:
+                错误文本: str = _错误摘要(结果)
                 with 状态.锁:
                     任务.状态名 = "failed"
-                    任务.错误 = f"退出码 {进程.returncode}"
-                状态.记录日志("error", f"下载失败: {任务.标题 or 任务.链接} (退出码 {进程.returncode})")
+                    任务.速度 = ""
+                    任务.错误 = 错误文本
+                已清理 = _清理本次残片(工作目录, 开始时间戳)
+                清理说明 = f"；已清理 {已清理} 个下载残片" if 已清理 else ""
+                状态.记录日志(
+                    "error",
+                    f"下载失败: {任务.标题 or 任务.链接} — {错误文本}{清理说明}",
+                )
+                break
 
         except Exception as e:
             with 状态.锁:
-                任务.状态名 = "failed"
-                任务.错误 = str(e)
+                已取消 = 状态._取消标记.is_set()
+                任务.状态名 = "cancelled" if 已取消 else "failed"
+                任务.错误 = "" if 已取消 else str(e)
+                任务.速度 = ""
                 状态._进程 = None
-            状态.记录日志("error", f"下载异常: {任务.链接} — {e}")
+            状态._取消标记.clear()
+            状态.记录日志(
+                "warn" if 已取消 else "error",
+                f"下载{'已取消' if 已取消 else '异常'}: {任务.链接}"
+                + ("" if 已取消 else f" — {e}"),
+            )
 
     with 状态.锁:
         状态._工作线程 = None

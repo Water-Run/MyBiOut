@@ -561,7 +561,10 @@
                         <button class="btn btn-ghost" onclick="检查老登了吗()">老登了吗</button>
                         <span class="setting-hint" style="margin:0">没配 SESSDATA 就别硬启动，先掏出你的收</span>
                     </div>
-                    <input type="text" id="s-sessdata" style="width:420px" placeholder="留空则不使用认证">
+                    <input type="password" id="s-sessdata" style="width:420px" placeholder="留空则不使用认证"
+                        autocomplete="off" autocapitalize="off" spellcheck="false">
+                    <button type="button" class="btn btn-ghost"
+                        onclick="切换敏感显示('s-sessdata', this)" aria-pressed="false">显示</button>
                     <button class="btn btn-orange" onclick="确认会话数据()">保存</button>
                     <button class="btn btn-pink" onclick="触发扫码登录()">扫码登</button>
                     <button class="btn btn-danger" onclick="清空会话数据()">清空</button>
@@ -582,7 +585,10 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
                         <span class="inline-label">Key:</span>
-                        <input type="text" id="s-api-key" style="width:380px" placeholder="sk-...">
+                        <input type="password" id="s-api-key" style="width:380px" placeholder="sk-..."
+                            autocomplete="off" autocapitalize="off" spellcheck="false">
+                        <button type="button" class="btn btn-ghost"
+                            onclick="切换敏感显示('s-api-key', this)" aria-pressed="false">显示</button>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
                         <span class="inline-label">Model:</span>
@@ -1039,6 +1045,14 @@
     <script>
         let _提示计时器 = null;
         let _预览计时器 = null;
+
+        function 切换敏感显示(输入框编号, 按钮) {
+            const 输入框 = document.getElementById(输入框编号);
+            const 即将显示 = 输入框.type === 'password';
+            输入框.type = 即将显示 ? 'text' : 'password';
+            按钮.textContent = 即将显示 ? '隐藏' : '显示';
+            按钮.setAttribute('aria-pressed', String(即将显示));
+        }
 
         function 显示提示(msg, isErr) {
             const el = document.getElementById('toast');
