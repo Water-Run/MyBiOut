@@ -8,7 +8,7 @@
     <title>MdOut! — MyBiOut!</title>
     <link rel="icon" href="/assets/logo.png" type="image/png">
     <link rel="stylesheet" href="/assets/entry.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/assets/markdown.js"></script>
     <style>
         * {
             margin: 0;
@@ -1013,6 +1013,9 @@
             let _上次状态 = null;
             let 上次日志长度 = 0;
             let 显示原文 = false;
+            let 上次预览文本 = null;
+            let 上次预览模式 = null;
+            let 正在轮询 = false;
             const 已选编号 = new Set();
 
             const 面板配置 = {
@@ -1182,6 +1185,8 @@
             };
 
             function 重置预览() {
+                上次预览文本 = null;
+                上次预览模式 = null;
                 取元素('prev-empty').style.display = '';
                 取元素('prev-rich').style.display = 'none';
                 取元素('prev-raw').style.display = 'none';
@@ -1189,6 +1194,9 @@
 
             function 渲染预览(md) {
                 if (!md) { 重置预览(); return; }
+                if (md === 上次预览文本 && 显示原文 === 上次预览模式) return;
+                上次预览文本 = md;
+                上次预览模式 = 显示原文;
                 取元素('prev-empty').style.display = 'none';
                 if (显示原文) {
                     取元素('prev-rich').style.display = 'none';
@@ -1197,7 +1205,7 @@
                 } else {
                     取元素('prev-raw').style.display = 'none';
                     取元素('prev-rich').style.display = '';
-                    try { 取元素('prev-rich').innerHTML = marked.parse(md); }
+                    try { 取元素('prev-rich').innerHTML = MyBiOutMarkdown.render(md); }
                     catch (e) { 取元素('prev-rich').textContent = md; }
                 }
             }
@@ -1285,6 +1293,8 @@
 
             /* ===== 轮询 ===== */
             async function 轮询() {
+                if (正在轮询) return;
+                正在轮询 = true;
                 try {
                     const r = await fetch('/api/mdout/state');
                     const s = await r.json();
@@ -1297,6 +1307,7 @@
                     取元素('st-fetch').textContent = s.cards.length;
                     取元素('st-done').textContent = (s.completed || []).length;
                 } catch (e) { }
+                finally { 正在轮询 = false; }
             }
 
             /* ===== BG STARS ===== */
