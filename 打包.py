@@ -3240,6 +3240,9 @@ def 执行构建(状态: 打包进度 | None = None) -> None:
         参数 += ["--icon", str(图标文件)]
     for 源路径, 目标标记 in 内嵌数据项:
         参数 += ["--add-data", f"{源路径}{操作系统.pathsep}{目标标记}"]
+    附加钩子目录 = 程序包目录 / "pyinstaller_hooks"
+    if 附加钩子目录.is_dir():
+        参数 += ["--additional-hooks-dir", str(附加钩子目录)]
     for 模块名 in 隐藏导入列表:
         参数 += ["--hidden-import", 模块名]
     if 系统.platform != "win32":
